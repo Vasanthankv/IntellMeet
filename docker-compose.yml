@@ -1,0 +1,69 @@
+services:
+  # 1. MongoDB Database Container
+  mongodb:
+    image: mongo:7
+    container_name: intellmeet-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: intellmeet
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - intellmeet-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. Express Backend API & Real-time WebRTC/Socket.IO Server
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: intellmeet-server
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - MONGO_URI=mongodb://mongodb:27017/intellmeet
+      - JWT_SECRET=intellmeet_jwt_secret_key_2026_secure
+      - NODE_ENV=production
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-AQ.Ab8RN6Jn93lgqrakUgHxr-Fbr3jvj46GtmOMQIagjUh9Wtl8VQ}
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - intellmeet-network
+
+  # 3. Frontend React (Vite) served via NGINX with SPA Routing & Reverse Proxy
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: intellmeet-client
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "5173:80"
+    depends_on:
+      - server
+    networks:
+      - intellmeet-network
+
+# Persistent volumes for database records and file attachments/avatars
+volumes:
+  mongodb_data:
+    driver: local
+  uploads_data:
+    driver: local
+
+# Internal network allowing isolated service-to-service communication
+networks:
+  intellmeet-network:
+    driver: bridge

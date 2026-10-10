@@ -1,0 +1,393 @@
+import express from 'express';
+import mongoose from 'mongoose';
+import Meeting from '../models/Meeting.js';
+import MeetingRegistration from '../models/MeetingRegistration.js';
+import { protect } from '../middleware/authMiddleware.js';
+
+const router = express.Router();
+
+const buildMeetingQuery = (rawId) => {
+  if (!rawId || rawId === 'undefined') return { meetingId: '' };
+  const cleanId = rawId.replace(/[\s-]/g, '');
+  const or = [
+    { meetingId: rawId },
+    { meetingId: cleanId }
+  ];
+
+  if (cleanId.length === 10) {
+    or.push({ meetingId: `${cleanId.slice(0, 3)} ${cleanId.slice(3, 6)} ${cleanId.slice(6)}` });
+    or.push({ meetingId: `${cleanId.slice(0, 3)}-${cleanId.slice(3, 6)}-${cleanId.slice(6)}` });
+  } else if (cleanId.length === 9) {
+    or.push({ meetingId: `${cleanId.slice(0, 3)} ${cleanId.slice(3, 6)} ${cleanId.slice(6)}` });
+    or.push({ meetingId: `${cleanId.slice(0, 3)}-${cleanId.slice(3, 6)}-${cleanId.slice(6)}` });
+  } else if (cleanId.length === 11) {
+    or.push({ meetingId: `${cleanId.slice(0, 3)} ${cleanId.slice(3, 7)} ${cleanId.slice(7)}` });
+  }
+
+  if (cleanId.length >= 6) {
+    const pattern = '^' + cleanId.split('').join('[\\s-]*') + '$';
+    or.push({ meetingId: { $regex: pattern, $options: 'i' } });
+  }
+
+  if (mongoose.Types.ObjectId.isValid(rawId)) {
+    or.push({ _id: rawId });
+  }
+  return { $or: or };
+};
+
+// @route   GET /api/meetings
+// @desc    Get user meetings
+router.get('/', protect, async (req, res) => {
+  try {
+    const isDbConnected = Meeting.db && Meeting.db.readyState === 1;
+    if (isDbConnected) {
+      const meetings = await Meeting.find({ host: req.user.id }).sort({ createdAt: -1 });
+      return res.json({ success: true, meetings });
+    }
+    return res.json({ success: true, meetings: [] });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+// @route   POST /api/meetings
+// @desc    Create a new meeting
+router.post('/', protect, async (req, res) => {
+  try {
+    const meetingData = req.body;
+    const { title, date, time } = meetingData;
+    
+    // Generate meeting ID if not provided automatically
+    const meetingId = meetingData.meetingId || `${Math.floor(100 + Math.random() * 900)}-${Math.floor(100 + Math.random() * 900)}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const isDbConnected = Meeting.db && Meeting.db.readyState === 1;
+    if (isDbConnected) {
+      const newMeeting = await Meeting.create({
+        ...meetingData,
+        meetingId,
+        host: req.user.id,
+        hostName: req.user.name,
+        status: 'scheduled',
+      });
+      return res.status(201).json({ success: true, meeting: newMeeting });
+    }
+
+    return res.status(201).json({
+      success: true,
+      meeting: {
+        id: 'mtg_' + Date.now(),
+        meetingId,
+        title: title || 'New Meeting',
+        date: date || new Date().toISOString().split('T')[0],
+        time: time || '10:00 AM',
+        status: 'scheduled',
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+// @route   GET /api/meetings/:meetingId
+// @desc    Get meeting details
+router.get('/:meetingId', async (req, res) => {
+  try {
+    const isDbConnected = Meeting.db && Meeting.db.readyState === 1;
+    if (isDbConnected) {
+      const meeting = await Meeting.findOne(buildMeetingQuery(req.params.meetingId));
+      if (!meeting) return res.status(404).json({ success: false, message: 'Meeting not found' });
+      return res.json({ success: true, meeting });
+    }
+    return res.status(404).json({ success: false, message: 'Database offline' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   DELETE /api/meetings/:meetingId
+// @desc    Delete scheduled meeting
+router.delete('/:meetingId', protect, async (req, res) => {
+  try {
+    const isDbConnected = Meeting.db && Meeting.db.readyState === 1;
+    if (isDbConnected) {
+      await Meeting.findOneAndDelete(buildMeetingQuery(req.params.meetingId));
+      return res.json({ success: true, message: 'Meeting deleted' });
+    }
+    return res.status(404).json({ success: false, message: 'Database offline' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   GET /api/meetings/public/:meetingId
+// @desc    Get public meeting info for registration page (no auth required)
+router.get('/public/:meetingId', async (req, res) => {
+  try {
+    const isDbConnected = Meeting.db && Meeting.db.readyState === 1;
+    if (isDbConnected) {
+      const meeting = await Meeting.findOne(buildMeetingQuery(req.params.meetingId))
+        .select('title description date time timezone hostName registration passcode');
+      if (!meeting) return res.status(404).json({ success: false, message: 'Meeting not found' });
+      return res.json({ success: true, meeting });
+    }
+    return res.status(404).json({ success: false, message: 'Database offline' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   POST /api/meetings/:meetingId/register
+// @desc    Submit participant registration
+router.post('/:meetingId/register', async (req, res) => {
+  try {
+    const { name, email, organization, customAnswers } = req.body;
+    if (!name || !email) {
+      return res.status(400).json({ success: false, message: 'Name and email are required' });
+    }
+
+    const meeting = await Meeting.findOne(buildMeetingQuery(req.params.meetingId));
+
+    if (!meeting) {
+      return res.status(404).json({ success: false, message: 'Meeting not found' });
+    }
+
+    // Check email domain restriction if configured
+    if (meeting.registration?.allowedDomains && meeting.registration.allowedDomains.length > 0) {
+      const userDomain = email.split('@')[1]?.toLowerCase();
+      const isAllowed = meeting.registration.allowedDomains.some(d => d.toLowerCase() === userDomain);
+      if (!isAllowed) {
+        return res.status(403).json({
+          success: false,
+          message: `Access denied. Registration for this meeting is restricted to: ${meeting.registration.allowedDomains.join(', ')}`
+        });
+      }
+    }
+
+    // Check if already registered
+    const existing = await MeetingRegistration.findOne({
+      meetingId: meeting.meetingId,
+      email: email.toLowerCase()
+    });
+
+    if (existing) {
+      return res.json({
+        success: true,
+        message: 'You are already registered for this meeting.',
+        registration: existing,
+        meeting
+      });
+    }
+
+    // Determine approval status
+    const isManualApproval = meeting.registration?.approvalType === 'manual';
+    const status = isManualApproval ? 'Pending' : 'Approved';
+
+    const newReg = await MeetingRegistration.create({
+      registrationId: 'reg_' + Math.floor(100000 + Math.random() * 900000),
+      meetingId: meeting.meetingId,
+      name,
+      email: email.toLowerCase(),
+      organization: organization || '',
+      customAnswers: customAnswers || [],
+      status,
+      registeredAt: new Date()
+    });
+
+    res.status(201).json({
+      success: true,
+      message: isManualApproval 
+        ? 'Your registration has been submitted and is pending host approval.' 
+        : 'Registration approved! You can now join the meeting.',
+      registration: newReg,
+      meeting
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   GET /api/meetings/:meetingId/registrations
+// @desc    Get all registrants for a meeting (Host view)
+router.get('/:meetingId/registrations', protect, async (req, res) => {
+  try {
+    const cleanId = req.params.meetingId.replace(/[\s-]/g, '');
+    const registrations = await MeetingRegistration.find({
+      $or: [{ meetingId: req.params.meetingId }, { meetingId: cleanId }]
+    }).sort({ createdAt: -1 });
+
+    res.json({ success: true, count: registrations.length, registrations });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   PUT /api/meetings/:meetingId/registrations/:regId
+// @desc    Approve or reject a registrant
+router.put('/:meetingId/registrations/:regId', protect, async (req, res) => {
+  try {
+    const { status } = req.body; // 'Approved' or 'Rejected'
+    const reg = await MeetingRegistration.findOneAndUpdate(
+      { $or: [{ registrationId: req.params.regId }, { _id: req.params.regId }] },
+      { status },
+      { new: true }
+    );
+    if (!reg) return res.status(404).json({ success: false, message: 'Registration not found' });
+    res.json({ success: true, registration: reg });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   DELETE /api/meetings/:meetingId/registrations/:regId
+// @desc    Remove a registrant
+router.delete('/:meetingId/registrations/:regId', protect, async (req, res) => {
+  try {
+    await MeetingRegistration.findOneAndDelete({
+      $or: [{ registrationId: req.params.regId }, { _id: req.params.regId }]
+    });
+    res.json({ success: true, message: 'Registration removed' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   GET /api/meetings/pre-join-check/:meetingId
+// @desc    Pre-meeting security evaluation pipeline (Passcode, Auth, Reg, Lock, Waiting Room)
+router.get('/pre-join-check/:meetingId', async (req, res) => {
+  try {
+    const meeting = await Meeting.findOne(buildMeetingQuery(req.params.meetingId));
+
+    if (!meeting) {
+      return res.status(404).json({ success: false, notFound: true, message: 'Meeting not found' });
+    }
+
+    const isLocked = !!(meeting.isLocked || meeting.securitySettings?.lockMeeting);
+
+    res.json({
+      success: true,
+      meeting: {
+        id: meeting._id,
+        meetingId: meeting.meetingId,
+        title: meeting.title,
+        hostName: meeting.hostName,
+        isLocked,
+        passcodeRequired: !!(meeting.passcode && meeting.passcode.trim().length > 0 && meeting.passcodeEnabled !== false),
+        waitingRoom: !!meeting.waitingRoom,
+        authentication: meeting.authentication || { required: false },
+        registration: meeting.registration || { required: false },
+        securitySettings: meeting.securitySettings || {},
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   POST /api/meetings/:meetingId/verify-passcode
+// @desc    Validate participant passcode
+router.post('/:meetingId/verify-passcode', async (req, res) => {
+  try {
+    const { passcode } = req.body;
+    const meeting = await Meeting.findOne(buildMeetingQuery(req.params.meetingId));
+
+    if (!meeting) return res.status(404).json({ success: false, message: 'Meeting not found' });
+
+    if (!meeting.passcode || meeting.passcode.trim() === '') {
+      return res.json({ success: true, valid: true });
+    }
+
+    const isValid = passcode && passcode.trim().toUpperCase() === meeting.passcode.trim().toUpperCase();
+    if (!isValid) {
+      return res.status(400).json({ success: false, valid: false, message: 'Invalid passcode' });
+    }
+
+    res.json({ success: true, valid: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   POST /api/meetings/:meetingId/check-registration
+// @desc    Verify if participant email is registered and approved
+router.post('/:meetingId/check-registration', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ success: false, message: 'Email required' });
+
+    const meeting = await Meeting.findOne(buildMeetingQuery(req.params.meetingId));
+
+    if (!meeting) return res.status(404).json({ success: false, message: 'Meeting not found' });
+
+    const registration = await MeetingRegistration.findOne({
+      meetingId: meeting.meetingId,
+      email: email.toLowerCase().trim()
+    });
+
+    if (!registration) {
+      return res.json({ success: true, registered: false });
+    }
+
+    res.json({
+      success: true,
+      registered: true,
+      status: registration.status, // 'Approved', 'Pending', 'Rejected'
+      registration
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   PUT /api/meetings/:meetingId/security
+// @desc    Host in-meeting security controls update (Lock, Waiting Room, Permissions, Screen Capture)
+router.put('/:meetingId/security', protect, async (req, res) => {
+  try {
+    const { isLocked, waitingRoom, securitySettings } = req.body;
+
+    const updateFields = {};
+    if (typeof isLocked === 'boolean') {
+      updateFields.isLocked = isLocked;
+      updateFields['securitySettings.lockMeeting'] = isLocked;
+    }
+    if (typeof waitingRoom === 'boolean') {
+      updateFields.waitingRoom = waitingRoom;
+      updateFields['securitySettings.enableWaitingRoom'] = waitingRoom;
+    }
+    if (securitySettings) {
+      for (const [key, val] of Object.entries(securitySettings)) {
+        updateFields[`securitySettings.${key}`] = val;
+      }
+    }
+
+    const meeting = await Meeting.findOneAndUpdate(
+      buildMeetingQuery(req.params.meetingId),
+      { $set: updateFields },
+      { new: true }
+    );
+
+    if (!meeting) return res.status(404).json({ success: false, message: 'Meeting not found' });
+    res.json({ success: true, meeting });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   PUT /api/meetings/:meetingId/lock
+// @desc    Quick toggle lock meeting
+router.put('/:meetingId/lock', protect, async (req, res) => {
+  try {
+    const { lock } = req.body;
+    const meeting = await Meeting.findOneAndUpdate(
+      buildMeetingQuery(req.params.meetingId),
+      { $set: { isLocked: !!lock, 'securitySettings.lockMeeting': !!lock } },
+      { new: true }
+    );
+    if (!meeting) return res.status(404).json({ success: false, message: 'Meeting not found' });
+    res.json({ success: true, isLocked: meeting.isLocked });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+export default router;

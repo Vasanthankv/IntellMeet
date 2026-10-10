@@ -1,0 +1,143 @@
+[
+  {
+    "name": "Google User",
+    "email": "user@google.com",
+    "password": "social_login_dummy_password",
+    "role": "Member",
+    "avatar": "https://ui-avatars.com/api/?name=Google User&background=random",
+    "weeklyActivity": [
+      {
+        "day": "Mon",
+        "hours": 0
+      },
+      {
+        "day": "Tue",
+        "hours": 0
+      },
+      {
+        "day": "Wed",
+        "hours": 0
+      },
+      {
+        "day": "Thu",
+        "hours": 0
+      },
+      {
+        "day": "Fri",
+        "hours": 0
+      },
+      {
+        "day": "Sat",
+        "hours": 0
+      },
+      {
+        "day": "Sun",
+        "hours": 0
+      }
+    ],
+    "tasks": [],
+    "hoursCollaborated": 0,
+    "stats": {
+      "meetings": 0,
+      "aiSummaries": 0,
+      "pendingTasks": 0,
+      "supportTickets": 0
+    },
+    "id": "1790923770701",
+    "_id": "1790923770701"
+  },
+  {
+    "name": "Facebook User",
+    "email": "user@facebook.com",
+    "password": "social_login_dummy_password",
+    "role": "Member",
+    "avatar": "https://ui-avatars.com/api/?name=Facebook User&background=random",
+    "weeklyActivity": [
+      {
+        "day": "Mon",
+        "hours": 0
+      },
+      {
+        "day": "Tue",
+        "hours": 0
+      },
+      {
+        "day": "Wed",
+        "hours": 0
+      },
+      {
+        "day": "Thu",
+        "hours": 0
+      },
+      {
+        "day": "Fri",
+        "hours": 0
+      },
+      {
+        "day": "Sat",
+        "hours": 0
+      },
+      {
+        "day": "Sun",
+        "hours": 0
+      }
+    ],
+    "tasks": [],
+    "hoursCollaborated": 0,
+    "stats": {
+      "meetings": 0,
+      "aiSummaries": 0,
+      "pendingTasks": 0,
+      "supportTickets": 0
+    },
+    "id": "1790923835273",
+    "_id": "1790923835273"
+  },
+  {
+    "name": "Vasanthan KV",
+    "email": "kvvasanth0309@gmail.com",
+    "password": "social_login_dummy_password",
+    "role": "Member",
+    "avatar": "https://ui-avatars.com/api/?name=Vasanthan+KV&background=0D8ABC&color=fff",
+    "weeklyActivity": [
+      {
+        "day": "Mon",
+        "hours": 0
+      },
+      {
+        "day": "Tue",
+        "hours": 0
+      },
+      {
+        "day": "Wed",
+        "hours": 0
+      },
+      {
+        "day": "Thu",
+        "hours": 0
+      },
+      {
+        "day": "Fri",
+        "hours": 0
+      },
+      {
+        "day": "Sat",
+        "hours": 0
+      },
+      {
+        "day": "Sun",
+        "hours": 0
+      }
+    ],
+    "tasks": [],
+    "hoursCollaborated": 0,
+    "stats": {
+      "meetings": 0,
+      "aiSummaries": 0,
+      "pendingTasks": 0,
+      "supportTickets": 0
+    },
+    "id": "1790924287521",
+    "_id": "1790924287521"
+  }
+]
