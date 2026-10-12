@@ -55,7 +55,12 @@ export default function MeetingPrepWorkspace({ meeting, meetingId, user, isLiveM
   useEffect(() => {
     if (!currentMeetingId) return;
 
-    socketRef.current = io('http://localhost:5000');
+    const socketUrl =
+      import.meta.env.VITE_API_URL ||
+      (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+        ? (typeof localStorage !== 'undefined' && localStorage.getItem('intellmeet_api_url')) || 'https://intellmeet-backend.onrender.com'
+        : 'http://localhost:5000');
+    socketRef.current = io(socketUrl);
     socketRef.current.emit('join-room', currentMeetingId, user?.id || 'guest', user?.name || 'User');
 
     socketRef.current.on('agenda-updated', (updatedAgenda) => {
