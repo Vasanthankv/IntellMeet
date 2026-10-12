@@ -8,8 +8,8 @@ services:
   - type: web
     name: intellmeet-backend
     runtime: docker
-    dockerfilePath: server/Dockerfile
-    dockerContext: server
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: ./server
     plan: free
     region: oregon
     healthCheckPath: /api/health
@@ -31,11 +31,9 @@ services:
   - type: web
     name: intellmeet-frontend
     runtime: static
-    plan: free
-    region: oregon
     rootDir: client
     buildCommand: npm install && npm run build
-    staticPublishPath: dist
+    staticPublishPath: ./dist
     routes:
       - type: rewrite
         source: /*
