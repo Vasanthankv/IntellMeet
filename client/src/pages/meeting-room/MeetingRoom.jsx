@@ -104,6 +104,12 @@ export default function MeetingRoom() {
 
   const [isHost, setIsHost] = useState(true);
   const [meetingInfo, setMeetingInfo] = useState({ title: `${user?.name || 'User'}'s Meeting`, meetingId });
+  const [meetingPermissions, setMeetingPermissions] = useState({
+    allowUnmute: true,
+    allowStartVideo: true,
+    allowRename: true,
+    allowShareScreen: true,
+  });
 
   useEffect(() => {
     const fetchMeeting = async () => {
@@ -6683,9 +6689,9 @@ export default function MeetingRoom() {
                           <span className="pr-2">{perm.label}</span>
                           <input 
                             type="checkbox" 
-                            checked={meetingPermissions[perm.key]}
+                            checked={meetingPermissions?.[perm.key] ?? true}
                             onChange={(e) => {
-                              const updated = { ...meetingPermissions, [perm.key]: e.target.checked };
+                              const updated = { ...(meetingPermissions || {}), [perm.key]: e.target.checked };
                               setMeetingPermissions(updated);
                               if (socketRef.current) {
                                 socketRef.current.emit('host-update-permissions', { meetingId, permissions: updated });
