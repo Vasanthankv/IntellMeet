@@ -810,6 +810,11 @@ export default function MeetingRoom() {
         const peer = createPeer(socketId, socketRef.current.id, currentStream, userName);
         peersRef.current.push({ peerID: socketId, peer, name: newUserName });
         setPeers([...peersRef.current]);
+        setSampleParticipants(prev => {
+          if (prev.some(p => p.id === socketId || p.id === newUserId)) return prev;
+          return [...prev, { id: socketId || newUserId, name: newUserName || 'Participant', isLocal: false, isMuted: false }];
+        });
+        toast.success(`${newUserName || 'A participant'} joined the meeting`);
       });
 
       socketRef.current.on('receiving-returned-signal', payload => {
@@ -821,7 +826,12 @@ export default function MeetingRoom() {
         const peer = addPeer(payload.signal, payload.callerID, currentStream);
         peersRef.current.push({ peerID: payload.callerID, peer, name: payload.callerName });
         setPeers([...peersRef.current]);
+        setSampleParticipants(prev => {
+          if (prev.some(p => p.id === payload.callerID)) return prev;
+          return [...prev, { id: payload.callerID, name: payload.callerName || 'Participant', isLocal: false, isMuted: false }];
+        });
         if (playJoinLeaveChime) playChimeSound('join');
+        toast.success(`${payload.callerName || 'A participant'} joined the meeting`);
       });
 
       socketRef.current.on('user-disconnected', socketId => {
@@ -830,6 +840,7 @@ export default function MeetingRoom() {
         const newPeers = peersRef.current.filter(p => p.peerID !== socketId);
         peersRef.current = newPeers;
         setPeers(newPeers);
+        setSampleParticipants(prev => prev.filter(p => p.id !== socketId));
         if (playJoinLeaveChime) playChimeSound('leave');
       });
 
@@ -5103,8 +5114,15 @@ export default function MeetingRoom() {
   const allParticipants = [
     { id: 'local', name: user?.name || 'You', isLocal: true, isMuted: !isAudioOn, isVideoOff: !isVideoOn },
     ...sampleParticipants,
-    ...peers
-  ];
+    ...peers.map(p => ({
+      id: p.peerID || p.id,
+      name: p.name || 'Participant',
+      isLocal: false,
+      isMuted: false,
+      isVideoOff: false,
+      peer: p.peer
+    }))
+  ].filter((p, index, self) => index === self.findIndex(t => t.id === p.id));
   const participants = allParticipants;
 
   const filteredParticipants = allParticipants.filter(p => 
