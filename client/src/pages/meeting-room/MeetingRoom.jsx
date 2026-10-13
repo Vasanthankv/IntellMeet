@@ -4652,6 +4652,10 @@ export default function MeetingRoom() {
     }
   };
 
+  const waitingRoomEnabled = securitySettings?.waitingRoomEnabled ?? securitySettings?.enableWaitingRoom ?? true;
+  const setWaitingRoomEnabled = (val) => handleToggleWaitingRoom(val);
+  const toggleMeetingLock = () => handleToggleLock();
+
   const handleToggleHideProfilePictures = async (hide) => {
     try {
       const token = localStorage.getItem('token');
@@ -6751,7 +6755,7 @@ export default function MeetingRoom() {
                         <span>Enable Waiting Room</span>
                         <input 
                           type="checkbox" 
-                          checked={waitingRoomEnabled}
+                          checked={!!waitingRoomEnabled}
                           onChange={(e) => {
                             setWaitingRoomEnabled(e.target.checked);
                             toast.info(`Waiting Room: ${e.target.checked ? 'Enabled' : 'Disabled'}`);
@@ -6764,7 +6768,7 @@ export default function MeetingRoom() {
                         <span>Lock Meeting</span>
                         <input 
                           type="checkbox" 
-                          checked={isMeetingLocked}
+                          checked={!!isMeetingLocked}
                           onChange={toggleMeetingLock}
                           className="accent-blue-600 rounded"
                         />
