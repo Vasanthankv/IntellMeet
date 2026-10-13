@@ -754,8 +754,9 @@ export default function MeetingRoom() {
 
   useEffect(() => {
     socketRef.current = io(SOCKET_SERVER_URL);
-    const userId = user?.id || 'u_' + Math.floor(Math.random() * 10000);
-    const userName = user?.name || 'Guest';
+    const storedGuestName = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('intellmeet_guest_name') : null;
+    const userId = user?.id || user?._id || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('intellmeet_guest_id') : null) || 'u_' + Math.floor(Math.random() * 10000);
+    const userName = user?.name || storedGuestName || 'Guest';
 
     const initialAudio = sessionStorage.getItem('intellmeet_initial_audio') !== 'false';
     const initialVideo = sessionStorage.getItem('intellmeet_initial_video') !== 'false';
@@ -806,37 +807,80 @@ export default function MeetingRoom() {
 
     startRoomMediaAndSocket();
 
+      // Listen for all existing users already in the room
+      socketRef.current.on('all-users', (existingUsers) => {
+        if (Array.isArray(existingUsers) && existingUsers.length > 0) {
+          setSampleParticipants(prev => {
+            const next = [...prev];
+            existingUsers.forEach(u => {
+              if (!next.some(p => p.id === u.socketId || p.id === u.userId)) {
+                next.push({ id: u.socketId || u.userId, name: u.userName || 'Participant', isLocal: false, isMuted: false });
+              }
+            });
+            return next;
+          });
+          existingUsers.forEach(u => {
+            try {
+              const peer = createPeer(u.socketId, socketRef.current.id, currentStream, userName);
+              peersRef.current.push({ peerID: u.socketId, peer, name: u.userName });
+            } catch (err) {
+              console.warn('Peer create error for existing user:', err);
+            }
+          });
+          setPeers([...peersRef.current]);
+        }
+      });
+
       socketRef.current.on('user-connected', (newUserId, newUserName, socketId) => {
-        const peer = createPeer(socketId, socketRef.current.id, currentStream, userName);
-        peersRef.current.push({ peerID: socketId, peer, name: newUserName });
-        setPeers([...peersRef.current]);
         setSampleParticipants(prev => {
           if (prev.some(p => p.id === socketId || p.id === newUserId)) return prev;
           return [...prev, { id: socketId || newUserId, name: newUserName || 'Participant', isLocal: false, isMuted: false }];
         });
+        if (playJoinLeaveChime) playChimeSound('join');
         toast.success(`${newUserName || 'A participant'} joined the meeting`);
+
+        try {
+          const peer = createPeer(socketId, socketRef.current.id, currentStream, userName);
+          peersRef.current.push({ peerID: socketId, peer, name: newUserName });
+          setPeers([...peersRef.current]);
+        } catch (err) {
+          console.warn('createPeer error:', err);
+        }
       });
 
       socketRef.current.on('receiving-returned-signal', payload => {
         const item = peersRef.current.find(p => p.peerID === payload.id);
-        if (item) item.peer.signal(payload.signal);
+        if (item) {
+          try {
+            item.peer.signal(payload.signal);
+          } catch (err) {
+            console.warn('Signal return error:', err);
+          }
+        }
       });
 
       socketRef.current.on('user-joined', payload => {
-        const peer = addPeer(payload.signal, payload.callerID, currentStream);
-        peersRef.current.push({ peerID: payload.callerID, peer, name: payload.callerName });
-        setPeers([...peersRef.current]);
         setSampleParticipants(prev => {
           if (prev.some(p => p.id === payload.callerID)) return prev;
           return [...prev, { id: payload.callerID, name: payload.callerName || 'Participant', isLocal: false, isMuted: false }];
         });
         if (playJoinLeaveChime) playChimeSound('join');
         toast.success(`${payload.callerName || 'A participant'} joined the meeting`);
+
+        try {
+          const peer = addPeer(payload.signal, payload.callerID, currentStream);
+          peersRef.current.push({ peerID: payload.callerID, peer, name: payload.callerName });
+          setPeers([...peersRef.current]);
+        } catch (err) {
+          console.warn('addPeer error:', err);
+        }
       });
 
       socketRef.current.on('user-disconnected', socketId => {
         const peerObj = peersRef.current.find(p => p.peerID === socketId);
-        if (peerObj) peerObj.peer.destroy();
+        if (peerObj) {
+          try { peerObj.peer.destroy(); } catch (err) {}
+        }
         const newPeers = peersRef.current.filter(p => p.peerID !== socketId);
         peersRef.current = newPeers;
         setPeers(newPeers);

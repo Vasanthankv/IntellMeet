@@ -7,7 +7,16 @@
     <title>IntellMeet</title>
     <script>
       window.global = window;
-      window.process = { env: { DEBUG: undefined }, version: '' };
+      window.process = window.process || {
+        env: { DEBUG: undefined },
+        version: '',
+        browser: true,
+        nextTick: function (cb) { setTimeout(cb, 0); },
+        stdout: { fd: 1 }
+      };
+      if (!window.process.nextTick) {
+        window.process.nextTick = function (cb) { setTimeout(cb, 0); };
+      }
     </script>
   </head>
   <body>

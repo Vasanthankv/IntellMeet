@@ -145,9 +145,27 @@ app.get('/api/health', (req, res) => {
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
 
-  socket.on('join-room', (roomId, userId, userName) => {
+  socket.on('join-room', async (roomId, userId, userName) => {
     socket.join(roomId);
+    socket.userId = userId;
+    socket.userName = userName;
+    socket.roomId = roomId;
     console.log(`User ${userName} (${userId}) joined room ${roomId}`);
+
+    try {
+      const clients = await io.in(roomId).fetchSockets();
+      const existingUsers = clients
+        .filter(s => s.id !== socket.id)
+        .map(s => ({
+          socketId: s.id,
+          userId: s.userId || s.id,
+          userName: s.userName || 'Participant'
+        }));
+      socket.emit('all-users', existingUsers);
+    } catch (e) {
+      console.warn('Error fetching existing room sockets:', e);
+    }
+
     // Tell everyone else in the room that a new user joined
     socket.to(roomId).emit('user-connected', userId, userName, socket.id);
   });
