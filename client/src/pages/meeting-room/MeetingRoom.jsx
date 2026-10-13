@@ -8677,12 +8677,13 @@ export default function MeetingRoom() {
                   <input
                     type="text"
                     readOnly
-                    value={`http://localhost:5173/meeting/${meetingId}`}
+                    value={`${typeof window !== 'undefined' ? window.location.origin : ''}/meetings/${meetingId}/room`}
                     className="w-full bg-[#1A1A1A] border border-[#3A3A3A] rounded-xl px-3 py-2 text-xs text-gray-300 select-all"
                   />
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(`http://localhost:5173/meeting/${meetingId}`);
+                      const dynamicUrl = `${window.location.origin}/meetings/${meetingId}/room`;
+                      navigator.clipboard.writeText(dynamicUrl);
                       toast.success('Join link copied to clipboard!');
                     }}
                     className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium shrink-0 flex items-center gap-1.5 transition-colors shadow"
@@ -8707,7 +8708,7 @@ export default function MeetingRoom() {
 
             <div className="flex justify-between items-center pt-3 border-t border-[#333]">
               <a
-                href={`mailto:?subject=Join IntellMeet Meeting&body=Join IntellMeet Meeting%0A%0ALink: http://localhost:5173/meeting/${meetingId}%0AMeeting ID: ${meetingId}`}
+                href={`mailto:?subject=Join IntellMeet Meeting&body=Join IntellMeet Meeting%0A%0ALink: ${typeof window !== 'undefined' ? window.location.origin : ''}/meetings/${meetingId}/room%0AMeeting ID: ${meetingId}`}
                 className="text-xs text-blue-400 hover:underline flex items-center gap-1"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
@@ -8716,7 +8717,8 @@ export default function MeetingRoom() {
               <div className="flex gap-2">
                 <button
                   onClick={() => {
-                    const invitationText = `Join IntellMeet Meeting\nTopic: ${meetingTitle}\nMeeting ID: ${meetingId}\nJoin Link: http://localhost:5173/meeting/${meetingId}`;
+                    const dynamicUrl = `${window.location.origin}/meetings/${meetingId}/room`;
+                    const invitationText = `Join IntellMeet Meeting\nTopic: ${meetingTitle || 'Meeting'}\nMeeting ID: ${meetingId}\nJoin Link: ${dynamicUrl}`;
                     navigator.clipboard.writeText(invitationText);
                     toast.success('Invitation details copied to clipboard!');
                   }}

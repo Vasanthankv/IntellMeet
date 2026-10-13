@@ -48,10 +48,13 @@ function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <Routes>
-          {/* Public Routes */}
+          {/* Public Meeting & Support Routes */}
           <Route path="/" element={<HomePage />} />
           <Route path="/join" element={<JoinMeeting />} />
+          <Route path="/meeting/:meetingId" element={<JoinMeeting />} />
           <Route path="/meetings/:meetingId/prejoin" element={<JoinMeeting />} />
+          <Route path="/meetings/:meetingId/room" element={<MeetingRoom />} />
+          <Route path="/meeting/:meetingId/room" element={<MeetingRoom />} />
           <Route path="/meeting/register/:meetingId" element={<MeetingRegistrationPage />} />
           <Route path="/support" element={<SupportPage />} />
           <Route path="/support/profile" element={<ProfilePage />} />
@@ -71,7 +74,6 @@ function App() {
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
             {/* Full Screen Routes */}
-            <Route path="/meetings/:meetingId/room" element={<MeetingRoom />} />
             <Route path="/whiteboards" element={<WhiteboardDashboard />} />
             <Route path="/whiteboards/:whiteboardId" element={<WhiteboardDashboard />} />
             

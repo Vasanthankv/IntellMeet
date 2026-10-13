@@ -119,7 +119,8 @@ export default function MeetingDetails() {
   };
 
   const cleanRoomId = meeting?.meetingId ? meeting.meetingId.replace(/\s/g, '') : (meeting?._id || '');
-  const joinUrl = `http://localhost:5173/join?meetingId=${cleanRoomId}${meeting?.passcode ? `&pwd=${meeting.passcode}` : ''}`;
+  const appOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  const joinUrl = `${appOrigin}/join?meetingId=${cleanRoomId}${meeting?.passcode ? `&pwd=${meeting.passcode}` : ''}`;
 
   const copyLink = () => {
     navigator.clipboard.writeText(joinUrl);
@@ -225,7 +226,7 @@ export default function MeetingDetails() {
     }
   }, [meeting]);
 
-  const regUrl = `http://localhost:5173/meeting/register/${cleanRoomId}`;
+  const regUrl = `${appOrigin}/meeting/register/${cleanRoomId}`;
 
   const copyRegLink = () => {
     navigator.clipboard.writeText(regUrl);
