@@ -11,7 +11,7 @@ if (typeof window !== 'undefined') {
     const targetBase =
       import.meta.env.VITE_API_URL ||
       (typeof localStorage !== 'undefined' && localStorage.getItem('intellmeet_api_url')) ||
-      'https://intellmeet-backend.onrender.com';
+      'https://intellmeet-backend-h3md.onrender.com';
 
     // 1. Intercept fetch calls targeting localhost:5000
     const rawFetch = window.fetch;

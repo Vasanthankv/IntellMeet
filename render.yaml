@@ -40,4 +40,4 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        value: https://intellmeet-backend.onrender.com
+        value: https://intellmeet-backend-h3md.onrender.com

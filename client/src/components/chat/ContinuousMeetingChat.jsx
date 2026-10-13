@@ -62,7 +62,7 @@ export default function ContinuousMeetingChat({ meeting, meetingId, user, onOpen
     const socketUrl =
       import.meta.env.VITE_API_URL ||
       (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-        ? (typeof localStorage !== 'undefined' && localStorage.getItem('intellmeet_api_url')) || 'https://intellmeet-backend.onrender.com'
+        ? (typeof localStorage !== 'undefined' && localStorage.getItem('intellmeet_api_url')) || 'https://intellmeet-backend-h3md.onrender.com'
         : 'http://localhost:5000');
     socketRef.current = io(socketUrl);
     socketRef.current.emit('join-room', currentMeetingId, user?.id || 'guest', user?.name || 'User');
