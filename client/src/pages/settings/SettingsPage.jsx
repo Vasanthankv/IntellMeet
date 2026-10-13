@@ -56,7 +56,7 @@ export default function SettingsPage() {
       localRecording: true,
       cloudRecording: true,
       autoRecording: false,
-      recordingPath: 'C:\\Users\\Vasanthan\\Documents\\IntellMeet\\Recordings',
+      recordingPath: 'IntellMeet/Recordings',
     },
     accessibility: {
       closedCaptioning: true,

@@ -77,33 +77,68 @@ const PROVIDER_CONFIG = {
 };
 
 // ─── Mock accounts (stored accounts for the chooser) ─────────────────────────
-const MOCK_ACCOUNTS = [
-  {
-    name: 'Vasanthan KV',
-    email: 'kvvasanth0309@gmail.com',
-    initials: 'KV',
-    color: '#5865F2',
-    signedIn: true,
-  },
-  {
-    name: 'IntelliMeet Admin',
-    email: 'admin@intellimeet.com',
-    initials: 'IA',
-    color: '#8C24A8',
-    signedIn: false,
-  },
-  {
-    name: 'Guest User',
-    email: 'guest@example.com',
-    initials: 'GU',
-    color: '#2e7d32',
-    signedIn: false,
-  },
-];
+// Helper: Read device-remembered accounts from local browser storage only
+const getDeviceStoredAccounts = () => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem('intellmeet_device_accounts');
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+};
 
-// ─── GitHub-style OAuth Account Chooser Overlay ───────────────────────────────
+const saveDeviceAccount = (acc) => {
+  if (typeof window === 'undefined' || !acc?.email) return;
+  try {
+    const list = getDeviceStoredAccounts().filter(a => a.email?.toLowerCase() !== acc.email.toLowerCase());
+    list.unshift({
+      name: acc.name || acc.email.split('@')[0],
+      email: acc.email.toLowerCase(),
+      initials: (acc.name || acc.email).substring(0, 2).toUpperCase(),
+      color: acc.color || '#4285F4',
+      avatar: acc.avatar || '',
+      signedIn: false,
+    });
+    // Keep max 5 most recent accounts on device
+    localStorage.setItem('intellmeet_device_accounts', JSON.stringify(list.slice(0, 5)));
+  } catch (e) {}
+};
+
+// ─── OAuth Account Chooser Overlay ───────────────────────────────────────────
 function OAuthAccountChooser({ provider, onSelect, onClose, isLoading }) {
   const cfg = PROVIDER_CONFIG[provider] || PROVIDER_CONFIG.Google;
+  const [deviceAccounts, setDeviceAccounts] = useState(() => getDeviceStoredAccounts());
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [customName, setCustomName] = useState('');
+  const [customEmail, setCustomEmail] = useState('');
+
+  const handleCustomSubmit = (e) => {
+    e.preventDefault();
+    if (!customEmail || !customEmail.includes('@')) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+    const derivedName = customName.trim() || customEmail.split('@')[0];
+    const newAcc = {
+      name: derivedName,
+      email: customEmail.trim().toLowerCase(),
+      initials: derivedName.substring(0, 2).toUpperCase(),
+      color: '#4285F4',
+      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(derivedName)}&background=4285F4&color=fff`,
+    };
+    onSelect(newAcc);
+  };
+
+  const handleRemoveAccount = (e, emailToRemove) => {
+    e.stopPropagation();
+    const updated = deviceAccounts.filter(a => a.email.toLowerCase() !== emailToRemove.toLowerCase());
+    setDeviceAccounts(updated);
+    try {
+      localStorage.setItem('intellmeet_device_accounts', JSON.stringify(updated));
+    } catch (err) {}
+  };
 
   return (
     <div
@@ -125,57 +160,111 @@ function OAuthAccountChooser({ provider, onSelect, onClose, isLoading }) {
           </p>
         </div>
 
-        {/* ── Account list ── */}
-        <ul className="divide-y divide-[#21262d]">
-          {MOCK_ACCOUNTS.map((acc, idx) => (
-            <li key={idx}>
+        {/* ── Add account inline form ── */}
+        {showAddForm ? (
+          <form onSubmit={handleCustomSubmit} className="p-5 space-y-3 bg-[#0d1117]">
+            <p className="text-xs text-[#8b949e] font-medium">Enter your {provider} account credentials:</p>
+            <div>
+              <input
+                type="text"
+                placeholder="Full Name (optional)"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                className="w-full px-3 py-2 bg-[#161b22] border border-[#30363d] rounded-lg text-white text-sm placeholder-[#484f58] focus:outline-none focus:border-[#58a6ff]"
+              />
+            </div>
+            <div>
+              <input
+                type="email"
+                placeholder="Email address (e.g. you@gmail.com)"
+                value={customEmail}
+                onChange={(e) => setCustomEmail(e.target.value)}
+                required
+                className="w-full px-3 py-2 bg-[#161b22] border border-[#30363d] rounded-lg text-white text-sm placeholder-[#484f58] focus:outline-none focus:border-[#58a6ff]"
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
               <button
-                onClick={() => onSelect(acc)}
-                disabled={isLoading}
-                className="w-full flex items-center gap-4 px-5 py-3.5 hover:bg-[#21262d] transition-colors text-left group disabled:opacity-50 disabled:cursor-wait focus:outline-none focus-visible:bg-[#21262d]"
+                type="button"
+                onClick={() => setShowAddForm(false)}
+                className="flex-1 py-2 text-xs text-[#8b949e] hover:text-white border border-[#30363d] rounded-lg"
               >
-                {/* Avatar */}
-                <div
-                  className="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm"
-                  style={{ backgroundColor: acc.color }}
-                >
-                  {isLoading ? (
-                    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    acc.initials
-                  )}
-                </div>
+                Back
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="flex-1 py-2 text-xs font-semibold text-white bg-[#238636] hover:bg-[#2ea043] rounded-lg disabled:opacity-50"
+              >
+                {isLoading ? 'Signing in...' : 'Sign In'}
+              </button>
+            </div>
+          </form>
+        ) : (
+          /* ── Account list ── */
+          <ul className="divide-y divide-[#21262d] max-h-[320px] overflow-y-auto">
+            {deviceAccounts.length > 0 ? (
+              deviceAccounts.map((acc, idx) => (
+                <li key={idx}>
+                  <button
+                    onClick={() => onSelect(acc)}
+                    disabled={isLoading}
+                    className="w-full flex items-center gap-4 px-5 py-3.5 hover:bg-[#21262d] transition-colors text-left group disabled:opacity-50 disabled:cursor-wait focus:outline-none focus-visible:bg-[#21262d]"
+                  >
+                    {/* Avatar */}
+                    <div
+                      className="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm"
+                      style={{ backgroundColor: acc.color || '#4285F4' }}
+                    >
+                      {isLoading ? (
+                        <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        acc.initials || 'U'
+                      )}
+                    </div>
 
-                {/* Name & email */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{acc.name}</p>
-                  <p className="text-xs text-[#8b949e] truncate">{acc.email}</p>
-                </div>
+                    {/* Name & email */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{acc.name}</p>
+                      <p className="text-xs text-[#8b949e] truncate">{acc.email}</p>
+                    </div>
 
-                {/* Signed-in badge */}
-                {acc.signedIn && (
-                  <span className="text-[10px] font-medium text-[#8b949e] border border-[#30363d] px-2 py-0.5 rounded-full flex-shrink-0">
-                    Signed out
-                  </span>
-                )}
+                    {/* Remove account button */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleRemoveAccount(e, acc.email)}
+                      title="Remove from this device"
+                      className="text-[#484f58] hover:text-[#f85149] p-1 rounded transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </button>
+                </li>
+              ))
+            ) : (
+              <li className="px-5 py-6 text-center text-xs text-[#8b949e]">
+                No accounts remembered on this device yet. Click below to sign in with your {provider} account.
+              </li>
+            )}
+
+            {/* Use another account row */}
+            <li>
+              <button
+                onClick={() => setShowAddForm(true)}
+                disabled={isLoading}
+                className="w-full flex items-center gap-4 px-5 py-3.5 hover:bg-[#21262d] transition-colors text-left group disabled:opacity-50 focus:outline-none focus-visible:bg-[#21262d]"
+              >
+                <div className="w-11 h-11 rounded-full border border-[#30363d] bg-[#21262d] flex items-center justify-center text-[#8b949e] flex-shrink-0">
+                  <UserCircle2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-sm text-[#c9d1d9] font-medium">Use another account</p>
+                  <p className="text-xs text-[#8b949e]">Sign in with any {provider} email</p>
+                </div>
               </button>
             </li>
-          ))}
-
-          {/* Use another account row */}
-          <li>
-            <button
-              onClick={() => onClose()}
-              disabled={isLoading}
-              className="w-full flex items-center gap-4 px-5 py-3.5 hover:bg-[#21262d] transition-colors text-left group disabled:opacity-50 focus:outline-none focus-visible:bg-[#21262d]"
-            >
-              <div className="w-11 h-11 rounded-full border border-[#30363d] bg-[#21262d] flex items-center justify-center text-[#8b949e] flex-shrink-0">
-                <UserCircle2 className="w-5 h-5" />
-              </div>
-              <p className="text-sm text-[#c9d1d9] font-medium">Use another account</p>
-            </button>
-          </li>
-        </ul>
+          </ul>
+        )}
 
         {/* ── Footer: Privacy links ── */}
         <div className="px-6 py-4 bg-[#0d1117] border-t border-[#21262d] flex flex-col items-center gap-2">
@@ -217,6 +306,7 @@ export default function Login() {
       setIsLoading(true);
       const res = await authService.login(data.email, data.password);
       login(res.user, res.token);
+      saveDeviceAccount(res.user);
       toast.success('Login successful!');
       navigate('/dashboard');
     } catch (error) {
@@ -239,11 +329,12 @@ export default function Login() {
         provider: chooserProvider,
         email: account.email,
         name: account.name,
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(account.name)}&background=${account.color.replace('#', '')}&color=fff`,
+        avatar: account.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(account.name)}&background=${(account.color || '#4285F4').replace('#', '')}&color=fff`,
       };
 
       const res = await authService.socialLogin(providerData);
       login(res.user, res.token);
+      saveDeviceAccount(res.user);
       toast.success(`Signed in as ${account.name}`);
       setChooserProvider(null);
       navigate('/dashboard');

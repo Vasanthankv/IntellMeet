@@ -12,7 +12,7 @@ import { Shield } from 'lucide-react';
  *  - visibleOn ('sharedContent' | 'video' | 'both'): scope target
  *  - containerType ('sharedContent' | 'video'): what this overlay is wrapping
  *  - opacity (number): 5 to 100
- *  - identity (string): e.g. "kv***@gmail.com" or "kvasanthan@gmail.com"
+ *  - identity (string): e.g. "us***@example.com" or "user@example.com"
  *  - subtext (string, optional): e.g. "IntellMeet Confidential"
  */
 export default function WatermarkOverlay({

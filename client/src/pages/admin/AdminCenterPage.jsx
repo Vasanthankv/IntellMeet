@@ -515,7 +515,7 @@ export default function AdminCenterPage() {
                 </div>
                 <div>
                   <span className="text-gray-400 block mb-1">Account Owner</span>
-                  <span className="font-bold text-purple-700 text-sm">{user?.name || 'Vasanthan KV'}</span>
+                  <span className="font-bold text-purple-700 text-sm">{user?.name || 'Organization Admin'}</span>
                 </div>
                 <div>
                   <span className="text-gray-400 block mb-1">Account Number</span>

@@ -73,9 +73,9 @@ export default function VideoLayoutEngine({
 }) {
   const watermarkIdentityStr = 
     watermarkSettings?.identityType === 'maskedEmail'
-      ? (viewerIdentity?.maskedEmail || 'kv***@gmail.com')
+      ? (viewerIdentity?.maskedEmail || 'us***@example.com')
       : watermarkSettings?.identityType === 'email'
-        ? (viewerIdentity?.rawEmail || 'kvasanthan@gmail.com')
+        ? (viewerIdentity?.rawEmail || 'user@example.com')
         : (viewerIdentity?.participantId || 'USR-LOCAL');
 
   const [activeTileMenu, setActiveTileMenu] = useState(null);

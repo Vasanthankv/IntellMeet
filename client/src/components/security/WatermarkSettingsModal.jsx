@@ -36,13 +36,12 @@ export default function WatermarkSettingsModal({
 
   if (!isOpen) return null;
 
-  // Determine effective display string for preview
   const previewIdentity = 
     identityType === 'maskedEmail'
-      ? (viewerIdentity.maskedEmail || 'kv***@gmail.com')
+      ? (viewerIdentity?.maskedEmail || 'us***@example.com')
       : identityType === 'email'
-        ? (viewerIdentity.rawEmail || 'kvasanthan@gmail.com')
-        : (viewerIdentity.participantId || 'USR-7491');
+        ? (viewerIdentity?.rawEmail || 'user@example.com')
+        : (viewerIdentity?.participantId || 'USR-7491');
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -272,7 +271,7 @@ export default function WatermarkSettingsModal({
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { id: 'maskedEmail', label: 'Masked Email', sample: 'kv***@gmail.com (Privacy)' },
-                    { id: 'email', label: 'Full Email', sample: 'kvasanthan@gmail.com' },
+                    { id: 'email', label: 'Full Email', sample: 'user@example.com' },
                     { id: 'participantId', label: 'Participant ID', sample: 'USR-8942-X' },
                   ].map((idOption) => (
                     <button

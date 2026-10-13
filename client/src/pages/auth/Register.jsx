@@ -106,6 +106,20 @@ export default function Register() {
       const res = await authService.register({ ...data, userType: selectedType });
       if (res.user && res.token) {
         login(res.user, res.token);
+        try {
+          const raw = localStorage.getItem('intellmeet_device_accounts');
+          const list = raw ? JSON.parse(raw) : [];
+          const filtered = list.filter(a => a.email?.toLowerCase() !== res.user.email?.toLowerCase());
+          filtered.unshift({
+            name: res.user.name,
+            email: res.user.email.toLowerCase(),
+            initials: res.user.name.substring(0, 2).toUpperCase(),
+            color: '#4285F4',
+            avatar: res.user.avatar || '',
+            signedIn: false,
+          });
+          localStorage.setItem('intellmeet_device_accounts', JSON.stringify(filtered.slice(0, 5)));
+        } catch (e) {}
       }
       toast.success('Account created! Welcome to IntellMeet 🎉');
       navigate('/dashboard');
