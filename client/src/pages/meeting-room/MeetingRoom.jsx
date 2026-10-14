@@ -13,7 +13,7 @@ import {
   Pin, Paperclip, Download, FileText, Image as ImageIcon, Send, File, ExternalLink, MoreVertical, FileCode, Archive,
   Search, Crown, Hand, UserPlus, Edit2, Trash2, Bell, BellOff, AlertOctagon,
   ThumbsUp, ThumbsDown, Zap, Clock, BarChart2, Globe, ListChecks,
-  Pen, Presentation, Activity
+  Pen, Presentation, Activity, LogOut
 } from 'lucide-react';
 
 
@@ -104,6 +104,7 @@ export default function MeetingRoom() {
 
   const [isHost, setIsHost] = useState(true);
   const [showLeaveDropdown, setShowLeaveDropdown] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [meetingInfo, setMeetingInfo] = useState({ title: `${user?.name || 'User'}'s Meeting`, meetingId });
   const [meetingPermissions, setMeetingPermissions] = useState({
     allowUnmute: true,
@@ -5386,8 +5387,8 @@ export default function MeetingRoom() {
             </div>
           )}
 
-          {/* Top Right: View Layout Button (Sections 8.8 - 8.16) */}
-          <div className="relative pointer-events-auto">
+          {/* Top Right: View Layout & Quick End Meeting Button */}
+          <div className="relative pointer-events-auto flex items-center gap-2">
             <button
               onClick={() => setShowViewMenu(!showViewMenu)}
               className="bg-[#242424]/90 hover:bg-[#333] border border-[#3A3A3A] text-white px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-lg backdrop-blur-md transition-all cursor-pointer"
@@ -5396,6 +5397,16 @@ export default function MeetingRoom() {
               <LayoutGrid className="w-4 h-4 text-blue-400" />
               <span>View</span>
               <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+            </button>
+
+            {/* Quick End/Leave Button in Header */}
+            <button
+              onClick={() => setShowLeaveModal(true)}
+              className="bg-[#E02828] hover:bg-[#C01F1F] text-white px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-red-500/20 transition-all cursor-pointer"
+              title={isHost ? 'End Meeting' : 'Leave Meeting'}
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>{isHost ? 'End' : 'Leave'}</span>
             </button>
 
             {showViewMenu && (
@@ -6986,7 +6997,7 @@ export default function MeetingRoom() {
 
       {/* Bottom Control Bar (Part 37 Theme Support) */}
       <div 
-        className="h-[68px] flex items-center justify-between px-4 shrink-0 transition-all duration-300 border-t"
+        className="h-[68px] flex items-center justify-between px-3 shrink-0 transition-all duration-300 border-t relative overflow-hidden"
         style={{
           backgroundColor: (THEMES.find(t => t.id === personalTheme) || THEMES[0]).toolbarBg,
           borderColor: (THEMES.find(t => t.id === personalTheme) || THEMES[0]).panelBg || '#333'
@@ -6994,7 +7005,7 @@ export default function MeetingRoom() {
       >
         
         {/* Left Controls */}
-        <div className="flex items-center gap-1 w-72">
+        <div className="flex items-center gap-1 shrink-0 z-10">
           {!isAudioConnected ? (
             <button
               onClick={() => setShowJoinAudioModal(true)}
@@ -7220,8 +7231,8 @@ export default function MeetingRoom() {
           </div>
         </div>
 
-        {/* Center Controls */}
-        <div className="flex gap-1">
+        {/* Center Controls (Horizontally responsive, scrollable if window is narrow) */}
+        <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto no-scrollbar py-1 px-2">
           {/* Host Security Panel Button */}
           <div className="relative">
             <button 
@@ -8043,8 +8054,8 @@ export default function MeetingRoom() {
           </div>
         </div>
 
-        {/* Right Controls — Leave / End Meeting */}
-        <div className="flex justify-end w-64">
+        {/* Right Controls — Leave / End Meeting (Always pinned on far right) */}
+        <div className="flex justify-end items-center shrink-0 ml-auto pl-2 z-30">
           <div className="relative">
             {/* Dropdown panel — opens above the button */}
             {showLeaveDropdown && (
@@ -8067,7 +8078,7 @@ export default function MeetingRoom() {
                   className="w-full flex items-center gap-3 px-4 py-3 text-[13px] font-semibold text-[#E02828] hover:bg-[#2A2A2A] transition-colors"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                  {isHost ? 'Leave Meeting' : 'Leave Meeting'}
+                  Leave Meeting
                 </button>
                 {/* Cancel */}
                 <div className="h-px bg-[#333]" />
@@ -8081,27 +8092,89 @@ export default function MeetingRoom() {
               </div>
             )}
 
-            {/* Red button row: [  Leave ▲ ] */}
+            {/* Red button row: [  End / Leave ▲ ] */}
             <div className="flex items-center">
               <button
-                onClick={() => { setShowLeaveDropdown(false); leaveMeeting(); }}
-                className="bg-[#E02828] hover:bg-[#C01F1F] text-white text-[13px] font-bold px-4 h-9 rounded-l-md transition-colors flex items-center gap-2 whitespace-nowrap"
+                onClick={() => setShowLeaveModal(true)}
+                className="bg-[#E02828] hover:bg-[#C01F1F] text-white text-[13px] font-bold px-4 h-9 rounded-l-md transition-colors flex items-center gap-2 whitespace-nowrap shadow-lg shadow-red-500/20"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                <LogOut className="w-4 h-4" />
                 {isHost ? 'End' : 'Leave'}
               </button>
               {/* Chevron to open dropdown */}
               <button
                 onClick={() => setShowLeaveDropdown(prev => !prev)}
-                className="bg-[#C01F1F] hover:bg-[#A01818] text-white h-9 px-2 rounded-r-md border-l border-[#E02828]/50 transition-colors flex items-center"
+                className="bg-[#C01F1F] hover:bg-[#A01818] text-white h-9 px-2 rounded-r-md border-l border-[#E02828]/50 transition-colors flex items-center shadow-lg"
                 title="More leave options"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+                <ChevronUp className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Leave / End Meeting Centered Confirmation Modal */}
+      {showLeaveModal && (
+        <div className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#242424] text-white border border-[#3A3A3A] rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-2 border-b border-[#333]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
+                  <LogOut className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base leading-tight">
+                    {isHost ? 'End or Leave Meeting' : 'Leave Meeting'}
+                  </h3>
+                  <p className="text-xs text-gray-400">{meetingTitle}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowLeaveModal(false)}
+                className="text-gray-400 hover:text-white p-1 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-300 leading-relaxed">
+              {isHost 
+                ? 'As the host, you can end the meeting for all participants or leave and let others continue.'
+                : 'Are you sure you want to leave this meeting? You can rejoin anytime using the link.'}
+            </p>
+
+            <div className="space-y-2.5 pt-1">
+              {isHost && (
+                <button
+                  onClick={() => { setShowLeaveModal(false); endMeetingForAll(); }}
+                  className="w-full py-2.5 px-4 bg-[#E02828] hover:bg-[#C01F1F] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-red-500/20"
+                >
+                  <LogOut className="w-4 h-4" />
+                  End Meeting for All
+                </button>
+              )}
+              <button
+                onClick={() => { setShowLeaveModal(false); leaveMeeting(); }}
+                className={`w-full py-2.5 px-4 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all ${
+                  isHost 
+                    ? 'bg-[#333] hover:bg-[#3D3D3D] text-gray-200 border border-white/5' 
+                    : 'bg-[#E02828] hover:bg-[#C01F1F] text-white font-bold shadow-lg shadow-red-500/20'
+                }`}
+              >
+                <LogOut className="w-4 h-4" />
+                {isHost ? 'Leave Meeting (Keep Room Open)' : 'Leave Meeting'}
+              </button>
+              <button
+                onClick={() => setShowLeaveModal(false)}
+                className="w-full py-2 px-4 hover:bg-white/5 text-gray-400 hover:text-white rounded-xl text-xs transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* PART 7: AUDIO DIALOG MODALS                                               */}
