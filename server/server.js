@@ -1010,6 +1010,24 @@ io.on('connection', (socket) => {
       socket.broadcast.emit('user-disconnected', socket.id);
     }
   });
+
+  // Host ends meeting for all participants
+  socket.on('end-meeting-for-all', ({ roomId }) => {
+    if (roomId) {
+      // Notify all other participants in the room to leave
+      socket.to(roomId).emit('meeting-ended', { message: 'The host has ended this meeting.' });
+      console.log(`Host ${socket.id} ended meeting for all in room ${roomId}`);
+    }
+  });
+
+  // Explicit leave-room (before disconnect) — notifies peers immediately
+  socket.on('leave-room', ({ roomId }) => {
+    if (roomId) {
+      socket.to(roomId).emit('user-disconnected', socket.id);
+      socket.leave(roomId);
+      console.log(`Socket ${socket.id} left room ${roomId}`);
+    }
+  });
 });
 
 // Start DB and Express Server

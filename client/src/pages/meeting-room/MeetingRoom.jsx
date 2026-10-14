@@ -103,6 +103,7 @@ export default function MeetingRoom() {
   const { user } = useAuthStore();
 
   const [isHost, setIsHost] = useState(true);
+  const [showLeaveDropdown, setShowLeaveDropdown] = useState(false);
   const [meetingInfo, setMeetingInfo] = useState({ title: `${user?.name || 'User'}'s Meeting`, meetingId });
   const [meetingPermissions, setMeetingPermissions] = useState({
     allowUnmute: true,
@@ -915,6 +916,13 @@ export default function MeetingRoom() {
         setPeers(newPeers);
         setSampleParticipants(prev => prev.filter(p => p.id !== socketId));
         if (playJoinLeaveChime) playChimeSound('leave');
+      });
+
+      // Host ended the meeting for all — navigate away gracefully
+      socketRef.current.on('meeting-ended', ({ message }) => {
+        toast.error(message || 'The host has ended this meeting.', { duration: 4000 });
+        if (stream) stream.getTracks().forEach(track => track.stop());
+        setTimeout(() => navigate(`/meetings/${meetingId}/lifecycle`), 2000);
       });
 
       socketRef.current.on('receive-chat-message', (incomingMsg) => {
@@ -4625,9 +4633,10 @@ export default function MeetingRoom() {
 
   const leaveMeeting = async () => {
     if (stream) stream.getTracks().forEach(track => track.stop());
+    if (socketRef.current) socketRef.current.emit('leave-room', { roomId: meetingId });
     try {
       // Part 40: End Meeting Lifecycle & Trigger Post-Meeting Processing Pipeline
-      await fetch(`http://localhost:5000/api/meetings/${meetingId}/lifecycle/stage`, {
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/lifecycle/stage`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -4637,7 +4646,30 @@ export default function MeetingRoom() {
         }),
       });
       // Fire post-meeting pipeline in background
-      fetch(`http://localhost:5000/api/meetings/${meetingId}/lifecycle/trigger-pipeline`, {
+      fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/lifecycle/trigger-pipeline`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      }).catch(() => null);
+    } catch (e) {
+      console.warn('Lifecycle update error:', e);
+    }
+    navigate(`/meetings/${meetingId}/lifecycle`);
+  };
+
+  const endMeetingForAll = async () => {
+    if (stream) stream.getTracks().forEach(track => track.stop());
+    if (socketRef.current) socketRef.current.emit('end-meeting-for-all', { roomId: meetingId });
+    try {
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/lifecycle/stage`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stage: 'ENDED',
+          triggeredBy: user?.name || 'Host',
+          notes: 'Meeting ended for all participants by host',
+        }),
+      });
+      fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/lifecycle/trigger-pipeline`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       }).catch(() => null);
@@ -8011,14 +8043,63 @@ export default function MeetingRoom() {
           </div>
         </div>
 
-        {/* Right Controls */}
+        {/* Right Controls — Leave / End Meeting */}
         <div className="flex justify-end w-64">
-          <button 
-            onClick={leaveMeeting}
-            className="bg-[#E02828] hover:bg-[#C01F1F] text-white text-[13px] font-bold px-4 h-8 rounded-md transition-colors flex items-center justify-center"
-          >
-            End
-          </button>
+          <div className="relative">
+            {/* Dropdown panel — opens above the button */}
+            {showLeaveDropdown && (
+              <div className="absolute bottom-full right-0 mb-2 w-56 bg-[#1A1A1A] border border-[#3A3A3A] rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
+                {/* Host-only: End for all */}
+                {isHost && (
+                  <button
+                    onClick={() => { setShowLeaveDropdown(false); endMeetingForAll(); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-[13px] font-semibold text-white bg-[#E02828] hover:bg-[#C01F1F] transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                    End Meeting for All
+                  </button>
+                )}
+                {/* Divider only when host (both options visible) */}
+                {isHost && <div className="h-px bg-[#333]" />}
+                {/* Leave meeting (both host & participants) */}
+                <button
+                  onClick={() => { setShowLeaveDropdown(false); leaveMeeting(); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-[13px] font-semibold text-[#E02828] hover:bg-[#2A2A2A] transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                  {isHost ? 'Leave Meeting' : 'Leave Meeting'}
+                </button>
+                {/* Cancel */}
+                <div className="h-px bg-[#333]" />
+                <button
+                  onClick={() => setShowLeaveDropdown(false)}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-[13px] text-gray-400 hover:bg-[#2A2A2A] transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                  Cancel
+                </button>
+              </div>
+            )}
+
+            {/* Red button row: [  Leave ▲ ] */}
+            <div className="flex items-center">
+              <button
+                onClick={() => { setShowLeaveDropdown(false); leaveMeeting(); }}
+                className="bg-[#E02828] hover:bg-[#C01F1F] text-white text-[13px] font-bold px-4 h-9 rounded-l-md transition-colors flex items-center gap-2 whitespace-nowrap"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                {isHost ? 'End' : 'Leave'}
+              </button>
+              {/* Chevron to open dropdown */}
+              <button
+                onClick={() => setShowLeaveDropdown(prev => !prev)}
+                className="bg-[#C01F1F] hover:bg-[#A01818] text-white h-9 px-2 rounded-r-md border-l border-[#E02828]/50 transition-colors flex items-center"
+                title="More leave options"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
