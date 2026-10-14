@@ -13,7 +13,10 @@ function ZoomToggle({ checked, onChange, disabled = false }) {
       role="switch"
       aria-checked={checked}
       disabled={disabled}
-      onClick={() => !disabled && onChange(!checked)}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!disabled) onChange(!checked);
+      }}
       className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
         checked ? 'bg-blue-600' : 'bg-[#404040]'
       } ${disabled ? 'opacity-40 cursor-not-allowed' : 'hover:opacity-90'}`}
@@ -55,13 +58,16 @@ export default function MeetingSecurityPanel({
     if (!isOpen) return;
 
     const handleOutsideClick = (e) => {
-      if (panelRef.current && !panelRef.current.contains(e.target)) {
-        const securityToolbarBtn = document.getElementById('security-toolbar-button');
-        if (securityToolbarBtn && securityToolbarBtn.contains(e.target)) {
-          return;
-        }
-        onClose();
+      // Ignore clicks inside panel
+      if (panelRef.current && panelRef.current.contains(e.target)) {
+        return;
       }
+      // Ignore clicks on security toolbar button (button's own click handler toggles it)
+      const securityToolbarBtn = document.getElementById('security-toolbar-button');
+      if (securityToolbarBtn && securityToolbarBtn.contains(e.target)) {
+        return;
+      }
+      onClose();
     };
 
     const handleKeyDown = (e) => {
@@ -70,11 +76,18 @@ export default function MeetingSecurityPanel({
       }
     };
 
-    document.addEventListener('mousedown', handleOutsideClick);
+    // 60ms delay ensures the opening click event doesn't trigger instant closing
+    const timer = setTimeout(() => {
+      document.addEventListener('mousedown', handleOutsideClick);
+      document.addEventListener('touchstart', handleOutsideClick);
+    }, 60);
+
     document.addEventListener('keydown', handleKeyDown);
 
     return () => {
+      clearTimeout(timer);
       document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('touchstart', handleOutsideClick);
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen, onClose]);
@@ -91,19 +104,20 @@ export default function MeetingSecurityPanel({
 
   return (
     <>
-      {/* Mobile Backdrop overlay to prevent unintentional background interaction */}
+      {/* Light backdrop overlay (dismiss on outside tap) */}
       <div 
-        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs sm:hidden animate-in fade-in duration-150" 
+        className="fixed inset-0 z-[990] bg-black/40 backdrop-blur-[1px] animate-in fade-in duration-150" 
         onClick={onClose} 
       />
 
-      {/* Security Popover / Bottom Sheet */}
+      {/* Security Popover / Modal: Positioned floating directly above toolbar */}
       <div 
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label="Meeting Security Settings"
-        className="fixed inset-x-2 bottom-20 z-50 sm:static sm:absolute sm:inset-auto sm:bottom-full sm:left-0 sm:mb-3 w-auto sm:w-[380px] max-w-[calc(100vw-16px)] bg-[#1A1A1A] border border-[#383838] rounded-2xl shadow-2xl text-xs text-gray-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[82vh] sm:max-h-[78vh]"
+        onClick={(e) => e.stopPropagation()}
+        className="fixed bottom-[74px] left-2 sm:left-12 md:left-24 z-[999] w-[calc(100vw-16px)] sm:w-[390px] bg-[#1A1A1A] border border-[#383838] rounded-2xl shadow-2xl text-xs text-gray-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[calc(100vh-90px)]"
       >
         
         {/* ── Top Header Bar ── */}

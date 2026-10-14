@@ -7269,7 +7269,7 @@ export default function MeetingRoom() {
 
       {/* Bottom Control Bar (Part 37 Theme Support) */}
       <div 
-        className="h-[68px] flex items-center justify-between px-3 shrink-0 transition-all duration-300 border-t relative overflow-hidden"
+        className="h-[68px] flex items-center justify-between px-3 shrink-0 transition-all duration-300 border-t relative"
         style={{
           backgroundColor: (THEMES.find(t => t.id === personalTheme) || THEMES[0]).toolbarBg,
           borderColor: (THEMES.find(t => t.id === personalTheme) || THEMES[0]).panelBg || '#333'
@@ -7506,41 +7506,20 @@ export default function MeetingRoom() {
         {/* Center Controls (Horizontally responsive, scrollable if window is narrow) */}
         <div className="flex items-center justify-center gap-1 sm:gap-1.5 flex-1 min-w-0 py-1 px-1 overflow-x-auto no-scrollbar">
           {/* Host Security Panel Button */}
-          <div className="relative">
-            <button 
-              id="security-toolbar-button"
-              onClick={() => setShowSecurityModal(!showSecurityModal)}
-              className="flex flex-col items-center justify-center w-16 h-14 rounded-lg hover:bg-[#2A2A2A] transition-colors group relative"
-              title="Meeting Security Settings"
-            >
-              <Shield className={`w-5 h-5 mb-1 ${isMeetingLocked ? 'text-amber-400' : 'text-gray-300 group-hover:text-white'}`} />
-              <span className="text-[11px] font-medium text-gray-300">Security</span>
-            </button>
-
-            <MeetingSecurityPanel
-              isOpen={showSecurityModal}
-              onClose={() => setShowSecurityModal(false)}
-              securitySettings={securitySettings}
-              isMeetingLocked={isMeetingLocked}
-              isHostOrCoHost={isHostOrCoHost}
-              waitingQueueCount={waitingRoomQueue?.length || 0}
-              onToggleLock={handleToggleLock}
-              onToggleWaitingRoom={handleToggleWaitingRoom}
-              onToggleHideProfilePictures={handleToggleHideProfilePictures}
-              onUpdatePermissions={handleUpdateParticipantPermissions}
-              onUpdateScreenSharePolicy={handleUpdateScreenSharePolicy}
-              onOpenSuspendModal={() => setShowSuspendModal(true)}
-              onResumeActivities={handleResumeActivities}
-              onOpenRemoveModal={() => setShowRemoveModal(true)}
-              onOpenParticipantsDrawer={() => {
-                setShowRightPanel(true);
-                setRightPanelTab('participants');
-              }}
-              watermarkSettings={watermarkSettings}
-              onToggleVisualWatermark={handleToggleVisualWatermark}
-              onOpenWatermarkSettings={() => setShowWatermarkSettingsModal(true)}
-            />
-          </div>
+          <button 
+            id="security-toolbar-button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowSecurityModal(prev => !prev);
+            }}
+            className={`flex flex-col items-center justify-center w-16 h-14 rounded-lg transition-colors group relative ${
+              showSecurityModal ? 'bg-[#2A2A2A] text-white' : 'hover:bg-[#2A2A2A]'
+            }`}
+            title="Meeting Security Settings"
+          >
+            <Shield className={`w-5 h-5 mb-1 ${isMeetingLocked ? 'text-amber-400' : 'text-gray-300 group-hover:text-white'}`} />
+            <span className="text-[11px] font-medium text-gray-300">Security</span>
+          </button>
 
           {/* Participants Button */}
           <button 
@@ -9318,6 +9297,31 @@ export default function MeetingRoom() {
         participants={allParticipants}
         currentUserId={user?.id || user?._id || 'local'}
         onConfirmRemove={handleRemoveParticipant}
+      />
+
+      {/* Zoom-Style Meeting Security Panel (Root level to guarantee zero clipping) */}
+      <MeetingSecurityPanel
+        isOpen={showSecurityModal}
+        onClose={() => setShowSecurityModal(false)}
+        securitySettings={securitySettings}
+        isMeetingLocked={isMeetingLocked}
+        isHostOrCoHost={isHostOrCoHost}
+        waitingQueueCount={waitingRoomQueue?.length || 0}
+        onToggleLock={handleToggleLock}
+        onToggleWaitingRoom={handleToggleWaitingRoom}
+        onToggleHideProfilePictures={handleToggleHideProfilePictures}
+        onUpdatePermissions={handleUpdateParticipantPermissions}
+        onUpdateScreenSharePolicy={handleUpdateScreenSharePolicy}
+        onOpenSuspendModal={() => setShowSuspendModal(true)}
+        onResumeActivities={handleResumeActivities}
+        onOpenRemoveModal={() => setShowRemoveModal(true)}
+        onOpenParticipantsDrawer={() => {
+          setShowRightPanel(true);
+          setRightPanelTab('participants');
+        }}
+        watermarkSettings={watermarkSettings}
+        onToggleVisualWatermark={handleToggleVisualWatermark}
+        onOpenWatermarkSettings={() => setShowWatermarkSettingsModal(true)}
       />
 
       {/* 11.16: Invite Participants Modal */}
