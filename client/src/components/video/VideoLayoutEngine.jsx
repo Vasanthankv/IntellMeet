@@ -273,7 +273,16 @@ export default function VideoLayoutEngine({
             </div>
           ) : isVideoOn ? (
             <video
-              ref={userVideoRef}
+              ref={(el) => {
+                if (userVideoRef) {
+                  if (typeof userVideoRef === 'function') userVideoRef(el);
+                  else userVideoRef.current = el;
+                }
+                if (el && localStream && el.srcObject !== localStream) {
+                  el.srcObject = localStream;
+                  el.play().catch(e => console.warn('Local video play error:', e));
+                }
+              }}
               autoPlay
               playsInline
               muted
@@ -400,9 +409,9 @@ export default function VideoLayoutEngine({
           )}
         </div>
 
-        {/* Part 32: Visual Watermark Overlay on Participant Video Tile (32.1) */}
+        {/* Part 32: Visual Watermark Overlay on Participant Video Tile (Disabled to prevent visual clutter) */}
         <WatermarkOverlay
-          enabled={watermarkSettings?.visualEnabled}
+          enabled={false}
           mode={watermarkSettings?.visualMode || 'repeated'}
           visibleOn={watermarkSettings?.visibleOn || 'both'}
           containerType="video"
@@ -701,9 +710,9 @@ export default function VideoLayoutEngine({
               />
             )}
 
-            {/* Part 32: Visual Watermark Overlay on Focused Screen Share (32.1) */}
+            {/* Part 32: Visual Watermark Overlay on Focused Screen Share (Disabled to prevent visual clutter) */}
             <WatermarkOverlay
-              enabled={watermarkSettings?.visualEnabled}
+              enabled={false}
               mode={watermarkSettings?.visualMode || 'repeated'}
               visibleOn={watermarkSettings?.visibleOn || 'both'}
               containerType="sharedContent"
@@ -1011,9 +1020,9 @@ export default function VideoLayoutEngine({
               />
             )}
 
-            {/* Part 32: Visual Watermark Overlay on Shared Screen Canvas (32.1) */}
+            {/* Part 32: Visual Watermark Overlay on Shared Screen Canvas (Disabled to prevent visual clutter) */}
             <WatermarkOverlay
-              enabled={watermarkSettings?.visualEnabled}
+              enabled={false}
               mode={watermarkSettings?.visualMode || 'repeated'}
               visibleOn={watermarkSettings?.visibleOn || 'both'}
               containerType="sharedContent"

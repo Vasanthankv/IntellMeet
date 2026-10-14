@@ -145,7 +145,7 @@ export default function MeetingRoom() {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   
   // UI Panels
-  const [showRightPanel, setShowRightPanel] = useState(true);
+  const [showRightPanel, setShowRightPanel] = useState(false);
   const [showSecurityPopover, setShowSecurityPopover] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
   const [showChatIntro, setShowChatIntro] = useState(true);
@@ -2232,18 +2232,79 @@ export default function MeetingRoom() {
     });
   };
 
-  const toggleVideo = () => {
-    if (stream) {
-      const videoTrack = stream.getVideoTracks().find(track => track.label !== 'screen' && !track.label.includes('screen')) || stream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setIsVideoOn(videoTrack.enabled);
+  const toggleVideo = async () => {
+    try {
+      if (isVideoOn) {
+        // Stop Video: disable track
+        const activeStream = stream || localStreamRef.current;
+        if (activeStream) {
+          const videoTracks = activeStream.getVideoTracks().filter(t => !t.label.includes('screen'));
+          videoTracks.forEach(track => {
+            track.enabled = false;
+          });
+        }
+        setIsVideoOn(false);
         const cleanMId = meetingId ? meetingId.replace(/[\s-]/g, '') : '';
-        socketRef.current?.emit('toggle-media-state', cleanMId || meetingId, { isVideoOn: videoTrack.enabled });
-        toast(videoTrack.enabled ? 'Video started' : 'Video stopped', {
-          icon: videoTrack.enabled ? '📹' : '🚫'
-        });
+        socketRef.current?.emit('toggle-media-state', cleanMId || meetingId, { isVideoOn: false });
+        toast('Video stopped', { icon: '🚫' });
+      } else {
+        // Start Video: recover ended/missing track if necessary and re-enable
+        let activeStream = stream || localStreamRef.current;
+        let videoTrack = activeStream ? activeStream.getVideoTracks().find(track => !track.label.includes('screen')) : null;
+
+        if (!videoTrack || videoTrack.readyState === 'ended') {
+          const constraints = {
+            video: selectedCamera === 'default' ? true : { deviceId: { exact: selectedCamera } }
+          };
+          const freshMediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+          const newVideoTrack = freshMediaStream.getVideoTracks()[0];
+
+          if (!activeStream) {
+            activeStream = new MediaStream([newVideoTrack]);
+            setStream(activeStream);
+            localStreamRef.current = activeStream;
+          } else {
+            if (videoTrack) {
+              try { activeStream.removeTrack(videoTrack); } catch (e) {}
+            }
+            activeStream.addTrack(newVideoTrack);
+          }
+
+          // Hot-swap or add track on all connected peers
+          peersRef.current.forEach(({ peer }) => {
+            if (peer) {
+              try {
+                if (videoTrack) {
+                  peer.replaceTrack(videoTrack, newVideoTrack, activeStream);
+                } else {
+                  peer.addTrack(newVideoTrack, activeStream);
+                }
+              } catch (e) {
+                console.warn('Peer track update on camera start:', e);
+              }
+            }
+          });
+
+          videoTrack = newVideoTrack;
+        }
+
+        videoTrack.enabled = true;
+        setIsVideoOn(true);
+
+        if (userVideo.current) {
+          if (userVideo.current.srcObject !== activeStream) {
+            userVideo.current.srcObject = activeStream;
+          }
+          userVideo.current.play().catch(e => console.warn('User video play error:', e));
+        }
+
+        const cleanMId = meetingId ? meetingId.replace(/[\s-]/g, '') : '';
+        socketRef.current?.emit('toggle-media-state', cleanMId || meetingId, { isVideoOn: true });
+        toast('Video started', { icon: '📹' });
       }
+    } catch (err) {
+      console.error('toggleVideo error:', err);
+      toast.error('Could not access camera: ' + (err.message || 'Permission denied'));
     }
   };
 
@@ -5677,7 +5738,7 @@ export default function MeetingRoom() {
         
         {/* Main Video Stage Engine (Sections 8.8 - 8.16 & Part 9 & Part 37 Personalization) */}
         <div 
-          className="flex-1 flex relative overflow-hidden transition-all duration-300"
+          className="flex-1 min-w-0 flex relative overflow-hidden transition-all duration-300"
           style={{
             backgroundColor: (THEMES.find(t => t.id === personalTheme) || THEMES[0]).canvasBg,
             ...(customWallpaper?.url ? {
@@ -5838,17 +5899,6 @@ export default function MeetingRoom() {
             </>
           )}
 
-          {/* Dynamic Attendee Watermark Protection */}
-          {securitySettings.watermark && (
-            <div className="absolute inset-0 pointer-events-none z-30 overflow-hidden flex flex-wrap gap-8 opacity-20 select-none p-4 text-white text-[11px] font-mono font-bold rotate-[-15deg]">
-              {Array.from({ length: 24 }).map((_, i) => (
-                <span key={i} className="whitespace-nowrap">
-                  {user?.email || sessionStorage.getItem('intellmeet_guest_name') || 'IntellMeet Secure'} • {new Date().toLocaleDateString()}
-                </span>
-              ))}
-            </div>
-          )}
-
           {/* Screen-Capture Protection Mask */}
           {screenCaptureShield && (
             <div className="absolute inset-0 bg-[#121212]/95 backdrop-blur-xl z-40 flex flex-col items-center justify-center text-white p-6 select-none animate-fade-in text-center">
@@ -5863,7 +5913,7 @@ export default function MeetingRoom() {
 
         {/* Right Split Pane (Chat & Participants) */}
         {showRightPanel && (
-          <div className="w-80 flex flex-col border-l border-[#333] bg-[#1A1A1A]">
+          <div className="w-80 shrink-0 flex flex-col border-l border-[#333] bg-[#1A1A1A] z-20">
             
             {/* Top Navigation Switcher for Right Panel (Part 11.1 & Part 10) */}
             <div className="h-10 border-b border-[#333] flex items-center justify-between px-2 bg-[#202020] shrink-0 select-none">
@@ -7317,12 +7367,12 @@ export default function MeetingRoom() {
         </div>
 
         {/* Center Controls (Horizontally responsive, scrollable if window is narrow) */}
-        <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto no-scrollbar py-1 px-2">
+        <div className="flex items-center justify-center gap-1.5 flex-1 min-w-0 py-1 px-2">
           {/* Host Security Panel Button */}
           <div className="relative">
             <button 
               onClick={() => setShowSecurityModal(!showSecurityModal)}
-              className="flex flex-col items-center justify-center w-16 h-14 rounded hover:bg-[#2A2A2A] transition-colors group relative"
+              className="flex flex-col items-center justify-center w-16 h-14 rounded-lg hover:bg-[#2A2A2A] transition-colors group relative"
               title="Meeting Security Settings"
             >
               <Shield className={`w-5 h-5 mb-1 ${isMeetingLocked ? 'text-amber-400' : 'text-gray-300 group-hover:text-white'}`} />
@@ -7354,23 +7404,7 @@ export default function MeetingRoom() {
             />
           </div>
 
-          <button 
-            onClick={() => {
-              if (showRightPanel && rightPanelTab === 'chat') {
-                setShowRightPanel(false);
-              } else {
-                setShowRightPanel(true);
-                setRightPanelTab('chat');
-              }
-            }}
-            className={`flex flex-col items-center justify-center w-16 h-14 rounded transition-colors group relative ${
-              showRightPanel && rightPanelTab === 'chat' ? 'bg-[#2A2A2A] text-white' : 'hover:bg-[#2A2A2A]'
-            }`}
-          >
-            <MessageSquare className="w-5 h-5 mb-1 text-gray-300 group-hover:text-white" />
-            <span className="text-[11px] font-medium text-gray-300">Chat</span>
-          </button>
-          
+          {/* Participants Button */}
           <button 
             onClick={() => {
               if (showRightPanel && rightPanelTab === 'participants') {
@@ -7380,9 +7414,10 @@ export default function MeetingRoom() {
                 setRightPanelTab('participants');
               }
             }}
-            className={`flex flex-col items-center justify-center w-16 h-14 rounded transition-colors group relative ${
+            className={`flex flex-col items-center justify-center w-16 h-14 rounded-lg transition-colors group relative ${
               showRightPanel && rightPanelTab === 'participants' ? 'bg-[#2A2A2A] text-white' : 'hover:bg-[#2A2A2A]'
             }`}
+            title="Manage Participants"
           >
             <div className="relative">
               <Users className="w-5 h-5 mb-1 text-gray-300 group-hover:text-white" />
@@ -7390,12 +7425,238 @@ export default function MeetingRoom() {
             </div>
             <span className="text-[11px] font-medium text-gray-300">Participants</span>
           </button>
-          
+
+          {/* Chat Button */}
+          <button 
+            onClick={() => {
+              if (showRightPanel && rightPanelTab === 'chat') {
+                setShowRightPanel(false);
+              } else {
+                setShowRightPanel(true);
+                setRightPanelTab('chat');
+              }
+            }}
+            className={`flex flex-col items-center justify-center w-16 h-14 rounded-lg transition-colors group relative ${
+              showRightPanel && rightPanelTab === 'chat' ? 'bg-[#2A2A2A] text-white' : 'hover:bg-[#2A2A2A]'
+            }`}
+            title="Meeting Chat"
+          >
+            <MessageSquare className="w-5 h-5 mb-1 text-gray-300 group-hover:text-white" />
+            <span className="text-[11px] font-medium text-gray-300">Chat</span>
+          </button>
+
+          {/* Part 13: Screen Sharing Button with ▲ Options Menu (13.1, 13.10, 13.11) */}
+          <div className="flex items-center rounded-lg hover:bg-[#2A2A2A] transition-colors group relative">
+            <button 
+              onClick={() => {
+                if (isScreenSharing && screenShareDetails?.sharerId === (user?.id || 'local')) {
+                  handleStopShare();
+                } else {
+                  handleOpenShareModal();
+                }
+              }}
+              className="flex flex-col items-center justify-center w-14 h-14 pl-1"
+              title={isScreenSharing ? 'Stop Screen Share' : 'Share Screen'}
+            >
+              <div className={`w-6 h-6 rounded ${isScreenSharing ? 'bg-red-500 animate-pulse' : 'bg-emerald-600'} flex items-center justify-center mb-0.5 shadow-sm`}>
+                <Share className="w-3.5 h-3.5 text-white" />
+              </div>
+              <span className={`text-[11px] font-medium ${isScreenSharing ? 'text-red-400 font-bold' : 'text-emerald-400 font-semibold'}`}>
+                {isScreenSharing ? 'Stop Share' : 'Share'}
+              </span>
+            </button>
+
+            {/* Chevron Menu Button (13.10 & 13.11) */}
+            <button
+              onClick={() => setShowShareChevronMenu(!showShareChevronMenu)}
+              className="h-14 px-1 rounded-r text-gray-400 hover:text-white transition-colors flex items-center justify-center border-l border-white/5"
+              title="Screen Sharing Options and Permissions"
+            >
+              <ChevronUp className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Screen Sharing Popover Menu (13.10 & 13.11) */}
+            {showShareChevronMenu && (
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl shadow-2xl p-2 z-50 text-xs text-gray-200 space-y-1 animate-in fade-in zoom-in-95 duration-100">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2 py-1 block border-b border-[#333]">
+                  Sharing Permissions (Host Tools)
+                </span>
+
+                <button
+                  onClick={() => {
+                    handleUpdateSharingSettings({ ...sharingSettings, mode: 'oneParticipant' });
+                    setShowShareChevronMenu(false);
+                  }}
+                  className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-white/5 flex items-center justify-between transition-colors"
+                >
+                  <span>One participant can share at a time</span>
+                  {sharingSettings.mode === 'oneParticipant' && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                </button>
+
+                <button
+                  onClick={() => {
+                    handleUpdateSharingSettings({ ...sharingSettings, mode: 'multiple' });
+                    setShowShareChevronMenu(false);
+                  }}
+                  className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-white/5 flex items-center justify-between transition-colors"
+                >
+                  <span>Multiple participants can share</span>
+                  {sharingSettings.mode === 'multiple' && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                </button>
+
+                {sharingSettings.mode === 'multiple' && (
+                  <button
+                    onClick={() => {
+                      handleSimulateMultiShare();
+                      setShowShareChevronMenu(false);
+                    }}
+                    className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-blue-600/20 text-blue-400 hover:text-blue-300 font-semibold flex items-center justify-between transition-colors"
+                  >
+                    <span>Simulate Multi-Share (Arun & Priya)</span>
+                    <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                  </button>
+                )}
+
+                <div className="my-1 border-t border-[#333]"></div>
+
+                {/* Part 15: Annotation Permissions (15.4, 15.6) */}
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2 py-1 block">
+                  Annotation Permissions (Host)
+                </span>
+                <button
+                  onClick={() => {
+                    const next = annotationSettings.annotationPermission === 'all' ? 'presenterOnly' : 'all';
+                    handleUpdateAnnotationSettings({ ...annotationSettings, annotationPermission: next });
+                  }}
+                  className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-white/5 flex items-center justify-between transition-colors"
+                >
+                  <span>Allow participants to annotate</span>
+                  {annotationSettings.annotationPermission === 'all' && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                </button>
+                <button
+                  onClick={() => {
+                    handleUpdateAnnotationSettings({ ...annotationSettings, showAnnotatorNames: !showAnnotatorNames });
+                  }}
+                  className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-white/5 flex items-center justify-between transition-colors"
+                >
+                  <span>Show names of annotators</span>
+                  {showAnnotatorNames && <Check className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
+                </button>
+
+                {/* Part 16: Slide Control Options in Share Chevron Menu */}
+                {presentationSession && (
+                  <>
+                    <div className="my-1 border-t border-[#333]"></div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2 py-1 block">
+                      Slide Control (Presentation)
+                    </span>
+                    <button
+                      onClick={() => {
+                        setShowShareChevronMenu(false);
+                        setShowSlideControlModal(true);
+                      }}
+                      className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-orange-600/20 text-orange-400 hover:text-orange-300 font-semibold flex items-center justify-between transition-colors"
+                    >
+                      <span>Slide Control Settings...</span>
+                      <Presentation className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
+
+                <div className="my-1 border-t border-[#333]"></div>
+
+                <button
+                  onClick={() => {
+                    setShowShareChevronMenu(false);
+                    setShowAdvancedShareModal(true);
+                  }}
+                  className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-white/5 text-blue-400 hover:text-blue-300 font-semibold flex items-center justify-between transition-colors"
+                >
+                  <span>Advanced Sharing Options...</span>
+                  <Sliders className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Part 15: Annotation Toggle Toolbar Button (15.1, 15.11) - Only visible when screen sharing */}
+          {isScreenSharing && (
+            <button
+              onClick={handleToggleAnnotate}
+              className={`flex flex-col items-center justify-center w-16 h-14 rounded-lg transition-colors group ${
+                isAnnotating ? 'bg-blue-600/30 text-blue-400 font-bold border border-blue-500/40' : 'hover:bg-[#2A2A2A] text-gray-300'
+              }`}
+              title="Toggle Annotation Toolbar (Draw, Highlight, Text on Shared Screen)"
+            >
+              <Pen className={`w-5 h-5 mb-1 ${isAnnotating ? 'text-blue-400 scale-110' : 'text-gray-300 group-hover:text-white'}`} />
+              <span className="text-[11px] font-medium">{isAnnotating ? 'Annotating' : 'Annotate'}</span>
+            </button>
+          )}
+
+          {/* Part 16: Slide Control Active Bar Indicator in Bottom Toolbar (16.2, 16.11) */}
+          {presentationSession && (
+            <button
+              onClick={() => setShowSlideControlModal(true)}
+              className="flex flex-col items-center justify-center w-16 h-14 rounded-lg hover:bg-[#2A2A2A] transition-colors group relative bg-orange-600/20 border border-orange-500/40 text-orange-300"
+              title="Slide Control Settings & Active Presenters"
+            >
+              <Presentation className="w-5 h-5 mb-1 text-orange-400" />
+              <span className="text-[11px] font-medium">Slides</span>
+            </button>
+          )}
+
+          {/* Part 23: In-Meeting Toolbar Recording Button with Popover (23.3, 23.7, 23.18) */}
+          <div className="relative">
+            <button 
+              onClick={() => {
+                if (isMeetingRecording) {
+                  handleStopRecording();
+                } else {
+                  setShowRecordingMenu(!showRecordingMenu);
+                }
+              }}
+              className={`flex flex-col items-center justify-center w-16 h-14 rounded-lg transition-colors group relative ${
+                isMeetingRecording ? 'bg-red-950/40 text-red-400 font-bold border border-red-500/40' : 'hover:bg-[#2A2A2A] text-gray-300'
+              }`}
+              title={isMeetingRecording ? `Stop Recording (${recordingMode})` : 'Record Meeting (Computer or Cloud)'}
+            >
+              <div className="relative">
+                <Disc className={`w-5 h-5 mb-1 ${isMeetingRecording ? 'text-red-500 animate-pulse scale-110' : 'text-gray-300 group-hover:text-red-400'} transition-transform`} />
+                {isMeetingRecording && (
+                  <span className="absolute -top-1 -right-2 text-[8px] bg-red-600 text-white font-black px-1 rounded-full uppercase shadow">
+                    {recordingMode === 'LOCAL' ? 'LOC' : 'CLD'}
+                  </span>
+                )}
+              </div>
+              <span className={`text-[11px] font-medium ${isMeetingRecording ? 'text-red-400' : 'text-gray-300'}`}>
+                {isMeetingRecording ? 'Recording' : 'Record'}
+              </span>
+            </button>
+
+            {/* Recording Options Popover (23.2, 23.6, 23.14) */}
+            <RecordingMenuPopover
+              isOpen={showRecordingMenu}
+              onClose={() => setShowRecordingMenu(false)}
+              onStartRecording={handleStartRecording}
+              onOpenSettings={() => {
+                setShowRecordingMenu(false);
+                setShowRecordingSettingsModal(true);
+              }}
+              isRecording={isMeetingRecording}
+              recordingMode={recordingMode}
+              recordingLayout={recordingLayout}
+              onChangeLayout={(layout) => setRecordingLayout(layout)}
+              canRecordLocal={isHost || user?.id === 'host' || coHosts?.includes(user?.id) || participantCanRecordLocal}
+              canRecordCloud={isHost || user?.id === 'host' || coHosts?.includes(user?.id)}
+              storageStats={recordingSettings?.cloudStorage}
+            />
+          </div>
+
           {/* Part 12: Reactions & Non-Verbal Feedback Toolbar Button & 3-Tier Popover */}
           <div className="relative">
             <button 
               onClick={() => setShowReactions(!showReactions)}
-              className={`flex flex-col items-center justify-center w-16 h-14 rounded transition-colors group relative ${
+              className={`flex flex-col items-center justify-center w-16 h-14 rounded-lg transition-colors group relative ${
                 handRaised ? 'bg-amber-500/20 text-amber-300' : 'hover:bg-[#2A2A2A]'
               }`}
               title="Reactions and Non-verbal Feedback"
@@ -7535,605 +7796,314 @@ export default function MeetingRoom() {
             )}
           </div>
 
-          {/* Part 23: In-Meeting Toolbar Recording Button with Popover (23.3, 23.7, 23.18) */}
-          <div className="relative">
-            <button 
-              onClick={() => {
-                if (isMeetingRecording) {
-                  handleStopRecording();
-                } else {
-                  setShowRecordingMenu(!showRecordingMenu);
-                }
-              }}
-              className={`flex flex-col items-center justify-center w-16 h-14 rounded transition-colors group relative ${
-                isMeetingRecording ? 'bg-red-950/40 text-red-400 font-bold border border-red-500/40' : 'hover:bg-[#2A2A2A] text-gray-300'
-              }`}
-              title={isMeetingRecording ? `Stop Recording (${recordingMode})` : 'Record Meeting (Computer or Cloud)'}
-            >
-              <div className="relative">
-                <Disc className={`w-5 h-5 mb-1 ${isMeetingRecording ? 'text-red-500 animate-pulse scale-110' : 'text-gray-300 group-hover:text-red-400'} transition-transform`} />
-                {isMeetingRecording && (
-                  <span className="absolute -top-1 -right-2 text-[8px] bg-red-600 text-white font-black px-1 rounded-full uppercase shadow">
-                    {recordingMode === 'LOCAL' ? 'LOC' : 'CLD'}
-                  </span>
-                )}
-              </div>
-              <span className={`text-[11px] font-medium ${isMeetingRecording ? 'text-red-400' : 'text-gray-300'}`}>
-                {isMeetingRecording ? 'Recording' : 'Record'}
-              </span>
-            </button>
-
-            {/* Recording Options Popover (23.2, 23.6, 23.14) */}
-            <RecordingMenuPopover
-              isOpen={showRecordingMenu}
-              onClose={() => setShowRecordingMenu(false)}
-              onStartRecording={handleStartRecording}
-              onOpenSettings={() => {
-                setShowRecordingMenu(false);
-                setShowRecordingSettingsModal(true);
-              }}
-              isRecording={isMeetingRecording}
-              recordingMode={recordingMode}
-              recordingLayout={recordingLayout}
-              onChangeLayout={(layout) => setRecordingLayout(layout)}
-              canRecordLocal={isHost || user?.id === 'host' || coHosts?.includes(user?.id) || participantCanRecordLocal}
-              canRecordCloud={isHost || user?.id === 'host' || coHosts?.includes(user?.id)}
-              storageStats={recordingSettings?.cloudStorage}
-            />
-          </div>
-          
-          {/* Part 20: In-Meeting Toolbar Live Captions Button with ▲ Options Menu (20.2, 20.11) */}
-          <div className="flex items-center rounded hover:bg-[#2A2A2A] transition-colors group relative">
-            <button 
-              onClick={toggleLiveCaptions}
-              className={`flex flex-col items-center justify-center w-14 h-14 pl-1 ${
-                showLiveCaptions ? 'text-emerald-400 font-bold' : 'text-gray-300'
-              }`}
-              title={showLiveCaptions ? 'Hide Live Captions' : 'Show Live Captions'}
-            >
-              <div className="relative">
-                <Subtitles className={`w-5 h-5 mb-1 ${showLiveCaptions ? 'text-emerald-400 scale-110' : 'text-gray-300 group-hover:text-white'} transition-transform`} />
-                {showLiveCaptions && (
-                  <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                )}
-              </div>
-              <span className="text-[11px] font-medium">{showLiveCaptions ? 'Captions On' : 'Captions'}</span>
-            </button>
-
-            {/* Chevron Menu Button (20.2, 20.4, 20.5) */}
-            <button
-              onClick={() => setShowCaptionsChevronMenu(!showCaptionsChevronMenu)}
-              className="h-14 px-1 rounded-r text-gray-400 hover:text-white transition-colors flex items-center justify-center border-l border-white/5"
-              title="Caption & Translation Options"
-            >
-              <ChevronUp className="w-3.5 h-3.5" />
-            </button>
-
-            {/* Captions Popover Menu */}
-            {showCaptionsChevronMenu && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-64 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl shadow-2xl p-2 z-50 text-xs text-gray-200 space-y-1 animate-in fade-in zoom-in-95 duration-100">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2 py-1 block border-b border-[#333]">
-                  Live Caption Controls (20.2)
-                </span>
-
-                <button
-                  onClick={() => {
-                    toggleLiveCaptions();
-                    setShowCaptionsChevronMenu(false);
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between text-xs"
-                >
-                  <span>{showLiveCaptions ? 'Hide Captions' : 'Show Captions'}</span>
-                  {showLiveCaptions && <Check className="w-3.5 h-3.5 text-emerald-400" />}
-                </button>
-
-                <button
-                  onClick={() => {
-                    setShowTranscriptPanel(true);
-                    setShowCaptionsChevronMenu(false);
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between text-xs text-blue-300"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5" /> View Full Transcript
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setShowTranslationModal(true);
-                    setShowCaptionsChevronMenu(false);
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between text-xs text-purple-300 font-medium"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <Globe className="w-3.5 h-3.5 text-purple-400" /> Language Translation (21.4)
-                  </span>
-                  <span className="text-[10px] bg-purple-900/60 px-1 rounded uppercase font-bold text-white">{participantTargetLanguage}</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setShowCaptionSettingsModal(true);
-                    setShowCaptionsChevronMenu(false);
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between text-xs"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <Settings className="w-3.5 h-3.5" /> Caption Settings...
-                  </span>
-                </button>
-
-                {(isHost || user?.id === 'host' || captionSettings.assignedCaptionerId === (user?.id || user?._id)) && (
-                  <button
-                    onClick={() => {
-                      setShowManualCaptionModal(true);
-                      setShowCaptionsChevronMenu(false);
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between text-xs text-indigo-300"
-                  >
-                    <span>Manual Caption Entry...</span>
-                  </button>
-                )}
-
-                {isHost && (
-                  <div className="pt-1 border-t border-[#333]">
-                    <button
-                      onClick={() => {
-                        toggleRetainedTranscription();
-                        setShowCaptionsChevronMenu(false);
-                      }}
-                      className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between text-xs font-semibold text-amber-300"
-                    >
-                      <span>{isTranscribing ? 'Stop Transcription' : 'Start Retained Transcription'}</span>
-                      {isTranscribing && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Part 21: In-Meeting Toolbar Translation Button (21.4, 21.11, 21.13) */}
-          <button 
-            onClick={() => setShowTranslationModal(true)}
-            className={`flex flex-col items-center justify-center w-16 h-14 rounded hover:bg-[#2A2A2A] transition-colors group relative ${
-              participantTranslationEnabled ? 'text-purple-400 font-bold' : 'text-gray-300'
-            }`}
-            title={`Multilingual Translation: Target language is ${participantTargetLanguage?.toUpperCase()}`}
-          >
-            <div className="relative">
-              <Globe className={`w-5 h-5 mb-1 ${participantTranslationEnabled ? 'text-purple-400 scale-110' : 'text-gray-300 group-hover:text-white'} transition-transform`} />
-              {participantTranslationEnabled && (
-                <span className="absolute -top-1 -right-2 text-[9px] bg-purple-600 text-white font-bold px-1 rounded-full uppercase shadow">
-                  {participantTargetLanguage || 'TA'}
-                </span>
-              )}
-            </div>
-            <span className="text-[11px] font-medium">Translate</span>
-          </button>
-
-          {/* Part 22: Language Interpretation Toolbar Button (22.1 - 22.23) */}
-          <button 
-            onClick={() => setShowInterpretationModal(true)}
-            className={`flex flex-col items-center justify-center w-16 h-14 rounded hover:bg-[#2A2A2A] transition-colors group relative ${
-              selectedInterpretationChannel !== 'original' || (interpretationSession?.status === 'ACTIVE') ? 'text-indigo-400 font-bold' : 'text-gray-300'
-            }`}
-            title={`Language Interpretation: ${selectedInterpretationChannel === 'original' ? 'Original Audio' : selectedInterpretationChannel.toUpperCase()}`}
-          >
-            <div className="relative">
-              <Headphones className={`w-5 h-5 mb-1 ${selectedInterpretationChannel !== 'original' ? 'text-indigo-400 scale-110' : 'text-gray-300 group-hover:text-white'} transition-transform`} />
-              {selectedInterpretationChannel !== 'original' && (
-                <span className="absolute -top-1 -right-2 text-[9px] bg-indigo-600 text-white font-bold px-1 rounded-full uppercase shadow">
-                  {selectedInterpretationChannel}
-                </span>
-              )}
-              {interpretationSession?.status === 'ACTIVE' && selectedInterpretationChannel === 'original' && (
-                <span className="absolute -top-0.5 -right-1 w-2 h-2 bg-emerald-500 rounded-full border border-[#1e1e1e]" />
-              )}
-            </div>
-            <span className="text-[11px] font-medium">Interpretation</span>
-          </button>
-
-
-          <button 
-            onClick={() => {
-              if (encryptionData?.type === 'E2EE') {
-                toast.error('AI Meeting Summary is disabled in End-to-End Encrypted meetings (Section 31.8 Policy)', { icon: '🔒' });
-                return;
-              }
-              setShowAISummaryModal(true);
-            }}
-            className={`flex flex-col items-center justify-center w-20 h-14 rounded hover:bg-[#2A2A2A] transition-colors group relative ${
-              showAISummaryModal || meetingSummaryRecord?.status === 'ACTIVE' ? 'bg-[#2A2A2A] text-purple-400 font-bold' : 'text-gray-300'
-            } ${encryptionData?.type === 'E2EE' ? 'opacity-50 cursor-not-allowed' : ''}`}
-            title={encryptionData?.type === 'E2EE' ? 'Disabled in E2EE (Section 31.8 Policy)' : 'AI Meeting Summary (Zoom-grade Intelligence)'}
-          >
-            <BrainCircuit className="w-5 h-5 mb-1 text-purple-400 group-hover:text-purple-300" />
-            <span className="text-[11px] font-medium text-purple-400">AI Summary</span>
-            {meetingSummaryRecord?.status === 'ACTIVE' && (
-              <span className="absolute top-2 right-3 w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            )}
-          </button>
-
-          {/* Part 26: AI Meeting Questions Button (26.1 - 26.29) */}
-          <button 
-            onClick={() => {
-              if (encryptionData?.type === 'E2EE') {
-                toast.error('AI Meeting Questions is disabled in End-to-End Encrypted meetings (Section 31.8 Policy)', { icon: '🔒' });
-                return;
-              }
-              setShowAIQuestionsDrawer(true);
-            }}
-            className={`flex flex-col items-center justify-center w-16 h-14 rounded hover:bg-[#2A2A2A] transition-colors group relative ${
-              showAIQuestionsDrawer ? 'bg-[#2A2A2A] text-purple-400 font-bold' : 'text-gray-300'
-            } ${encryptionData?.type === 'E2EE' ? 'opacity-50 cursor-not-allowed' : ''}`}
-            title={encryptionData?.type === 'E2EE' ? 'Disabled in E2EE (Section 31.8 Policy)' : 'Ask AI questions about this meeting without interrupting (Zoom AI)'}
-          >
-            <HelpCircle className="w-5 h-5 mb-1 text-purple-400 group-hover:text-purple-300" />
-            <span className="text-[11px] font-medium text-purple-400">Questions</span>
-          </button>
-
-          {/* Part 27: AI / Personal Notes (My Notes) Button (27.1 - 27.12) */}
-          <button 
-            onClick={() => setShowMyNotesDrawer(true)}
-            className={`flex flex-col items-center justify-center w-16 h-14 rounded hover:bg-[#2A2A2A] transition-colors group relative ${
-              showMyNotesDrawer ? 'bg-[#2A2A2A] text-amber-400 font-bold' : 'text-gray-300'
-            }`}
-            title="My Notes: Personal notes, transcript sync, and AI enrichment (Zoom AI)"
-          >
-            <FileText className="w-5 h-5 mb-1 text-amber-400 group-hover:text-amber-300" />
-            <span className="text-[11px] font-medium text-amber-400">My Notes</span>
-          </button>
-
-          {/* Part 36: Live Agenda, Pre-reads & Shared Notes Button (36.1 - 36.15) */}
-          <button 
-            onClick={() => setShowAgendaDrawer(true)}
-            className={`flex flex-col items-center justify-center w-16 h-14 rounded hover:bg-[#2A2A2A] transition-colors group relative ${
-              showAgendaDrawer ? 'bg-[#2A2A2A] text-emerald-400 font-bold' : 'text-gray-300'
-            }`}
-            title="Meeting Agenda, Pre-reads & Shared Notes (Part 36)"
-          >
-            <ListChecks className="w-5 h-5 mb-1 text-emerald-400 group-hover:text-emerald-300" />
-            <span className="text-[11px] font-medium text-emerald-400">Agenda</span>
-          </button>
-
-          {/* Part 33: Live Streaming Toolbar Button (33.9, 33.11, 33.16) */}
-          <button 
-            onClick={() => setShowLiveStreamingModal(true)}
-            className={`flex flex-col items-center justify-center w-16 h-14 rounded hover:bg-[#2A2A2A] transition-colors group relative ${
-              liveStreamSession?.status === 'LIVE' ? 'bg-[#2A2A2A] text-red-400 font-bold' : 'text-gray-300'
-            }`}
-            title="Live Streaming (YouTube, Facebook, Twitch, Custom RTMP)"
-          >
-            <div className="relative">
-              <Radio className={`w-5 h-5 mb-1 ${liveStreamSession?.status === 'LIVE' ? 'text-red-500 animate-pulse scale-110' : 'text-gray-300 group-hover:text-red-400'} transition-transform`} />
-              {liveStreamSession?.status === 'LIVE' && (
-                <span className="absolute -top-1 -right-2 text-[8px] bg-red-600 text-white font-black px-1 rounded-full uppercase shadow">
-                  LIVE
-                </span>
-              )}
-            </div>
-            <span className={`text-[11px] font-medium ${liveStreamSession?.status === 'LIVE' ? 'text-red-400' : 'text-gray-300'}`}>
-              {liveStreamSession?.status === 'LIVE' ? 'Live' : 'Live Stream'}
-            </span>
-          </button>
-
-
-          {/* Part 13: Screen Sharing Button with ▲ Options Menu (13.1, 13.10, 13.11) */}
-          <div className="flex items-center rounded hover:bg-[#2A2A2A] transition-colors group relative">
-            <button 
-              onClick={() => {
-                if (isScreenSharing && screenShareDetails?.sharerId === (user?.id || 'local')) {
-                  handleStopShare();
-                } else {
-                  handleOpenShareModal();
-                }
-              }}
-              className="flex flex-col items-center justify-center w-14 h-14 pl-1"
-              title={isScreenSharing ? 'Stop Screen Share' : 'Share Screen'}
-            >
-              <div className={`w-6 h-6 rounded ${isScreenSharing ? 'bg-red-500 animate-pulse' : 'bg-emerald-600'} flex items-center justify-center mb-0.5 shadow-sm`}>
-                <Share className="w-3.5 h-3.5 text-white" />
-              </div>
-              <span className={`text-[11px] font-medium ${isScreenSharing ? 'text-red-400 font-bold' : 'text-emerald-400 font-semibold'}`}>
-                {isScreenSharing ? 'Stop Share' : 'Share'}
-              </span>
-            </button>
-
-            {/* Chevron Menu Button (13.10 & 13.11) */}
-            <button
-              onClick={() => setShowShareChevronMenu(!showShareChevronMenu)}
-              className="h-14 px-1 rounded-r text-gray-400 hover:text-white transition-colors flex items-center justify-center border-l border-white/5"
-              title="Screen Sharing Options and Permissions"
-            >
-              <ChevronUp className="w-3.5 h-3.5" />
-            </button>
-
-            {/* Screen Sharing Popover Menu (13.10 & 13.11) */}
-            {showShareChevronMenu && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl shadow-2xl p-2 z-50 text-xs text-gray-200 space-y-1 animate-in fade-in zoom-in-95 duration-100">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2 py-1 block border-b border-[#333]">
-                  Sharing Permissions (Host Tools)
-                </span>
-
-                <button
-                  onClick={() => {
-                    handleUpdateSharingSettings({ ...sharingSettings, mode: 'oneParticipant' });
-                    setShowShareChevronMenu(false);
-                  }}
-                  className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-white/5 flex items-center justify-between transition-colors"
-                >
-                  <span>One participant can share at a time</span>
-                  {sharingSettings.mode === 'oneParticipant' && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
-                </button>
-
-                <button
-                  onClick={() => {
-                    handleUpdateSharingSettings({ ...sharingSettings, mode: 'multiple' });
-                    setShowShareChevronMenu(false);
-                  }}
-                  className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-white/5 flex items-center justify-between transition-colors"
-                >
-                  <span>Multiple participants can share</span>
-                  {sharingSettings.mode === 'multiple' && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
-                </button>
-
-                {sharingSettings.mode === 'multiple' && (
-                  <button
-                    onClick={() => {
-                      handleSimulateMultiShare();
-                      setShowShareChevronMenu(false);
-                    }}
-                    className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-blue-600/20 text-blue-400 hover:text-blue-300 font-semibold flex items-center justify-between transition-colors"
-                  >
-                    <span>Simulate Multi-Share (Arun & Priya)</span>
-                    <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                  </button>
-                )}
-
-                <div className="my-1 border-t border-[#333]"></div>
-
-                {/* Part 15: Annotation Permissions (15.4, 15.6) */}
-                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2 py-1 block">
-                  Annotation Permissions (Host)
-                </span>
-                <button
-                  onClick={() => {
-                    const next = annotationSettings.annotationPermission === 'all' ? 'presenterOnly' : 'all';
-                    handleUpdateAnnotationSettings({ ...annotationSettings, annotationPermission: next });
-                  }}
-                  className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-white/5 flex items-center justify-between transition-colors"
-                >
-                  <span>Allow participants to annotate</span>
-                  {annotationSettings.annotationPermission === 'all' && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
-                </button>
-                <button
-                  onClick={() => {
-                    handleUpdateAnnotationSettings({ ...annotationSettings, showAnnotatorNames: !showAnnotatorNames });
-                  }}
-                  className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-white/5 flex items-center justify-between transition-colors"
-                >
-                  <span>Show names of annotators</span>
-                  {showAnnotatorNames && <Check className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
-                </button>
-
-                {/* Part 16: Slide Control Options in Share Chevron Menu */}
-                {presentationSession && (
-                  <>
-                    <div className="my-1 border-t border-[#333]"></div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2 py-1 block">
-                      Slide Control (Presentation)
-                    </span>
-                    <button
-                      onClick={() => {
-                        setShowShareChevronMenu(false);
-                        setShowSlideControlModal(true);
-                      }}
-                      className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-orange-600/20 text-orange-400 hover:text-orange-300 font-semibold flex items-center justify-between transition-colors"
-                    >
-                      <span>Slide Control Settings...</span>
-                      <Presentation className="w-3.5 h-3.5" />
-                    </button>
-                  </>
-                )}
-
-                <div className="my-1 border-t border-[#333]"></div>
-
-                <button
-                  onClick={() => {
-                    setShowShareChevronMenu(false);
-                    setShowAdvancedShareModal(true);
-                  }}
-                  className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-white/5 text-blue-400 hover:text-blue-300 font-semibold flex items-center justify-between transition-colors"
-                >
-                  <span>Advanced Sharing Options...</span>
-                  <Sliders className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Part 15: In-Meeting Toolbar Annotate Button (15.2) */}
-          {isScreenSharing && (
-            <button
-              onClick={handleToggleAnnotate}
-              className={`flex flex-col items-center justify-center w-16 h-14 rounded transition-colors group ${
-                isAnnotating ? 'bg-blue-600/30 text-blue-400 font-bold border border-blue-500/40' : 'hover:bg-[#2A2A2A] text-gray-300'
-              }`}
-              title="Toggle Annotation Toolbar (Draw, Highlight, Text on Shared Screen)"
-            >
-              <Pen className={`w-5 h-5 mb-1 ${isAnnotating ? 'text-blue-400 scale-110' : 'text-gray-300 group-hover:text-white'}`} />
-              <span className="text-[11px] font-medium">{isAnnotating ? 'Annotating' : 'Annotate'}</span>
-            </button>
-          )}
-
-          {/* Part 16: In-Meeting Toolbar Slide Control Button (16.2 & 16.11) */}
-          {presentationSession && (
-            <button
-              onClick={() => {
-                if (presentationSession.presenterId === (user?.id || user?._id || 'local') || user?.id === 'host' || isHost) {
-                  setShowSlideControlModal(true);
-                } else {
-                  toast.info(`Presentation is active (Slide ${presentationSession.currentSlide}/${presentationSession.totalSlides})`);
-                }
-              }}
-              className="flex flex-col items-center justify-center w-16 h-14 rounded transition-colors group hover:bg-[#2A2A2A] text-orange-400 relative"
-              title="Slide Control Settings & Navigation"
-            >
-              <Presentation className="w-5 h-5 mb-1 text-orange-400 group-hover:scale-110 transition-transform" />
-              <span className="text-[11px] font-medium">Slides</span>
-              {presentationSession.controllers?.filter(c => c.status === 'ACTIVE').length > 0 && (
-                <span className="absolute top-2 right-2 w-4 h-4 rounded-full bg-emerald-500 text-black text-[9px] font-bold flex items-center justify-center">
-                  {presentationSession.controllers.filter(c => c.status === 'ACTIVE').length}
-                </span>
-              )}
-            </button>
-          )}
-
-          {/* Part 17: In-Meeting Toolbar Whiteboards Button (17.1, 17.2) */}
-          <button
-            onClick={() => {
-              if (encryptionData?.type === 'E2EE') {
-                toast.error('Whiteboard collaboration is disabled in End-to-End Encrypted meetings (Section 31.8 Policy)', { icon: '🔒' });
-                return;
-              }
-              if (activeWhiteboard) {
-                setActiveWhiteboard(null);
-              } else {
-                setShowWhiteboardPicker(true);
-              }
-            }}
-            className={`flex flex-col items-center justify-center w-16 h-14 rounded transition-colors group ${
-              activeWhiteboard ? 'bg-indigo-600/30 text-indigo-400 font-bold border border-indigo-500/40' : 'hover:bg-[#2A2A2A] text-gray-300'
-            } ${encryptionData?.type === 'E2EE' ? 'opacity-50 cursor-not-allowed' : ''}`}
-            title={encryptionData?.type === 'E2EE' ? 'Disabled in E2EE (Section 31.8 Policy)' : 'Whiteboards: Collaborative digital canvas with sticky notes and diagrams'}
-          >
-            <LayoutGrid className={`w-5 h-5 mb-1 ${activeWhiteboard ? 'text-indigo-400 scale-110' : 'text-gray-300 group-hover:text-white'}`} />
-            <span className="text-[11px] font-medium">{activeWhiteboard ? 'Whiteboard' : 'Whiteboards'}</span>
-          </button>
-
-          {/* Part 18: In-Meeting Toolbar Breakout Rooms Button (18.1, 18.24) */}
-          <button
-            onClick={() => {
-              if (isHost || user?.id === 'host') {
-                setShowBreakoutHostModal(true);
-              } else {
-                setShowBreakoutParticipantModal(true);
-              }
-            }}
-            className={`flex flex-col items-center justify-center w-16 h-14 rounded transition-colors group relative ${
-              currentBreakoutRoom 
-                ? 'bg-emerald-600/30 text-emerald-400 font-bold border border-emerald-500/40' 
-                : breakoutRoomsList.length > 0
-                  ? 'text-indigo-400 hover:bg-[#2A2A2A]' 
-                  : 'hover:bg-[#2A2A2A] text-gray-300'
-            }`}
-            title="Breakout Rooms: Split meeting into smaller discussion groups"
-          >
-            <div className="relative">
-              <Users className={`w-5 h-5 mb-1 ${currentBreakoutRoom ? 'text-emerald-400 scale-110' : 'text-gray-300 group-hover:text-white'}`} />
-              {currentBreakoutRoom && (
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping" />
-              )}
-            </div>
-            <span className="text-[11px] font-medium truncate max-w-[56px]">
-              {currentBreakoutRoom ? currentBreakoutRoom.name : 'Breakout'}
-            </span>
-          </button>
-
-          {/* Part 19: In-Meeting Toolbar Polls & Quizzes Button (19.1, 19.17) */}
-          <button
-            onClick={() => {
-              if (encryptionData?.type === 'E2EE') {
-                toast.error('Polls and Quizzes are disabled in End-to-End Encrypted meetings (Section 31.8 Policy)', { icon: '🔒' });
-                return;
-              }
-              setShowPollsModal(true);
-            }}
-            className={`flex flex-col items-center justify-center w-16 h-14 rounded transition-colors group relative ${
-              activePoll
-                ? 'bg-indigo-600/30 text-indigo-400 font-bold border border-indigo-500/40'
-                : 'hover:bg-[#2A2A2A] text-gray-300'
-            } ${encryptionData?.type === 'E2EE' ? 'opacity-50 cursor-not-allowed' : ''}`}
-            title={encryptionData?.type === 'E2EE' ? 'Disabled in E2EE (Section 31.8 Policy)' : 'Polls & Quizzes: Create and launch interactive polls and quizzes'}
-          >
-            <div className="relative">
-              <BarChart2 className={`w-5 h-5 mb-1 ${activePoll ? 'text-indigo-400 scale-110' : 'text-gray-300 group-hover:text-white'}`} />
-              {activePoll && (
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-indigo-400 rounded-full animate-pulse" />
-              )}
-            </div>
-            <span className="text-[11px] font-medium">Polls</span>
-          </button>
-
-          
           <div className="relative">
             <button 
               onClick={() => setShowMoreMenu(!showMoreMenu)}
-              className="flex flex-col items-center justify-center w-16 h-14 rounded hover:bg-[#2A2A2A] transition-colors group"
+              className={`flex flex-col items-center justify-center w-16 h-14 rounded-lg transition-colors group ${
+                showMoreMenu ? 'bg-[#2A2A2A] text-white' : 'hover:bg-[#2A2A2A] text-gray-300'
+              }`}
+              title="More Options"
             >
               <MoreHorizontal className="w-5 h-5 mb-1 text-gray-300 group-hover:text-white" />
               <span className="text-[11px] font-medium text-gray-300">More</span>
             </button>
 
             {showMoreMenu && (
-              <div className="absolute bottom-full right-0 mb-2 w-56 bg-[#242424] border border-[#333] rounded-lg shadow-xl py-2 z-50 text-[13px]">
-                <button 
-                  className="w-full text-left px-4 py-2 hover:bg-[#333] text-gray-300 hover:text-white transition-colors" 
-                  onClick={() => { setIsVirtualBackgroundOn(!isVirtualBackgroundOn); setShowMoreMenu(false); toast(isVirtualBackgroundOn ? 'Virtual Background off' : 'Blur Virtual Background enabled'); }}
-                >
-                  {isVirtualBackgroundOn ? 'Disable Virtual Background' : 'Blur Background'}
-                </button>
-                <button 
-                  className="w-full text-left px-4 py-2 hover:bg-[#333] text-gray-300 hover:text-white transition-colors" 
-                  onClick={() => { setShowPollsModal(true); setShowMoreMenu(false); }}
-                >
-                  📊 Polls & Quizzes
-                </button>
-                <button className="w-full text-left px-4 py-2 hover:bg-[#333] text-gray-300 hover:text-white transition-colors" onClick={() => { setShowBreakoutHostModal(true); setShowMoreMenu(false); }}>
-                  Breakout Rooms
-                </button>
-                <button 
-                  className="w-full text-left px-4 py-2 hover:bg-[#333] text-gray-300 hover:text-white transition-colors flex items-center justify-between" 
-                  onClick={() => { setShowLiveStreamingModal(true); setShowMoreMenu(false); }}
-                >
-                  <span className="flex items-center gap-2">
-                    <Radio className="w-4 h-4 text-red-400" />
-                    <span>Live on YouTube / Facebook</span>
+              <div 
+                className="absolute bottom-full right-0 mb-3 w-72 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl shadow-2xl p-2 z-50 text-xs text-gray-200 divide-y divide-[#2F2F2F] animate-in fade-in zoom-in-95 duration-100 max-h-[80vh] overflow-y-auto no-scrollbar"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Section 1: Collaboration & Tools */}
+                <div className="p-1 space-y-0.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2 py-1 block">
+                    Collaboration & Tools
                   </span>
-                  {liveStreamSession?.status === 'LIVE' && (
-                    <span className="text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded font-bold">LIVE</span>
-                  )}
-                </button>
-                <div className="border-t border-[#333] my-1"></div>
-                <button 
-                  className="w-full text-left px-4 py-2 hover:bg-[#333] text-blue-300 hover:text-blue-200 transition-colors flex justify-between items-center font-semibold"
-                  onClick={() => { setShowPersonalizationModal(true); setShowMoreMenu(false); }}
-                >
-                  <span className="flex items-center gap-2">
-                    <Palette className="w-4 h-4 text-blue-400" />
-                    <span>Personalization (37)...</span>
+                  
+                  {/* Whiteboards */}
+                  <button 
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between transition-colors"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      if (encryptionData?.type === 'E2EE') {
+                        toast.error('Whiteboard disabled in E2EE');
+                        return;
+                      }
+                      if (activeWhiteboard) setActiveWhiteboard(null);
+                      else setShowWhiteboardPicker(true);
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <LayoutGrid className="w-4 h-4 text-indigo-400" />
+                      <span>{activeWhiteboard ? 'Close Whiteboard' : 'Whiteboards'}</span>
+                    </span>
+                    {activeWhiteboard && <span className="text-[10px] bg-indigo-500/30 text-indigo-300 px-1.5 py-0.5 rounded font-bold">ACTIVE</span>}
+                  </button>
+
+                  {/* Breakout Rooms */}
+                  <button 
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between transition-colors"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      if (isHost || user?.id === 'host') setShowBreakoutHostModal(true);
+                      else setShowBreakoutParticipantModal(true);
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-emerald-400" />
+                      <span>Breakout Rooms</span>
+                    </span>
+                    {currentBreakoutRoom && <span className="text-[10px] bg-emerald-500/30 text-emerald-300 px-1.5 py-0.5 rounded font-bold">JOINED</span>}
+                  </button>
+
+                  {/* Polls & Quizzes */}
+                  <button 
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between transition-colors"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      if (encryptionData?.type === 'E2EE') {
+                        toast.error('Polls disabled in E2EE');
+                        return;
+                      }
+                      setShowPollsModal(true);
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <BarChart2 className="w-4 h-4 text-amber-400" />
+                      <span>Polls & Quizzes</span>
+                    </span>
+                    {activePoll && <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />}
+                  </button>
+
+                  {/* My Notes */}
+                  <button 
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between transition-colors"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      setShowMyNotesDrawer(true);
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-amber-400" />
+                      <span>My Notes</span>
+                    </span>
+                  </button>
+
+                  {/* Meeting Agenda */}
+                  <button 
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between transition-colors"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      setShowAgendaDrawer(true);
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <ListChecks className="w-4 h-4 text-emerald-400" />
+                      <span>Agenda & Notes</span>
+                    </span>
+                  </button>
+                </div>
+
+                {/* Section 2: AI & Accessibility */}
+                <div className="p-1 space-y-0.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2 py-1 block">
+                    AI & Accessibility
                   </span>
-                  <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded font-bold">Customize</span>
-                </button>
-                {/* Part 38: Network & Device Health */}
-                <button 
-                  className="w-full text-left px-4 py-2 hover:bg-[#333] text-emerald-300 hover:text-emerald-200 transition-colors flex justify-between items-center font-semibold"
-                  onClick={() => { setShowNetworkHealthModal(true); setShowMoreMenu(false); }}
-                >
-                  <span className="flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-emerald-400" />
-                    <span>Network & Device Health (38)...</span>
+
+                  {/* Captions */}
+                  <button 
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between transition-colors"
+                    onClick={() => {
+                      toggleLiveCaptions();
+                      setShowMoreMenu(false);
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Subtitles className={`w-4 h-4 ${showLiveCaptions ? 'text-emerald-400' : 'text-gray-400'}`} />
+                      <span>{showLiveCaptions ? 'Hide Captions' : 'Show Live Captions'}</span>
+                    </span>
+                    {showLiveCaptions && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                  </button>
+
+                  {/* Full Transcript */}
+                  <button 
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between transition-colors"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      setShowTranscriptPanel(true);
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-blue-400" />
+                      <span>View Full Transcript</span>
+                    </span>
+                  </button>
+
+                  {/* Multilingual Translation */}
+                  <button 
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between transition-colors"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      setShowTranslationModal(true);
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-purple-400" />
+                      <span>Language Translation</span>
+                    </span>
+                    {participantTranslationEnabled && (
+                      <span className="text-[10px] bg-purple-600 px-1 rounded uppercase font-bold text-white">
+                        {participantTargetLanguage || 'TA'}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Language Interpretation */}
+                  <button 
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between transition-colors"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      setShowInterpretationModal(true);
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Headphones className="w-4 h-4 text-indigo-400" />
+                      <span>Audio Interpretation</span>
+                    </span>
+                    {selectedInterpretationChannel !== 'original' && (
+                      <span className="text-[10px] bg-indigo-600 px-1 rounded uppercase font-bold text-white">
+                        {selectedInterpretationChannel}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* AI Summary */}
+                  <button 
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between transition-colors"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      if (encryptionData?.type === 'E2EE') {
+                        toast.error('AI Summary disabled in E2EE');
+                        return;
+                      }
+                      setShowAISummaryModal(true);
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <BrainCircuit className="w-4 h-4 text-purple-400" />
+                      <span>AI Meeting Summary</span>
+                    </span>
+                    {meetingSummaryRecord?.status === 'ACTIVE' && (
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    )}
+                  </button>
+
+                  {/* AI Questions */}
+                  <button 
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between transition-colors"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      if (encryptionData?.type === 'E2EE') {
+                        toast.error('AI Questions disabled in E2EE');
+                        return;
+                      }
+                      setShowAIQuestionsDrawer(true);
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <HelpCircle className="w-4 h-4 text-purple-400" />
+                      <span>AI Meeting Questions</span>
+                    </span>
+                  </button>
+                </div>
+
+                {/* Section 3: Broadcast & Live Streaming */}
+                <div className="p-1 space-y-0.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2 py-1 block">
+                    Broadcast
                   </span>
-                  <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold">
-                    {networkStats?.latency || 35}ms
+                  <button 
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between transition-colors"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      setShowLiveStreamingModal(true);
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Radio className="w-4 h-4 text-red-400" />
+                      <span>Live Stream (YouTube / Facebook)</span>
+                    </span>
+                    {liveStreamSession?.status === 'LIVE' && (
+                      <span className="text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded font-bold animate-pulse">LIVE</span>
+                    )}
+                  </button>
+                </div>
+
+                {/* Section 4: Personalization, Health & Settings */}
+                <div className="p-1 space-y-0.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2 py-1 block">
+                    Preferences & System
                   </span>
-                </button>
-                <button className="w-full text-left px-4 py-2 hover:bg-[#333] text-gray-300 hover:text-white transition-colors flex justify-between items-center" onClick={() => setShowMoreMenu(false)}>
-                  <span>Meeting Settings</span>
-                  <Settings className="w-3.5 h-3.5" />
-                </button>
+
+                  {/* Virtual Background */}
+                  <button 
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between transition-colors"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      setBackgroundEffectsTab('background');
+                      setShowBackgroundEffectsModal(true);
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-blue-400" />
+                      <span>Virtual Background & Effects...</span>
+                    </span>
+                  </button>
+
+                  {/* Personalization */}
+                  <button 
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between transition-colors"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      setShowPersonalizationModal(true);
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Palette className="w-4 h-4 text-blue-400" />
+                      <span>Personalization & Themes...</span>
+                    </span>
+                  </button>
+
+                  {/* Network Health */}
+                  <button 
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between transition-colors"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      setShowNetworkHealthModal(true);
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-emerald-400" />
+                      <span>Network & Device Health...</span>
+                    </span>
+                    <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold">
+                      {networkStats?.latency || 35}ms
+                    </span>
+                  </button>
+
+                  {/* Audio/Video Settings */}
+                  <button 
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between transition-colors"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      setShowAudioSettingsModal(true);
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Settings className="w-4 h-4 text-gray-400" />
+                      <span>Meeting Settings...</span>
+                    </span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
