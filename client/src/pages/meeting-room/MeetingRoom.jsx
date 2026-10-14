@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import Peer from 'simple-peer';
@@ -713,6 +713,7 @@ export default function MeetingRoom() {
   const socketRef = useRef();
   const userVideo = useRef();
   const peersRef = useRef([]);
+  const localStreamRef = useRef(null);
   const screenTrackRef = useRef(null);
 
   const [meetingTitle, setMeetingTitle] = useState(user?.name ? `${user.name}'s IntellMeet` : 'IntellMeet Meeting');
@@ -805,8 +806,20 @@ export default function MeetingRoom() {
       if (currentStream) {
         currentStream.getAudioTracks().forEach(track => { track.enabled = initialAudio; });
         currentStream.getVideoTracks().forEach(track => { track.enabled = initialVideo; });
+        localStreamRef.current = currentStream;
         setStream(currentStream);
         if (userVideo.current) userVideo.current.srcObject = currentStream;
+
+        // If any peers were already created while getUserMedia was acquiring, attach tracks now
+        peersRef.current.forEach(({ peer }) => {
+          if (peer) {
+            try {
+              currentStream.getTracks().forEach(track => {
+                peer.addTrack(track, currentStream);
+              });
+            } catch (err) {}
+          }
+        });
       }
 
       if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
@@ -831,19 +844,26 @@ export default function MeetingRoom() {
           setSampleParticipants(prev => {
             const next = [...prev];
             existingUsers.forEach(u => {
-              if (!next.some(p => p.id === u.socketId || p.id === u.userId)) {
-                next.push({ id: u.socketId || u.userId, name: u.userName || 'Participant', isLocal: false, isMuted: false, hasVideo: true });
+              const uId = u.socketId || u.userId;
+              if (!next.some(p => p.id === uId || p.userId === u.userId)) {
+                next.push({ id: uId, userId: u.userId, name: u.userName || 'Participant', isLocal: false, isMuted: false, hasVideo: true });
               }
             });
             return next;
           });
+          const activeStream = stream || localStreamRef.current || currentStream;
           existingUsers.forEach(u => {
             try {
-              const peer = createPeer(u.socketId, socketRef.current.id, currentStream, userName);
+              const peer = createPeer(u.socketId, socketRef.current.id, activeStream, userName);
+              const peerEntry = { peerID: u.socketId, peer, name: u.userName, stream: null };
               peer.on('stream', (remoteStream) => {
+                console.log('Incoming remote stream for existing user:', u.socketId, remoteStream);
+                peerEntry.stream = remoteStream;
+                const pObj = peersRef.current.find(p => p.peerID === u.socketId);
+                if (pObj) pObj.stream = remoteStream;
                 setPeers(prevPeers => prevPeers.map(p => p.peerID === u.socketId ? { ...p, stream: remoteStream } : p));
               });
-              peersRef.current.push({ peerID: u.socketId, peer, name: u.userName, stream: null });
+              peersRef.current.push(peerEntry);
             } catch (err) {
               console.warn('Peer create error for existing user:', err);
             }
@@ -856,8 +876,19 @@ export default function MeetingRoom() {
       // (Do NOT call createPeer here to avoid WebRTC offer glare; wait for newcomer's offer via 'user-joined')
       socketRef.current.on('user-connected', (newUserId, newUserName, socketId) => {
         setSampleParticipants(prev => {
-          if (prev.some(p => p.id === socketId || p.id === newUserId)) return prev;
-          return [...prev, { id: socketId || newUserId, name: newUserName || 'Participant', isLocal: false, isMuted: false, hasVideo: true }];
+          const effectiveId = socketId || newUserId;
+          const existingIdx = prev.findIndex(p => p.id === socketId || p.id === newUserId || p.userId === newUserId);
+          if (existingIdx !== -1) {
+            const updated = [...prev];
+            updated[existingIdx] = {
+              ...updated[existingIdx],
+              id: effectiveId,
+              userId: newUserId,
+              name: newUserName || updated[existingIdx].name
+            };
+            return updated;
+          }
+          return [...prev, { id: effectiveId, userId: newUserId, name: newUserName || 'Participant', isLocal: false, isMuted: false, hasVideo: true }];
         });
         if (playJoinLeaveChime) playChimeSound('join');
         toast.success(`${newUserName || 'A participant'} joined the meeting`);
@@ -877,18 +908,29 @@ export default function MeetingRoom() {
       // Existing user receives offer from newcomer and creates answer
       socketRef.current.on('user-joined', payload => {
         setSampleParticipants(prev => {
-          if (prev.some(p => p.id === payload.callerID)) return prev;
+          const existingIdx = prev.findIndex(p => p.id === payload.callerID || p.name === payload.callerName);
+          if (existingIdx !== -1) {
+            const updated = [...prev];
+            updated[existingIdx] = { ...updated[existingIdx], id: payload.callerID };
+            return updated;
+          }
           return [...prev, { id: payload.callerID, name: payload.callerName || 'Participant', isLocal: false, isMuted: false, hasVideo: true }];
         });
         if (playJoinLeaveChime) playChimeSound('join');
         toast.success(`${payload.callerName || 'A participant'} joined the meeting`);
 
         try {
-          const peer = addPeer(payload.signal, payload.callerID, currentStream);
+          const activeStream = stream || localStreamRef.current || currentStream;
+          const peer = addPeer(payload.signal, payload.callerID, activeStream);
+          const peerEntry = { peerID: payload.callerID, peer, name: payload.callerName, stream: null };
           peer.on('stream', (remoteStream) => {
+            console.log('Incoming remote stream for caller:', payload.callerID, remoteStream);
+            peerEntry.stream = remoteStream;
+            const pObj = peersRef.current.find(p => p.peerID === payload.callerID);
+            if (pObj) pObj.stream = remoteStream;
             setPeers(prevPeers => prevPeers.map(p => p.peerID === payload.callerID ? { ...p, stream: remoteStream } : p));
           });
-          peersRef.current.push({ peerID: payload.callerID, peer, name: payload.callerName, stream: null });
+          peersRef.current.push(peerEntry);
           setPeers([...peersRef.current]);
         } catch (err) {
           console.warn('addPeer error:', err);
@@ -1960,25 +2002,27 @@ export default function MeetingRoom() {
     { urls: 'stun:global.stun.twilio.com:3478' }
   ];
 
-  function createPeer(userToSignal, callerID, stream, callerName) {
+  function createPeer(userToSignal, callerID, streamToSend, callerName) {
+    const activeStream = streamToSend || localStreamRef.current || stream;
     const peer = new Peer({ 
       initiator: true, 
       trickle: false, 
-      ...(stream ? { stream } : {}),
+      ...(activeStream ? { stream: activeStream } : {}),
       config: { iceServers: ICE_SERVERS }
     });
-    peer.on('signal', signal => socketRef.current.emit('sending-signal', { userToSignal, callerID, signal, callerName }));
+    peer.on('signal', signal => socketRef.current?.emit('sending-signal', { userToSignal, callerID, signal, callerName }));
     return peer;
   }
 
-  function addPeer(incomingSignal, callerID, stream) {
+  function addPeer(incomingSignal, callerID, streamToSend) {
+    const activeStream = streamToSend || localStreamRef.current || stream;
     const peer = new Peer({ 
       initiator: false, 
       trickle: false, 
-      ...(stream ? { stream } : {}),
+      ...(activeStream ? { stream: activeStream } : {}),
       config: { iceServers: ICE_SERVERS }
     });
-    peer.on('signal', signal => socketRef.current.emit('returning-signal', { signal, callerID }));
+    peer.on('signal', signal => socketRef.current?.emit('returning-signal', { signal, callerID }));
     peer.signal(incomingSignal);
     return peer;
   }
@@ -5243,19 +5287,47 @@ export default function MeetingRoom() {
   }, [liveStreamSession?.status, meetingId]);
 
 
-  const allParticipants = [
-    { id: 'local', name: user?.name || 'You', isLocal: true, isMuted: !isAudioOn, isVideoOff: !isVideoOn, hasVideo: isVideoOn },
-    ...sampleParticipants.map(sp => {
-      const peerMatch = peers.find(p => p.peerID === sp.id || p.id === sp.id);
-      return {
+  const allParticipants = useMemo(() => {
+    const list = [
+      { id: 'local', name: user?.name || 'You', isLocal: true, isMuted: !isAudioOn, isVideoOff: !isVideoOn, hasVideo: isVideoOn, stream: stream || localStreamRef.current }
+    ];
+
+    const remoteMap = new Map();
+
+    // 1. Populate from sampleParticipants
+    sampleParticipants.forEach(sp => {
+      remoteMap.set(sp.id, {
         ...sp,
         isLocal: false,
-        peer: peerMatch?.peer,
-        stream: peerMatch?.stream,
         hasVideo: sp.hasVideo !== undefined ? sp.hasVideo : !sp.isVideoOff
-      };
-    })
-  ].filter((p, index, self) => index === self.findIndex(t => t.id === p.id));
+      });
+    });
+
+    // 2. Merge all active peers from peers state (contains active peer connections and remote streams)
+    peers.forEach(p => {
+      const matchKey = Array.from(remoteMap.keys()).find(k => k === p.peerID || remoteMap.get(k)?.id === p.peerID || remoteMap.get(k)?.userId === p.peerID);
+      const existing = matchKey ? remoteMap.get(matchKey) : null;
+      const finalId = p.peerID;
+
+      remoteMap.set(finalId, {
+        ...(existing || {}),
+        id: finalId,
+        name: p.name || existing?.name || 'Participant',
+        isLocal: false,
+        peer: p.peer,
+        stream: p.stream || existing?.stream,
+        isMuted: existing?.isMuted || false,
+        isVideoOff: existing?.isVideoOff || false,
+        hasVideo: existing?.hasVideo !== undefined ? existing?.hasVideo : true
+      });
+
+      if (matchKey && matchKey !== finalId) {
+        remoteMap.delete(matchKey);
+      }
+    });
+
+    return [...list, ...Array.from(remoteMap.values())];
+  }, [sampleParticipants, peers, isAudioOn, isVideoOn, stream, user?.name]);
   const participants = allParticipants;
 
   const filteredParticipants = allParticipants.filter(p => 
@@ -5342,9 +5414,7 @@ export default function MeetingRoom() {
                 <button
                   onClick={() => {
                     const guest = waitingRoomQueue[0];
-                    setSampleParticipants(prev => [...prev, { id: guest.id, name: guest.name, isLocal: false, isMuted: true }]);
-                    setWaitingRoomQueue(prev => prev.slice(1));
-                    toast.success(`Admitted ${guest.name} into the meeting`);
+                    if (guest) handleAdmitWaiting(guest.id, guest.name);
                   }}
                   className="bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded-lg font-bold transition-all text-xs shadow-sm"
                 >
@@ -5353,8 +5423,7 @@ export default function MeetingRoom() {
                 <button
                   onClick={() => {
                     const guest = waitingRoomQueue[0];
-                    setWaitingRoomQueue(prev => prev.slice(1));
-                    toast.error(`Removed ${guest.name} from Waiting Room`);
+                    if (guest) handleRemoveWaiting(guest.id, guest.name);
                   }}
                   className="text-gray-400 hover:text-white px-2 py-1 text-xs"
                 >

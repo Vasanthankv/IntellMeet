@@ -12,14 +12,11 @@ import WatermarkOverlay from '../security/WatermarkOverlay';
 import toast from 'react-hot-toast';
 
 function RemoteParticipantTile({ participant, hasCamOn }) {
-  const videoRef = useRef(null);
-  const audioRef = useRef(null);
   const [remoteStream, setRemoteStream] = useState(participant.stream || null);
 
   useEffect(() => {
     if (participant.stream) {
       setRemoteStream(participant.stream);
-      return;
     }
     const peer = participant.peer;
     if (!peer) return;
@@ -29,10 +26,12 @@ function RemoteParticipantTile({ participant, hasCamOn }) {
     }
 
     const onStream = (stream) => {
+      console.log('RemoteParticipantTile received remote stream:', stream.id, stream.getTracks());
       setRemoteStream(stream);
     };
 
     peer.on('stream', onStream);
+
     return () => {
       if (typeof peer.removeListener === 'function') {
         peer.removeListener('stream', onStream);
@@ -40,30 +39,34 @@ function RemoteParticipantTile({ participant, hasCamOn }) {
     };
   }, [participant.peer, participant.stream]);
 
-  useEffect(() => {
-    if (videoRef.current && remoteStream) {
-      videoRef.current.srcObject = remoteStream;
-      videoRef.current.play().catch(e => console.warn('Remote video play:', e));
-    }
-    if (audioRef.current && remoteStream) {
-      audioRef.current.srcObject = remoteStream;
-      audioRef.current.play().catch(e => console.warn('Remote audio play:', e));
-    }
-  }, [remoteStream, hasCamOn]);
-
   const initials = (participant.name || 'Participant').slice(0, 2).toUpperCase();
 
   return (
     <div className="w-full h-full relative flex items-center justify-center bg-black">
       {/* Hidden audio element always renders so participants can always hear each other */}
-      <audio ref={audioRef} autoPlay playsInline />
+      <audio
+        ref={(el) => {
+          if (el && remoteStream && el.srcObject !== remoteStream) {
+            el.srcObject = remoteStream;
+            el.play().catch(e => console.warn('Remote audio play:', e));
+          }
+        }}
+        autoPlay
+        playsInline
+      />
 
       {/* Video display when camera is active and stream is available */}
       {hasCamOn && remoteStream ? (
         <video
-          ref={videoRef}
+          ref={(el) => {
+            if (el && remoteStream && el.srcObject !== remoteStream) {
+              el.srcObject = remoteStream;
+              el.play().catch(e => console.warn('Remote video play:', e));
+            }
+          }}
           autoPlay
           playsInline
+          muted
           className="w-full h-full object-cover relative z-10"
         />
       ) : (
