@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   Pin, Sparkles, Mic, MicOff, MoreHorizontal, VideoOff, 
   Maximize2, Minimize2, Star, Check, Volume2, Shield, Users, 
@@ -10,6 +10,75 @@ import AnnotationCanvasOverlay from '../annotation/AnnotationCanvasOverlay';
 import PresentationViewer from '../presentation/PresentationViewer';
 import WatermarkOverlay from '../security/WatermarkOverlay';
 import toast from 'react-hot-toast';
+
+function RemoteParticipantTile({ participant, hasCamOn }) {
+  const videoRef = useRef(null);
+  const audioRef = useRef(null);
+  const [remoteStream, setRemoteStream] = useState(participant.stream || null);
+
+  useEffect(() => {
+    if (participant.stream) {
+      setRemoteStream(participant.stream);
+      return;
+    }
+    const peer = participant.peer;
+    if (!peer) return;
+
+    if (peer._remoteStreams && peer._remoteStreams[0]) {
+      setRemoteStream(peer._remoteStreams[0]);
+    }
+
+    const onStream = (stream) => {
+      setRemoteStream(stream);
+    };
+
+    peer.on('stream', onStream);
+    return () => {
+      if (typeof peer.removeListener === 'function') {
+        peer.removeListener('stream', onStream);
+      }
+    };
+  }, [participant.peer, participant.stream]);
+
+  useEffect(() => {
+    if (videoRef.current && remoteStream) {
+      videoRef.current.srcObject = remoteStream;
+      videoRef.current.play().catch(e => console.warn('Remote video play:', e));
+    }
+    if (audioRef.current && remoteStream) {
+      audioRef.current.srcObject = remoteStream;
+      audioRef.current.play().catch(e => console.warn('Remote audio play:', e));
+    }
+  }, [remoteStream, hasCamOn]);
+
+  const initials = (participant.name || 'Participant').slice(0, 2).toUpperCase();
+
+  return (
+    <div className="w-full h-full relative flex items-center justify-center bg-black">
+      {/* Hidden audio element always renders so participants can always hear each other */}
+      <audio ref={audioRef} autoPlay playsInline />
+
+      {/* Video display when camera is active and stream is available */}
+      {hasCamOn && remoteStream ? (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          className="w-full h-full object-cover relative z-10"
+        />
+      ) : (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-b from-[#2B2B2B] to-[#1C1C1C]">
+          <div className={`w-20 h-20 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg ${
+            participant.isSpeaking ? 'bg-emerald-600 animate-pulse' : 'bg-purple-700'
+          }`}>
+            {initials}
+          </div>
+          <span className="mt-3 text-xs text-gray-300 font-medium">{participant.name}</span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function VideoLayoutEngine({
   layoutMode = 'gallery', // 'speaker' | 'gallery' | 'dynamic-gallery' | 'multi' | 'immersive' | 'floating' | 'side-by-side-speaker' | 'side-by-side-gallery'
@@ -216,20 +285,8 @@ export default function VideoLayoutEngine({
             </div>
           )
         ) : (
-          /* Remote Participant Video or Initials Tile */
-          hasCamOn ? (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-b from-[#2B2B2B] to-[#1C1C1C]">
-              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-white text-xl font-bold shadow-md ${
-                p.isSpeaking ? 'bg-emerald-600 animate-pulse' : 'bg-[#404040]'
-              }`}>
-                {p.name.slice(0, 2).toUpperCase()}
-              </div>
-            </div>
-          ) : (
-            <div className="w-16 h-16 bg-[#333] rounded-2xl flex items-center justify-center text-gray-400 text-lg font-bold border border-white/5">
-              {p.name.slice(0, 2).toUpperCase()}
-            </div>
-          )
+          /* Remote Participant Live Video / Audio Tile */
+          <RemoteParticipantTile participant={p} hasCamOn={hasCamOn} />
         )}
 
         {/* Badges: Pin, Spotlight, Hand Raised & Non-Verbal (Part 9 & Part 12) */}

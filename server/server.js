@@ -179,6 +179,44 @@ io.on('connection', (socket) => {
     io.to(payload.callerID).emit('receiving-returned-signal', { signal: payload.signal, id: socket.id });
   });
 
+  // Real-time camera and microphone track status synchronization
+  socket.on('toggle-media-state', (roomId, mediaState) => {
+    socket.to(roomId).emit('participant-media-status', {
+      socketId: socket.id,
+      userId: socket.userId || socket.id,
+      ...mediaState
+    });
+  });
+
+  // Real-time Waiting Room & Admission Signaling
+  socket.on('request-admission', (roomId, attendeeData) => {
+    socket.join(`${roomId}-waiting`);
+    socket.roomId = roomId;
+    socket.userId = attendeeData.userId || socket.id;
+    socket.userName = attendeeData.userName || 'Guest';
+    io.to(roomId).emit('attendee-waiting', {
+      socketId: socket.id,
+      userId: attendeeData.userId || socket.id,
+      name: attendeeData.userName || 'Guest',
+      joinedAt: new Date().toISOString()
+    });
+  });
+
+  socket.on('admit-waiting-participant', (roomId, { socketId, participantId, name }) => {
+    io.to(socketId || participantId).emit('admission-approved', { roomId });
+    io.to(roomId).emit('waiting-participant-admitted', { socketId, participantId, name });
+  });
+
+  socket.on('reject-waiting-participant', (roomId, { socketId, participantId }) => {
+    io.to(socketId || participantId).emit('admission-rejected');
+    io.to(roomId).emit('waiting-participant-rejected', { socketId, participantId });
+  });
+
+  socket.on('admit-all-waiting-participants', (roomId) => {
+    io.to(`${roomId}-waiting`).emit('admission-approved', { roomId });
+    io.to(roomId).emit('all-waiting-admitted');
+  });
+
   // Chat and Captions (Part 10 In-Meeting & Continuous Chat)
   socket.on('send-message', (roomId, messageData) => {
     io.to(roomId).emit('receive-message', messageData);
@@ -965,7 +1003,12 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
-    socket.broadcast.emit('user-disconnected', socket.id);
+    if (socket.roomId) {
+      socket.to(socket.roomId).emit('user-disconnected', socket.id);
+      socket.to(socket.roomId).emit('waiting-participant-removed', { participantId: socket.id });
+    } else {
+      socket.broadcast.emit('user-disconnected', socket.id);
+    }
   });
 });
 

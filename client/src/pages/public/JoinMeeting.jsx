@@ -10,6 +10,13 @@ import {
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import PreJoinNetworkTest from '../../components/adaptation/PreJoinNetworkTest';
+import io from 'socket.io-client';
+
+const SOCKET_SERVER_URL =
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+    ? (typeof localStorage !== 'undefined' && localStorage.getItem('intellmeet_api_url')) || 'https://intellmeet-backend-h3md.onrender.com'
+    : 'http://localhost:5000');
 
 export default function JoinMeeting() {
   const [searchParams] = useSearchParams();
@@ -175,6 +182,12 @@ export default function JoinMeeting() {
 
         // Barrier 5: Waiting Room
         if (mtg.waitingRoom) {
+          const cleanId = mid.replace(/[\s-]/g, '');
+          const guestName = displayName || user?.name || 'Guest';
+          const guestId = user?.id || user?._id || 'guest_' + Math.floor(Math.random() * 100000);
+          sessionStorage.setItem('intellmeet_guest_name', guestName);
+          sessionStorage.setItem('intellmeet_guest_id', guestId);
+
           setInWaitingRoom(true);
           setIsChecking(false);
           return;
@@ -193,6 +206,38 @@ export default function JoinMeeting() {
       setIsChecking(false);
     }
   };
+
+  // Real-time waiting room socket connection
+  useEffect(() => {
+    if (!inWaitingRoom || !meetingId) return;
+
+    const cleanId = meetingId.replace(/[\s-]/g, '');
+    const socket = io(SOCKET_SERVER_URL);
+    const guestName = displayName || user?.name || sessionStorage.getItem('intellmeet_guest_name') || 'Guest';
+    const guestId = user?.id || user?._id || sessionStorage.getItem('intellmeet_guest_id') || 'guest_' + Math.floor(Math.random() * 10000);
+
+    socket.on('connect', () => {
+      socket.emit('request-admission', cleanId, {
+        userId: guestId,
+        userName: guestName
+      });
+    });
+
+    socket.on('admission-approved', () => {
+      setInWaitingRoom(false);
+      setIsPreJoinScreen(true);
+      toast.success('Host admitted you to the meeting! 🎉', { duration: 4000 });
+    });
+
+    socket.on('admission-rejected', () => {
+      setInWaitingRoom(false);
+      toast.error('The host has declined your request to join this meeting.');
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [inWaitingRoom, meetingId, displayName, user]);
 
   const handleStartJoinFlow = (e) => {
     e.preventDefault();
@@ -803,21 +848,15 @@ export default function JoinMeeting() {
                   </div>
                 </div>
 
-                {/* Host Admitted action -> Transitions to Pre-Join Screen */}
+                {/* Live Real-time Status */}
                 <div className="pt-2 space-y-2">
-                  <button
-                    onClick={() => {
-                      setInWaitingRoom(false);
-                      setIsPreJoinScreen(true);
-                      toast.success('Host admitted you! Setting up camera and audio...');
-                    }}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-md transition-all text-xs flex items-center justify-center gap-2"
-                  >
-                    <Check className="w-4 h-4" /> Enter Pre-Join Setup (Host Admitted)
-                  </button>
+                  <div className="flex items-center justify-center gap-2 py-3 px-4 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-xs font-semibold">
+                    <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping" />
+                    Waiting for the host to admit you...
+                  </div>
                   <button
                     onClick={() => setInWaitingRoom(false)}
-                    className="w-full py-2 text-xs text-gray-400 hover:text-gray-600 font-medium"
+                    className="w-full py-2 text-xs text-gray-400 hover:text-gray-600 font-medium transition-colors"
                   >
                     Leave Waiting Room
                   </button>
