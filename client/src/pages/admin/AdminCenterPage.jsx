@@ -36,7 +36,7 @@ export default function AdminCenterPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/users', {
+      const res = await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/users', {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -68,7 +68,7 @@ export default function AdminCenterPage() {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/users', {
+      const res = await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/users', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -103,7 +103,7 @@ export default function AdminCenterPage() {
     if (!editingUser) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/users/${editingUser._id || editingUser.id}`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/users/${editingUser._id || editingUser.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -137,7 +137,7 @@ export default function AdminCenterPage() {
     }
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/users/${id}`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/users/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });

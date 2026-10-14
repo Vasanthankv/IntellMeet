@@ -19,8 +19,8 @@ export default function AdminIntegrationsView() {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
       const [appsRes, logsRes] = await Promise.all([
-        fetch('http://localhost:5000/api/integrations/marketplace', { headers }),
-        fetch('http://localhost:5000/api/integrations/admin/audit-logs', { headers })
+        fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/integrations/marketplace', { headers }),
+        fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/integrations/admin/audit-logs', { headers })
       ]);
 
       const [appsData, logsData] = await Promise.all([appsRes.json(), logsRes.json()]);
@@ -41,7 +41,7 @@ export default function AdminIntegrationsView() {
   const handleToggleApprovalRequired = async (integrationId, currentVal) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/integrations/admin/apps/${integrationId}/status`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/integrations/admin/apps/${integrationId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -63,7 +63,7 @@ export default function AdminIntegrationsView() {
     const nextStatus = currentStatus === 'DISABLED_BY_ADMIN' ? 'ACTIVE' : 'DISABLED_BY_ADMIN';
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/integrations/admin/apps/${integrationId}/status`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/integrations/admin/apps/${integrationId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

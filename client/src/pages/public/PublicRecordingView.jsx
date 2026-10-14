@@ -25,7 +25,7 @@ export default function PublicRecordingView() {
     setIsLoading(true);
     setError(null);
     try {
-      const url = `http://localhost:5000/api/recordings/public/${shareToken}${code ? `?passcode=${encodeURIComponent(code)}` : ''}`;
+      const url = `${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/recordings/public/${shareToken}${code ? `?passcode=${encodeURIComponent(code)}` : ''}`;
       const res = await fetch(url);
       const data = await res.json();
       if (res.status === 401 && data.requirePasscode) {

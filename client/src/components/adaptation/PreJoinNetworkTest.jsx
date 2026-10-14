@@ -14,7 +14,7 @@ export default function PreJoinNetworkTest({ onSelectAudioOnly, onSelectStandard
     setIsTesting(true);
     const start = performance.now();
     try {
-      await fetch('http://localhost:5000/api/meetings/pre-join-check/ping-test', { cache: 'no-store' });
+      await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/pre-join-check/ping-test', { cache: 'no-store' });
       const rtt = Math.round(performance.now() - start);
       setLatency(rtt);
     } catch (e) {

@@ -300,7 +300,7 @@ export default function ScheduleMeeting() {
           const cleanId = generatedMeetingId.replace(/\s/g, '');
           for (const [idx, item] of agendaTopics.entries()) {
             if (item.title && item.title.trim()) {
-              await fetch(`http://localhost:5000/api/meetings/${cleanId}/agenda/items`, {
+              await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${cleanId}/agenda/items`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -324,7 +324,7 @@ export default function ScheduleMeeting() {
       if (syncCalendar) {
         try {
           const token = localStorage.getItem('token');
-          await fetch('http://localhost:5000/api/integrations/calendar/sync', {
+          await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/integrations/calendar/sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
             body: JSON.stringify({ provider: 'GOOGLE' })
@@ -336,7 +336,7 @@ export default function ScheduleMeeting() {
       if (notifySlack) {
         try {
           const token = localStorage.getItem('token');
-          await fetch('http://localhost:5000/api/integrations/dispatch', {
+          await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/integrations/dispatch', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
             body: JSON.stringify({

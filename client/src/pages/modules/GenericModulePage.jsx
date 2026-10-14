@@ -18,7 +18,7 @@ export default function GenericModulePage() {
   
   const fetchItems = async () => {
     try {
-      const res = await fetch(`http://localhost:5000/api/modules/${type}`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/modules/${type}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
@@ -45,7 +45,7 @@ export default function GenericModulePage() {
     if (!newItemName.trim()) return;
 
     try {
-      const res = await fetch(`http://localhost:5000/api/modules/${type}`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/modules/${type}`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -76,7 +76,7 @@ export default function GenericModulePage() {
     if (!window.confirm(`Are you sure you want to delete this ${moduleName}?`)) return;
     
     try {
-      const res = await fetch(`http://localhost:5000/api/modules/${type}/${id}`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/modules/${type}/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });

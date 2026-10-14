@@ -101,7 +101,7 @@ export default function WhiteboardStudio({
   // Fetch whiteboard data on mount
   const fetchBoardData = useCallback(async () => {
     try {
-      const res = await axios.get(`http://localhost:5000/api/whiteboards/${whiteboardId}`);
+      const res = await axios.get(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/whiteboards/${whiteboardId}`);
       if (res.data.success) {
         setBoard(res.data.whiteboard);
         setObjects(res.data.objects || []);
@@ -371,7 +371,7 @@ export default function WhiteboardStudio({
 
   const persistNewObject = async (objData) => {
     try {
-      const res = await axios.post(`http://localhost:5000/api/whiteboards/${whiteboardId}/objects`, objData);
+      const res = await axios.post(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/whiteboards/${whiteboardId}/objects`, objData);
       if (res.data.success) {
         setObjects(prev => [...prev, res.data.object]);
         if (socket && roomId) {
@@ -385,7 +385,7 @@ export default function WhiteboardStudio({
 
   const saveObjectUpdate = async (objectId, updates) => {
     try {
-      const res = await axios.put(`http://localhost:5000/api/whiteboards/${whiteboardId}/objects/${objectId}`, updates);
+      const res = await axios.put(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/whiteboards/${whiteboardId}/objects/${objectId}`, updates);
       if (res.data.success) {
         if (socket && roomId) {
           socket.emit('whiteboard-object-update', roomId, res.data.object);
@@ -398,7 +398,7 @@ export default function WhiteboardStudio({
 
   const deleteObject = async (objectId) => {
     try {
-      const res = await axios.delete(`http://localhost:5000/api/whiteboards/${whiteboardId}/objects/${objectId}`);
+      const res = await axios.delete(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/whiteboards/${whiteboardId}/objects/${objectId}`);
       if (res.data.success) {
         setObjects(prev => prev.filter(o => o.objectId !== objectId));
         if (socket && roomId) {
@@ -454,7 +454,7 @@ export default function WhiteboardStudio({
       mentions: []
     };
     try {
-      const res = await axios.post(`http://localhost:5000/api/whiteboards/${whiteboardId}/comments`, newComment);
+      const res = await axios.post(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/whiteboards/${whiteboardId}/comments`, newComment);
       if (res.data.success) {
         setComments(prev => [...prev, res.data.comment]);
         setSelectedCommentId(res.data.comment.commentId);
@@ -472,7 +472,7 @@ export default function WhiteboardStudio({
   const handleAddReply = async (commentId) => {
     if (!replyText.trim()) return;
     try {
-      const res = await axios.post(`http://localhost:5000/api/whiteboards/${whiteboardId}/comments/${commentId}/reply`, {
+      const res = await axios.post(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/whiteboards/${whiteboardId}/comments/${commentId}/reply`, {
         userId: currentUser.id,
         userName: currentUser.name,
         content: replyText
@@ -492,7 +492,7 @@ export default function WhiteboardStudio({
   const handleResolveComment = async (commentId, currentStatus) => {
     const newStatus = currentStatus === 'ACTIVE' ? 'RESOLVED' : 'ACTIVE';
     try {
-      const res = await axios.put(`http://localhost:5000/api/whiteboards/${whiteboardId}/comments/${commentId}/resolve`, {
+      const res = await axios.put(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/whiteboards/${whiteboardId}/comments/${commentId}/resolve`, {
         status: newStatus
       });
       if (res.data.success) {
@@ -509,7 +509,7 @@ export default function WhiteboardStudio({
   // Multi-page navigation (17.18)
   const handleAddPage = async () => {
     try {
-      const res = await axios.post(`http://localhost:5000/api/whiteboards/${whiteboardId}/pages`, {
+      const res = await axios.post(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/whiteboards/${whiteboardId}/pages`, {
         title: `Page ${board.pages.length + 1}`
       });
       if (res.data.success) {
@@ -528,7 +528,7 @@ export default function WhiteboardStudio({
   // Toggle Whiteboard Settings (Lock, Star, Mode, Private Brainstorming)
   const updateSettings = async (updates) => {
     try {
-      const res = await axios.put(`http://localhost:5000/api/whiteboards/${whiteboardId}`, updates);
+      const res = await axios.put(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/whiteboards/${whiteboardId}`, updates);
       if (res.data.success) {
         setBoard(res.data.whiteboard);
         if (socket && roomId) {
@@ -544,7 +544,7 @@ export default function WhiteboardStudio({
   const handleAssignPermission = async () => {
     if (!inviteUserId.trim()) return;
     try {
-      const res = await axios.post(`http://localhost:5000/api/whiteboards/${whiteboardId}/permissions`, {
+      const res = await axios.post(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/whiteboards/${whiteboardId}/permissions`, {
         userId: inviteUserId,
         userName: inviteUserName || inviteUserId,
         role: inviteRole

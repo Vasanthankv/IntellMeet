@@ -43,7 +43,7 @@ export default function RecordingsPage() {
     try {
       const token = localStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const url = `http://localhost:5000/api/recordings?search=${encodeURIComponent(searchQuery)}`;
+      const url = `${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/recordings?search=${encodeURIComponent(searchQuery)}`;
       const res = await fetch(url, { headers });
       const data = await res.json();
       if (data.success) {
@@ -71,7 +71,7 @@ export default function RecordingsPage() {
     try {
       const token = localStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const res = await fetch(`http://localhost:5000/api/recordings/${recordingId}`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/recordings/${recordingId}`, {
         method: 'DELETE',
         headers
       });
@@ -94,7 +94,7 @@ export default function RecordingsPage() {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       };
-      const res = await fetch(`http://localhost:5000/api/recordings/${recordingId}`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/recordings/${recordingId}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({ meetingTitle: newTitle })
@@ -669,7 +669,7 @@ export default function RecordingsPage() {
               'Content-Type': 'application/json',
               ...(token ? { Authorization: `Bearer ${token}` } : {})
             };
-            const res = await fetch(`http://localhost:5000/api/recordings/${recordingId}/share`, {
+            const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/recordings/${recordingId}/share`, {
               method: 'PUT',
               headers,
               body: JSON.stringify(updates)

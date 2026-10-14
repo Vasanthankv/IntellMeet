@@ -40,8 +40,8 @@ export default function MeetingAIQuestionsDrawer({
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
       const [sessRes, histRes] = await Promise.all([
-        fetch(`http://localhost:5000/api/meetings/${meetingId}/questions/session`, { headers }),
-        fetch(`http://localhost:5000/api/meetings/${meetingId}/questions/history`, { headers })
+        fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/questions/session`, { headers }),
+        fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/questions/history`, { headers })
       ]);
 
       const sessData = await sessRes.json();
@@ -120,7 +120,7 @@ export default function MeetingAIQuestionsDrawer({
     const endpoint = isCurrentlyActive ? 'stop' : 'start';
 
     try {
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/questions/${endpoint}`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/questions/${endpoint}`, {
         method: isCurrentlyActive ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
       });
@@ -160,7 +160,7 @@ export default function MeetingAIQuestionsDrawer({
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/questions/ask`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/questions/ask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -186,7 +186,7 @@ export default function MeetingAIQuestionsDrawer({
   const handleSaveSettings = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/questions/settings`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/questions/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({

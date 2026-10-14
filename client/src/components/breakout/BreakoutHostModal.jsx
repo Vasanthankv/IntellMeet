@@ -66,7 +66,7 @@ export default function BreakoutHostModal({
 
   const fetchRooms = async () => {
     try {
-      const res = await axios.get(`http://localhost:5000/api/meetings/${meetingId}/breakout`);
+      const res = await axios.get(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/breakout`);
       if (res.data.success && res.data.rooms?.length > 0) {
         setRooms(res.data.rooms);
         setViewState('MANAGE');
@@ -80,7 +80,7 @@ export default function BreakoutHostModal({
 
   const fetchSavedAssignments = async () => {
     try {
-      const res = await axios.get(`http://localhost:5000/api/meetings/${meetingId}/breakout/saved-assignments`);
+      const res = await axios.get(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/breakout/saved-assignments`);
       if (res.data.success) {
         setSavedAssignments(res.data.savedAssignments || []);
       }
@@ -92,7 +92,7 @@ export default function BreakoutHostModal({
   // 1. Create Breakout Rooms (18.2 - 18.6)
   const handleCreateRooms = async () => {
     try {
-      const res = await axios.post(`http://localhost:5000/api/meetings/${meetingId}/breakout/create`, {
+      const res = await axios.post(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/breakout/create`, {
         count: roomCount,
         method: assignmentMethod,
         participants: currentParticipants.map(p => ({ userId: p.userId || p.id, userName: p.name || p.userName })),
@@ -118,7 +118,7 @@ export default function BreakoutHostModal({
   // 2. Open All Rooms (18.9)
   const handleOpenAllRooms = async () => {
     try {
-      const res = await axios.post(`http://localhost:5000/api/meetings/${meetingId}/breakout/open`);
+      const res = await axios.post(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/breakout/open`);
       if (res.data.success) {
         setRooms(res.data.rooms);
         if (socket) {
@@ -136,7 +136,7 @@ export default function BreakoutHostModal({
   // 3. Initiate Closing Countdown (18.16, 18.18)
   const handleCloseAllRooms = async () => {
     try {
-      const res = await axios.post(`http://localhost:5000/api/meetings/${meetingId}/breakout/close`);
+      const res = await axios.post(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/breakout/close`);
       if (res.data.success) {
         setRooms(res.data.rooms);
         if (socket) {
@@ -153,7 +153,7 @@ export default function BreakoutHostModal({
   // 4. Immediately End Rooms (18.16)
   const handleEndRoomsNow = async () => {
     try {
-      const res = await axios.post(`http://localhost:5000/api/meetings/${meetingId}/breakout/end`);
+      const res = await axios.post(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/breakout/end`);
       if (res.data.success) {
         setRooms(res.data.rooms);
         setViewState('CREATE');
@@ -169,7 +169,7 @@ export default function BreakoutHostModal({
   // 5. Add Room (18.21)
   const handleAddRoom = async () => {
     try {
-      const res = await axios.post(`http://localhost:5000/api/meetings/${meetingId}/breakout/rooms`, {
+      const res = await axios.post(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/breakout/rooms`, {
         name: `Room ${rooms.length + 1}`
       });
       if (res.data.success) {
@@ -187,7 +187,7 @@ export default function BreakoutHostModal({
       return;
     }
     try {
-      const res = await axios.put(`http://localhost:5000/api/meetings/${meetingId}/breakout/rooms/${roomId}`, {
+      const res = await axios.put(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/breakout/rooms/${roomId}`, {
         name: editNameText.trim()
       });
       if (res.data.success) {
@@ -202,7 +202,7 @@ export default function BreakoutHostModal({
   // 7. Delete Room (18.21)
   const handleDeleteRoom = async (roomId) => {
     try {
-      const res = await axios.delete(`http://localhost:5000/api/meetings/${meetingId}/breakout/rooms/${roomId}`);
+      const res = await axios.delete(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/breakout/rooms/${roomId}`);
       if (res.data.success) {
         setRooms(prev => prev.filter(r => r.roomId !== roomId));
       }
@@ -214,7 +214,7 @@ export default function BreakoutHostModal({
   // 8. Assign / Move Participant (18.4, 18.7)
   const handleAssignUser = async (userId, userName, targetRoomId) => {
     try {
-      const res = await axios.post(`http://localhost:5000/api/meetings/${meetingId}/breakout/assign`, {
+      const res = await axios.post(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/breakout/assign`, {
         userId,
         userName,
         targetRoomId
@@ -236,7 +236,7 @@ export default function BreakoutHostModal({
   const handleExchangeUser = async (targetUserId) => {
     if (!selectedUserForExchange) return;
     try {
-      const res = await axios.post(`http://localhost:5000/api/meetings/${meetingId}/breakout/exchange`, {
+      const res = await axios.post(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/breakout/exchange`, {
         userAId: selectedUserForExchange.userId,
         userBId: targetUserId
       });
@@ -279,7 +279,7 @@ export default function BreakoutHostModal({
   const handleSaveCurrentAssignment = async () => {
     if (!saveTitle.trim()) return;
     try {
-      const res = await axios.post(`http://localhost:5000/api/meetings/${meetingId}/breakout/save-assignment`, {
+      const res = await axios.post(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/breakout/save-assignment`, {
         title: saveTitle.trim(),
         createdBy: currentUser.id
       });
@@ -296,7 +296,7 @@ export default function BreakoutHostModal({
   // 13. Resolve Help Request (18.15)
   const handleResolveHelp = async (requestId, targetRoom) => {
     try {
-      await axios.put(`http://localhost:5000/api/meetings/${meetingId}/breakout/help/${requestId}/resolve`);
+      await axios.put(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/breakout/help/${requestId}/resolve`);
       setRooms(prev => prev.map(r => ({
         ...r,
         helpRequests: r.helpRequests?.map(h => h.requestId === requestId ? { ...h, status: 'RESOLVED' } : h)

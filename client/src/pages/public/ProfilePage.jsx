@@ -56,7 +56,7 @@ export default function ProfilePage() {
       try {
         const token = getToken();
         if (!token) return;
-        const res = await fetch('http://localhost:5000/api/auth/me', {
+        const res = await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/auth/me', {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();
@@ -97,7 +97,7 @@ export default function ProfilePage() {
         toast.error('Authentication token missing. Please sign in again.');
         return;
       }
-      const res = await fetch('http://localhost:5000/api/users/me/profile', {
+      const res = await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/users/me/profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

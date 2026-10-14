@@ -86,7 +86,7 @@ export default function JoinMeeting() {
     const cleanId = mid.replace(/[\s-]/g, '');
 
     try {
-      const checkRes = await fetch(`http://localhost:5000/api/meetings/pre-join-check/${cleanId}`);
+      const checkRes = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/pre-join-check/${cleanId}`);
       const checkData = await checkRes.json();
 
       if (checkData.success && checkData.meeting) {
@@ -108,7 +108,7 @@ export default function JoinMeeting() {
             setIsChecking(false);
             return;
           }
-          const pwdRes = await fetch(`http://localhost:5000/api/meetings/${cleanId}/verify-passcode`, {
+          const pwdRes = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${cleanId}/verify-passcode`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ passcode: pwd.trim() })
@@ -147,7 +147,7 @@ export default function JoinMeeting() {
         if (mtg.registration?.required) {
           const userEmail = user?.email;
           if (userEmail) {
-            const regCheckRes = await fetch(`http://localhost:5000/api/meetings/${cleanId}/check-registration`, {
+            const regCheckRes = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${cleanId}/check-registration`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ email: userEmail })

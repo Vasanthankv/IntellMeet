@@ -53,7 +53,7 @@ export default function AINotesPage() {
     try {
       const token = localStorage.getItem('token');
       // Fetch personal note
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/notes/my`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/notes/my`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -74,7 +74,7 @@ export default function AINotesPage() {
       }
 
       // Fetch transcript segments
-      const trRes = await fetch(`http://localhost:5000/api/meetings/${meetingId}/transcript/export?format=json`, {
+      const trRes = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/transcript/export?format=json`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const trData = await trRes.json();
@@ -97,7 +97,7 @@ export default function AINotesPage() {
     setSaving(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/notes/${note.noteId || note._id}`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/notes/${note.noteId || note._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -157,7 +157,7 @@ export default function AINotesPage() {
     setIsGenerating(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/notes/${note.noteId || note._id}/ai-enhance`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/notes/${note.noteId || note._id}/ai-enhance`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -186,7 +186,7 @@ export default function AINotesPage() {
     setIsRefining(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/notes/${note.noteId || note._id}/ai-refine`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/notes/${note.noteId || note._id}/ai-refine`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -219,7 +219,7 @@ export default function AINotesPage() {
     if (!shareEmail.trim() || !note) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/notes/${note.noteId || note._id}/share`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/notes/${note.noteId || note._id}/share`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -242,7 +242,7 @@ export default function AINotesPage() {
     if (!note) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/notes/${note.noteId || note._id}/share/${emailOrId}`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/notes/${note.noteId || note._id}/share/${emailOrId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });

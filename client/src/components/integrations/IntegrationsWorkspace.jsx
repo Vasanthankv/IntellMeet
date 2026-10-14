@@ -36,9 +36,9 @@ export default function IntegrationsWorkspace({ isAdminView = false }) {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
       const [marketRes, myRes, whRes] = await Promise.all([
-        fetch('http://localhost:5000/api/integrations/marketplace', { headers }),
-        fetch('http://localhost:5000/api/integrations/my', { headers }),
-        fetch('http://localhost:5000/api/integrations/webhooks', { headers })
+        fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/integrations/marketplace', { headers }),
+        fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/integrations/my', { headers }),
+        fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/integrations/webhooks', { headers })
       ]);
 
       const [marketData, myData, whData] = await Promise.all([
@@ -74,7 +74,7 @@ export default function IntegrationsWorkspace({ isAdminView = false }) {
     setIsConnecting(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/integrations/connect', {
+      const res = await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/integrations/connect', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -105,7 +105,7 @@ export default function IntegrationsWorkspace({ isAdminView = false }) {
   const handleDisconnect = async (integrationId) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/integrations/disconnect', {
+      const res = await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/integrations/disconnect', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -130,7 +130,7 @@ export default function IntegrationsWorkspace({ isAdminView = false }) {
     setSyncingCalendar(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/integrations/calendar/sync', {
+      const res = await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/integrations/calendar/sync', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -159,7 +159,7 @@ export default function IntegrationsWorkspace({ isAdminView = false }) {
     setIsCreatingWebhook(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/integrations/webhooks', {
+      const res = await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/integrations/webhooks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -191,7 +191,7 @@ export default function IntegrationsWorkspace({ isAdminView = false }) {
   const handleTestWebhook = async (webhookId) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/integrations/webhooks/test', {
+      const res = await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/integrations/webhooks/test', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -214,7 +214,7 @@ export default function IntegrationsWorkspace({ isAdminView = false }) {
   const handleDeleteWebhook = async (subscriptionId) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/integrations/webhooks/${subscriptionId}`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/integrations/webhooks/${subscriptionId}`, {
         method: 'DELETE',
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });

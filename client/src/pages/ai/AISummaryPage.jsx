@@ -23,7 +23,7 @@ export default function AISummaryPage() {
   const fetchSummariesList = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/summaries/all/list', {
+      const res = await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/summaries/all/list', {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       const data = await res.json();
@@ -53,7 +53,7 @@ export default function AISummaryPage() {
       setIsLoading(true);
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`http://localhost:5000/api/meetings/${selectedMeetingId}/summary`, {
+        const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/summary`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         });
         const data = await res.json();
@@ -84,7 +84,7 @@ export default function AISummaryPage() {
     const toastId = toast.loading('AI is processing transcript to generate meeting summary...');
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${selectedMeetingId}/summary/generate`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/summary/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ template: chosenTemplate })
@@ -109,7 +109,7 @@ export default function AISummaryPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${selectedMeetingId}/summary/approve`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/summary/approve`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -128,7 +128,7 @@ export default function AISummaryPage() {
     if (!selectedMeetingId) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${selectedMeetingId}/summary`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/summary`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ overview: newText })
@@ -148,7 +148,7 @@ export default function AISummaryPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${selectedMeetingId}/summary/action-items/${actionItemId}`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/summary/action-items/${actionItemId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ status: nextStatus })
@@ -173,7 +173,7 @@ export default function AISummaryPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${selectedMeetingId}/summary/action-items`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/summary/action-items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(newAction)
@@ -194,7 +194,7 @@ export default function AISummaryPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${selectedMeetingId}/summary/action-items/${actionItemId}`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/summary/action-items/${actionItemId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -217,7 +217,7 @@ export default function AISummaryPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${selectedMeetingId}/summary/decisions`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/summary/decisions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(newDec)
@@ -238,7 +238,7 @@ export default function AISummaryPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${selectedMeetingId}/summary/decisions/${decisionId}`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/summary/decisions/${decisionId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -258,7 +258,7 @@ export default function AISummaryPage() {
   // Share handlers (25.12, 25.13)
   const handleShareEmail = async (recipients) => {
     const token = localStorage.getItem('token');
-    const res = await fetch(`http://localhost:5000/api/meetings/${selectedMeetingId}/summary/share/email`, {
+    const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/summary/share/email`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ recipients })
@@ -273,7 +273,7 @@ export default function AISummaryPage() {
 
   const handleShareChat = async () => {
     const token = localStorage.getItem('token');
-    const res = await fetch(`http://localhost:5000/api/meetings/${selectedMeetingId}/summary/share/chat`, {
+    const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/summary/share/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
     });

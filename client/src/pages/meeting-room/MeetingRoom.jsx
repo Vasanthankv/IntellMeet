@@ -117,7 +117,7 @@ export default function MeetingRoom() {
     const fetchMeeting = async () => {
       try {
         const cleanMeetingId = meetingId ? meetingId.replace(/[\s-]/g, '') : '';
-        const res = await fetch(`http://localhost:5000/api/meetings/${encodeURIComponent(cleanMeetingId || meetingId || '')}`);
+        const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${encodeURIComponent(cleanMeetingId || meetingId || '')}`);
         const data = await res.json();
         if (data.success && data.meeting) {
           setMeetingInfo(data.meeting);
@@ -558,7 +558,7 @@ export default function MeetingRoom() {
     const loadChatHistory = async () => {
       try {
         const currentUserId = user?.id || user?._id || '';
-        const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/messages?userId=${currentUserId}`);
+        const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/messages?userId=${currentUserId}`);
         const data = await res.json();
         if (data.success) {
           setChatMessages(data.messages.map(m => ({
@@ -571,7 +571,7 @@ export default function MeetingRoom() {
           }
         }
         // Fetch host chat settings
-        const permRes = await fetch(`http://localhost:5000/api/meetings/${meetingId}/chat-settings`);
+        const permRes = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/chat-settings`);
         const permData = await permRes.json();
         if (permData.success && permData.allowChat) {
           setChatPermission(permData.allowChat);
@@ -579,7 +579,7 @@ export default function MeetingRoom() {
 
         // Part 12: Fetch feedback & raised hands state from MongoDB (12.16)
         try {
-          const fbRes = await fetch(`http://localhost:5000/api/meetings/${meetingId}/feedback`);
+          const fbRes = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/feedback`);
           const fbData = await fbRes.json();
           if (fbData.success) {
             if (fbData.raisedHandsQueue && fbData.raisedHandsQueue.length > 0) {
@@ -614,7 +614,7 @@ export default function MeetingRoom() {
 
         // Part 13: Fetch active screen share session & settings from MongoDB (13.21)
         try {
-          const shareRes = await fetch(`http://localhost:5000/api/meetings/${meetingId}/share-session`);
+          const shareRes = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/share-session`);
           const shareData = await shareRes.json();
           if (shareData.success) {
             if (shareData.sharingSettings) {
@@ -661,7 +661,7 @@ export default function MeetingRoom() {
 
         // Part 15: Fetch active annotations & settings from MongoDB (15.10)
         try {
-          const annRes = await fetch(`http://localhost:5000/api/meetings/${meetingId}/annotations`);
+          const annRes = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/annotations`);
           const annData = await annRes.json();
           if (annData.success) {
             if (annData.annotations && annData.annotations.length > 0) {
@@ -681,7 +681,7 @@ export default function MeetingRoom() {
 
         // Part 16: Fetch active presentation session from MongoDB (16.14)
         try {
-          const presRes = await fetch(`http://localhost:5000/api/meetings/${meetingId}/presentation/current`);
+          const presRes = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/presentation/current`);
           const presData = await presRes.json();
           if (presData.success && presData.active && presData.session) {
             setPresentationSession(presData.session);
@@ -1738,7 +1738,7 @@ export default function MeetingRoom() {
           if (src !== tgt) {
             try {
               const token = localStorage.getItem('token');
-              const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/translation/translate`, {
+              const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/translation/translate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({
@@ -1916,7 +1916,7 @@ export default function MeetingRoom() {
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
     
-    fetch(`http://localhost:5000/api/meetings/${meetingId}/translation/settings`, { headers })
+    fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/translation/settings`, { headers })
       .then(r => r.json())
       .then(d => {
         if (d.success && d.session) {
@@ -1924,7 +1924,7 @@ export default function MeetingRoom() {
         }
       }).catch(() => {});
 
-    fetch(`http://localhost:5000/api/meetings/${meetingId}/translation/language-pairs`, { headers })
+    fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/translation/language-pairs`, { headers })
       .then(r => r.json())
       .then(d => {
         if (d.success && d.pairs) {
@@ -1932,7 +1932,7 @@ export default function MeetingRoom() {
         }
       }).catch(() => {});
 
-    fetch(`http://localhost:5000/api/meetings/${meetingId}/translation/preference`, { headers })
+    fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/translation/preference`, { headers })
       .then(r => r.json())
       .then(d => {
         if (d.success && d.preference) {
@@ -1945,7 +1945,7 @@ export default function MeetingRoom() {
       }).catch(() => {});
 
     // Fetch Part 22 Interpretation settings & preferences (22.2, 22.7)
-    fetch(`http://localhost:5000/api/meetings/${meetingId}/interpretation/settings`, { headers })
+    fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/interpretation/settings`, { headers })
       .then(r => r.json())
       .then(d => {
         if (d.success && d.session) {
@@ -1953,7 +1953,7 @@ export default function MeetingRoom() {
         }
       }).catch(() => {});
 
-    fetch(`http://localhost:5000/api/meetings/${meetingId}/interpretation/preference`, { headers })
+    fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/interpretation/preference`, { headers })
       .then(r => r.json())
       .then(d => {
         if (d.success && d.preference) {
@@ -1965,7 +1965,7 @@ export default function MeetingRoom() {
       }).catch(() => {});
 
     // Fetch Part 23 Recording Settings & Status (23.3, 23.4, 23.13)
-    fetch(`http://localhost:5000/api/meetings/${meetingId}/recording/settings`, { headers })
+    fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/recording/settings`, { headers })
       .then(r => r.json())
       .then(d => {
         if (d.success && d.settings) {
@@ -1977,7 +1977,7 @@ export default function MeetingRoom() {
         }
       }).catch(() => {});
 
-    fetch(`http://localhost:5000/api/meetings/${meetingId}/recording/status`, { headers })
+    fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/recording/status`, { headers })
       .then(r => r.json())
       .then(d => {
         if (d.success && d.isRecording && d.recording) {
@@ -2059,7 +2059,7 @@ export default function MeetingRoom() {
       };
 
       try {
-        const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/messages`, {
+        const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/messages`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(msgPayload)
@@ -2118,7 +2118,7 @@ export default function MeetingRoom() {
   const handleTogglePin = async (msg) => {
     try {
       const msgId = msg._id || msg.id;
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/messages/${msgId}/pin`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/messages/${msgId}/pin`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pinnedBy: user?.name || 'Host' })
@@ -2138,7 +2138,7 @@ export default function MeetingRoom() {
   const handleReactToMessage = async (msgId, emoji) => {
     try {
       const userName = user?.name || 'Guest';
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/messages/${msgId}/react`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/messages/${msgId}/react`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ emoji, userName })
@@ -2157,7 +2157,7 @@ export default function MeetingRoom() {
     setChatPermission(newPerm);
     setShowChatSettingsMenu(false);
     try {
-      await fetch(`http://localhost:5000/api/meetings/${meetingId}/chat-settings`, {
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/chat-settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ allowChat: newPerm })
@@ -2194,7 +2194,7 @@ export default function MeetingRoom() {
     };
 
     try {
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/messages`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -2579,7 +2579,7 @@ export default function MeetingRoom() {
     setSampleParticipants(prev => prev.map(p => p.id === pId ? { ...p, isMuted: true } : p));
     socketRef.current?.emit('host-mute-participant', meetingId, pId);
     try {
-      await fetch(`http://localhost:5000/api/meetings/${meetingId}/participants/${pId}`, {
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/participants/${pId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ audioState: 'muted' })
@@ -2599,7 +2599,7 @@ export default function MeetingRoom() {
     setSampleParticipants(prev => prev.map(p => p.id === pId ? { ...p, isVideoOff: true } : p));
     socketRef.current?.emit('host-stop-video', meetingId, pId);
     try {
-      await fetch(`http://localhost:5000/api/meetings/${meetingId}/participants/${pId}`, {
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/participants/${pId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ videoState: 'off' })
@@ -2638,7 +2638,7 @@ export default function MeetingRoom() {
     }
     socketRef.current?.emit('host-make-cohost', meetingId, { participantId: pId, isCoHost: make });
     try {
-      await fetch(`http://localhost:5000/api/meetings/${meetingId}/participants/${pId}`, {
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/participants/${pId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: make ? 'co-host' : 'participant' })
@@ -2662,7 +2662,7 @@ export default function MeetingRoom() {
     try {
       const token = localStorage.getItem('token');
       await Promise.all([
-        fetch(`http://localhost:5000/api/meetings/${meetingId}/security/remove-participant`, {
+        fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/security/remove-participant`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -2670,7 +2670,7 @@ export default function MeetingRoom() {
           },
           body: JSON.stringify({ participantId: pId, name: pName, preventRejoin })
         }),
-        fetch(`http://localhost:5000/api/meetings/${meetingId}/participants/${pId}`, {
+        fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/participants/${pId}`, {
           method: 'DELETE',
           headers: {
             Authorization: `Bearer ${token}`
@@ -2694,7 +2694,7 @@ export default function MeetingRoom() {
     }
     socketRef.current?.emit('participant-rename', meetingId, { participantId: pId, newName });
     try {
-      await fetch(`http://localhost:5000/api/meetings/${meetingId}/participants/${pId}`, {
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/participants/${pId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ displayName: newName })
@@ -2727,7 +2727,7 @@ export default function MeetingRoom() {
     }));
     socketRef.current?.emit('host-suspend-activities', meetingId);
     try {
-      await fetch(`http://localhost:5000/api/meetings/${meetingId}/suspend-activities`, {
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/suspend-activities`, {
         method: 'POST'
       });
     } catch (e) {}
@@ -2755,7 +2755,7 @@ export default function MeetingRoom() {
       senderId: myId,
       senderName: myName,
     });
-    fetch(`http://localhost:5000/api/meetings/${meetingId}/feedback`, {
+    fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/feedback`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ participantId: myId, displayName: myName, type: 'REACTION', value: emoji })
@@ -2790,7 +2790,7 @@ export default function MeetingRoom() {
       isRaised: nextHand,
       name: myName
     });
-    fetch(`http://localhost:5000/api/meetings/${meetingId}/feedback`, {
+    fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/feedback`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ participantId: myId, displayName: myName, type: 'RAISE_HAND', value: nextHand ? 'RAISE' : 'LOWER' })
@@ -2833,7 +2833,7 @@ export default function MeetingRoom() {
       value: nextVal
     });
 
-    fetch(`http://localhost:5000/api/meetings/${meetingId}/feedback`, {
+    fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/feedback`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ participantId: myId, displayName: myName, type: 'NON_VERBAL', value: nextVal || 'CLEAR' })
@@ -2861,7 +2861,7 @@ export default function MeetingRoom() {
     setRaisedHandsQueue([]);
     setHandRaised(false);
     socketRef.current?.emit('host-lower-all-hands', meetingId);
-    fetch(`http://localhost:5000/api/meetings/${meetingId}/feedback/lower-all-hands`, {
+    fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/feedback/lower-all-hands`, {
       method: 'POST'
     }).catch(() => {});
     toast.success('Lowered all hands');
@@ -2875,7 +2875,7 @@ export default function MeetingRoom() {
     setMyNonVerbal(null);
     setFloatingEmojis([]);
     socketRef.current?.emit('clear-all-feedback', meetingId);
-    fetch(`http://localhost:5000/api/meetings/${meetingId}/feedback/clear`, {
+    fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/feedback/clear`, {
       method: 'POST'
     }).catch(() => {});
     toast.success('Cleared all feedback and raised hands');
@@ -2927,7 +2927,7 @@ export default function MeetingRoom() {
     const toastId = toast.loading('AI is summarizing the meeting and generating tasks...');
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/ai/summarize', {
+      const response = await fetch('${SOCKET_SERVER_URL}/api/ai/summarize', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2940,7 +2940,7 @@ export default function MeetingRoom() {
         toast.success('AI Summary complete! Action items added to your Tasks.', { id: toastId, duration: 4000 });
         
         // Also post to generic modules route to persist the summary
-        fetch('http://localhost:5000/api/modules/summaries', {
+        fetch('${SOCKET_SERVER_URL}/api/modules/summaries', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
@@ -2979,11 +2979,48 @@ export default function MeetingRoom() {
 
     try {
       if (isLocal) {
-        if (!stream) {
+        if (!stream && peers.length === 0) {
           toast.error('No video or audio stream available for local recording');
           return;
         }
-        localRecordingEngine.start(stream);
+
+        // Mix local and remote audio tracks so the recording captures all meeting participants
+        let streamToRecord = stream;
+        try {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) {
+            const audioCtx = new AudioContextClass();
+            const audioDest = audioCtx.createMediaStreamDestination();
+
+            // Connect local audio
+            if (stream && stream.getAudioTracks().length > 0) {
+              const localAudioSource = audioCtx.createMediaStreamSource(stream);
+              localAudioSource.connect(audioDest);
+            }
+
+            // Connect remote participant audio
+            peers.forEach(p => {
+              if (p.stream && p.stream.getAudioTracks().length > 0) {
+                try {
+                  const remoteAudioSource = audioCtx.createMediaStreamSource(p.stream);
+                  remoteAudioSource.connect(audioDest);
+                } catch (e) {}
+              }
+            });
+
+            // Combine video track with mixed audio track
+            const activeVideoTrack = screenTrackRef.current || stream?.getVideoTracks()[0];
+            const compositeStream = new MediaStream();
+            if (activeVideoTrack) compositeStream.addTrack(activeVideoTrack);
+            audioDest.stream.getAudioTracks().forEach(t => compositeStream.addTrack(t));
+            streamToRecord = compositeStream;
+          }
+        } catch (mixErr) {
+          console.warn('Audio mixing fallback to direct stream:', mixErr);
+          streamToRecord = stream;
+        }
+
+        localRecordingEngine.start(streamToRecord);
       }
 
       const token = localStorage.getItem('token');
@@ -2992,7 +3029,7 @@ export default function MeetingRoom() {
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       };
 
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/recording/start`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/recording/start`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -3037,7 +3074,7 @@ export default function MeetingRoom() {
 
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
-      await fetch(`http://localhost:5000/api/meetings/${meetingId}/recording/pause`, {
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/recording/pause`, {
         method: 'PUT',
         headers
       });
@@ -3058,7 +3095,7 @@ export default function MeetingRoom() {
 
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
-      await fetch(`http://localhost:5000/api/meetings/${meetingId}/recording/resume`, {
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/recording/resume`, {
         method: 'PUT',
         headers
       });
@@ -3087,7 +3124,7 @@ export default function MeetingRoom() {
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       };
 
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/recording/stop`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/recording/stop`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({ recordingId: activeRecordingId })
@@ -3116,7 +3153,7 @@ export default function MeetingRoom() {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       };
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/recording/settings`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/recording/settings`, {
         method: 'PUT',
         headers,
         body: JSON.stringify(updates)
@@ -3137,7 +3174,7 @@ export default function MeetingRoom() {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       };
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/recording/permission`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/recording/permission`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ userId: targetUserId, userName: targetUserName, allowed })
@@ -3230,10 +3267,29 @@ export default function MeetingRoom() {
           const rawText = lastResult[0].transcript.trim();
           if (!rawText) return;
 
-          // Simple multilingual translation annotation if translation language is chosen
+          // Real backend multilingual translation if translation language is chosen
           let translatedText = null;
-          if (translationLanguage && translationLanguage !== 'none') {
-            translatedText = `[${translationLanguage.toUpperCase()}] ${rawText}`;
+          const targetLang = (translationLanguage && translationLanguage !== 'none') 
+            ? translationLanguage 
+            : (participantTranslationEnabled && participantTargetLanguage ? participantTargetLanguage : null);
+          if (targetLang) {
+            try {
+              const transRes = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/translation/translate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  text: rawText,
+                  sourceLanguage: speakingLanguage ? speakingLanguage.split('-')[0] : 'en',
+                  targetLanguage: targetLang
+                })
+              });
+              const transData = await transRes.json();
+              if (transData.success && transData.translatedText) {
+                translatedText = transData.translatedText;
+              }
+            } catch (err) {
+              console.warn('Live translation error:', err);
+            }
           }
 
           const segment = {
@@ -3262,7 +3318,7 @@ export default function MeetingRoom() {
             try {
               const token = localStorage.getItem('token');
               // Part 24 Transcript route
-              fetch(`http://localhost:5000/api/meetings/${meetingId}/transcript/segments`, {
+              fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/transcript/segments`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({
@@ -3276,7 +3332,7 @@ export default function MeetingRoom() {
                 })
               }).catch(() => {});
 
-              fetch(`http://localhost:5000/api/meetings/${meetingId}/captions/transcription/segment`, {
+              fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/captions/transcription/segment`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify(segment)
@@ -3320,7 +3376,7 @@ export default function MeetingRoom() {
   useEffect(() => {
     if (showTranscriptPanel && meetingId) {
       const token = localStorage.getItem('token');
-      fetch(`http://localhost:5000/api/meetings/${meetingId}/transcript`, {
+      fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/transcript`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       })
       .then(res => res.json())
@@ -3342,7 +3398,7 @@ export default function MeetingRoom() {
   useEffect(() => {
     if (meetingId) {
       const token = localStorage.getItem('token');
-      fetch(`http://localhost:5000/api/meetings/${meetingId}/summary`, {
+      fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/summary`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       })
       .then(res => res.json())
@@ -3375,7 +3431,7 @@ export default function MeetingRoom() {
     const toastId = toast.loading('AI is analyzing transcript to synthesize meeting summary...');
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/summary/generate`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/summary/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ template })
@@ -3417,13 +3473,13 @@ export default function MeetingRoom() {
     try {
       const endpoint = nextStatus ? 'start' : 'stop';
       // Part 24 endpoint
-      fetch(`http://localhost:5000/api/meetings/${meetingId}/transcript/${nextStatus ? 'start' : 'stop'}`, {
+      fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/transcript/${nextStatus ? 'start' : 'stop'}`, {
         method: nextStatus ? 'POST' : 'PUT',
         headers
       }).catch(() => {});
 
       // Part 20 fallback endpoint
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/captions/transcription/${endpoint}`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/captions/transcription/${endpoint}`, {
         method: 'POST',
         headers
       });
@@ -3450,14 +3506,14 @@ export default function MeetingRoom() {
     try {
       const token = localStorage.getItem('token');
       // Part 24 AI analysis endpoint
-      let res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/transcript/ai-analyze`, {
+      let res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/transcript/ai-analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       });
       let data = await res.json();
       if (!data.success) {
         // Fallback to Part 20 caption summary
-        res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/captions/transcription/ai-summary`, {
+        res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/captions/transcription/ai-summary`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         });
@@ -3480,12 +3536,12 @@ export default function MeetingRoom() {
   const handleExportTranscript = async (format = 'txt') => {
     try {
       const token = localStorage.getItem('token');
-      let res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/transcript/export?format=${format}`, {
+      let res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/transcript/export?format=${format}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       if (!res.ok) {
         // Fallback
-        res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/captions/transcription/export?format=${format}`, {
+        res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/captions/transcription/export?format=${format}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         });
       }
@@ -3506,7 +3562,7 @@ export default function MeetingRoom() {
   const handleEditSegment = async (segmentId, newText) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/transcript/segments/${segmentId}`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/transcript/segments/${segmentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ text: newText })
@@ -3537,7 +3593,7 @@ export default function MeetingRoom() {
   const handleDeleteSegment = async (segmentId) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/transcript/segments/${segmentId}`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/transcript/segments/${segmentId}`, {
         method: 'DELETE',
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
@@ -3565,7 +3621,7 @@ export default function MeetingRoom() {
   const handleUpdateHostCaptionSettings = async (newSettings) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/captions/settings`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/captions/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(newSettings)
@@ -3585,7 +3641,7 @@ export default function MeetingRoom() {
   const handleRequestCaptionsFromHost = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/captions/request`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/captions/request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ participantName: user?.name || 'Participant' })
@@ -3604,7 +3660,7 @@ export default function MeetingRoom() {
   const handleResolveCaptionRequest = async (requestId, action) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/captions/request/${requestId}`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/captions/request/${requestId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ action })
@@ -3625,7 +3681,7 @@ export default function MeetingRoom() {
   const handleAssignCaptioner = async (participantId, participantName) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/captions/assign-captioner`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/captions/assign-captioner`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ participantId, participantName })
@@ -3667,7 +3723,7 @@ export default function MeetingRoom() {
 
     if (isTranscribing) {
       const token = localStorage.getItem('token');
-      fetch(`http://localhost:5000/api/meetings/${meetingId}/captions/transcription/segment`, {
+      fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/captions/transcription/segment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(segment)
@@ -3683,7 +3739,7 @@ export default function MeetingRoom() {
   const handleUpdateLanguagePairs = async (sourceLanguage, targetLanguages, enabled = true) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/translation/language-pairs`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/translation/language-pairs`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ sourceLanguage, targetLanguages, enabled })
@@ -3705,7 +3761,7 @@ export default function MeetingRoom() {
   const handleToggleMeetingTranslation = async (enabled) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/translation/settings`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/translation/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ status: enabled ? 'ACTIVE' : 'STOPPED' })
@@ -3725,7 +3781,7 @@ export default function MeetingRoom() {
   const handleSaveParticipantTranslationPreference = async (updates) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/translation/preference`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/translation/preference`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(updates)
@@ -3765,7 +3821,7 @@ export default function MeetingRoom() {
     try {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      await fetch(`http://localhost:5000/api/meetings/${meetingId}/interpretation/preference`, {
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/interpretation/preference`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({
@@ -3791,7 +3847,7 @@ export default function MeetingRoom() {
     try {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      await fetch(`http://localhost:5000/api/meetings/${meetingId}/interpretation/preference`, {
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/interpretation/preference`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({
@@ -3809,7 +3865,7 @@ export default function MeetingRoom() {
     try {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      await fetch(`http://localhost:5000/api/meetings/${meetingId}/interpretation/preference`, {
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/interpretation/preference`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({
@@ -3828,7 +3884,7 @@ export default function MeetingRoom() {
     try {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      await fetch(`http://localhost:5000/api/meetings/${meetingId}/interpretation/preference`, {
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/interpretation/preference`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({
@@ -3846,7 +3902,7 @@ export default function MeetingRoom() {
     try {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/interpretation/session/start`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/interpretation/session/start`, {
         method: 'POST',
         headers
       });
@@ -3869,7 +3925,7 @@ export default function MeetingRoom() {
     try {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/interpretation/session/stop`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/interpretation/session/stop`, {
         method: 'PUT',
         headers
       });
@@ -3890,7 +3946,7 @@ export default function MeetingRoom() {
     try {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/interpretation/languages`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/interpretation/languages`, {
         method: 'POST',
         headers,
         body: JSON.stringify(languageData)
@@ -3911,7 +3967,7 @@ export default function MeetingRoom() {
     try {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/interpretation/languages/${languageId}`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/interpretation/languages/${languageId}`, {
         method: 'DELETE',
         headers
       });
@@ -3929,7 +3985,7 @@ export default function MeetingRoom() {
     try {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/interpretation/languages/${languageId}/interpreter`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/interpretation/languages/${languageId}/interpreter`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({ interpreterId, interpreterName, interpreterEmail })
@@ -3950,7 +4006,7 @@ export default function MeetingRoom() {
     try {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/interpretation/sign-language/assign`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/interpretation/sign-language/assign`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ userId, userName, userEmail })
@@ -3976,7 +4032,7 @@ export default function MeetingRoom() {
       try {
         const headers = { 'Content-Type': 'application/json' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
-        await fetch(`http://localhost:5000/api/meetings/${meetingId}/interpretation/interpreter/status`, {
+        await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/interpretation/interpreter/status`, {
           method: 'PUT',
           headers,
           body: JSON.stringify({
@@ -4054,7 +4110,7 @@ export default function MeetingRoom() {
           type: 'WHITEBOARD',
           sourceName: 'Whiteboard'
         });
-        fetch(`http://localhost:5000/api/meetings/${meetingId}/share-session/start`, {
+        fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/share-session/start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -4093,13 +4149,30 @@ export default function MeetingRoom() {
       }
 
       if (screenStream) {
-        screenTrackRef.current = screenStream.getVideoTracks()[0];
+        const screenTrack = screenStream.getVideoTracks()[0];
+        screenTrackRef.current = screenTrack;
         if (userVideo.current) {
           userVideo.current.srcObject = screenStream;
         }
 
+        // Hot-swap video track on all connected WebRTC peers so remote participants see the screen
+        const currentCamTrack = (localStreamRef.current || stream)?.getVideoTracks()[0];
+        peersRef.current.forEach(({ peer }) => {
+          if (peer && screenTrack) {
+            try {
+              if (currentCamTrack) {
+                peer.replaceTrack(currentCamTrack, screenTrack, stream || screenStream);
+              } else {
+                peer.addTrack(screenTrack, screenStream);
+              }
+            } catch (err) {
+              console.warn('Error hot-swapping screen share track to peer:', err);
+            }
+          }
+        });
+
         // Listen for native browser "Stop Sharing" button
-        screenStream.getVideoTracks()[0].onended = () => {
+        screenTrack.onended = () => {
           handleStopShare();
         };
       }
@@ -4157,7 +4230,7 @@ export default function MeetingRoom() {
         videoOptimization: sourceDetails.videoOptimization
       });
 
-      fetch(`http://localhost:5000/api/meetings/${meetingId}/share-session/start`, {
+      fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/share-session/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -4192,7 +4265,7 @@ export default function MeetingRoom() {
       isPaused: nextPaused
     });
 
-    fetch(`http://localhost:5000/api/meetings/${meetingId}/share-session/pause`, {
+    fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/share-session/pause`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ participantId: myId, isPaused: nextPaused })
@@ -4202,13 +4275,30 @@ export default function MeetingRoom() {
   };
 
   const handleStopShare = () => {
+    const stoppedTrack = screenTrackRef.current;
     if (screenTrackRef.current) {
       screenTrackRef.current.stop();
       screenTrackRef.current = null;
     }
+    const cameraTrack = (localStreamRef.current || stream)?.getVideoTracks()[0];
     if (userVideo.current && stream) {
       userVideo.current.srcObject = stream;
     }
+
+    // Restore camera video track on all connected peers
+    peersRef.current.forEach(({ peer }) => {
+      if (peer && cameraTrack) {
+        try {
+          if (stoppedTrack) {
+            peer.replaceTrack(stoppedTrack, cameraTrack, stream);
+          } else {
+            peer.addTrack(cameraTrack, stream);
+          }
+        } catch (err) {
+          console.warn('Error restoring camera track to peer:', err);
+        }
+      }
+    });
 
     const myId = user?.id || user?._id || 'local';
     const myName = user?.name || 'You';
@@ -4242,7 +4332,7 @@ export default function MeetingRoom() {
       participantName: myName
     });
 
-    fetch(`http://localhost:5000/api/meetings/${meetingId}/share-session/stop`, {
+    fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/share-session/stop`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ participantId: myId })
@@ -4250,7 +4340,7 @@ export default function MeetingRoom() {
 
     // Part 16: End slide control presentation if active (Section 16.5)
     if (presentationSession && presentationSession.presenterId === myId) {
-      fetch(`http://localhost:5000/api/meetings/${meetingId}/presentation/end`, {
+      fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/presentation/end`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ presenterId: myId })
@@ -4279,7 +4369,7 @@ export default function MeetingRoom() {
         hostId
       });
 
-      await fetch(`http://localhost:5000/api/meetings/${meetingId}/share-session/stop-participant`, {
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/share-session/stop-participant`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ participantId, hostId })
@@ -4368,7 +4458,7 @@ export default function MeetingRoom() {
     setSharingSettings(newSettings);
     socketRef.current?.emit('update-sharing-settings', meetingId, newSettings);
     try {
-      await fetch(`http://localhost:5000/api/meetings/${meetingId}/sharing-settings`, {
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/sharing-settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSettings)
@@ -4430,7 +4520,7 @@ export default function MeetingRoom() {
 
       // Persist to MongoDB (Section 15.10)
       if (!newAnnotation.isVanishing) {
-        fetch(`http://localhost:5000/api/meetings/${meetingId}/annotations`, {
+        fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/annotations`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newAnnotation)
@@ -4445,7 +4535,7 @@ export default function MeetingRoom() {
     if (isLocal) {
       socketRef.current?.emit('annotation-undo', meetingId, { annotationId });
 
-      fetch(`http://localhost:5000/api/meetings/${meetingId}/annotations/undo`, {
+      fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/annotations/undo`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user?.id || 'local' })
@@ -4477,7 +4567,7 @@ export default function MeetingRoom() {
         userId: myId
       });
 
-      fetch(`http://localhost:5000/api/meetings/${meetingId}/annotations/clear`, {
+      fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/annotations/clear`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -4548,7 +4638,7 @@ export default function MeetingRoom() {
     socketRef.current?.emit('update-annotation-settings', meetingId, newSettings);
 
     try {
-      await fetch(`http://localhost:5000/api/meetings/${meetingId}/annotation-settings`, {
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/annotation-settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSettings)
@@ -4565,7 +4655,7 @@ export default function MeetingRoom() {
     const myName = user?.name || 'You';
 
     try {
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/presentation/start`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/presentation/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -4613,7 +4703,7 @@ export default function MeetingRoom() {
   const handleGrantSlideControl = async (controllersToGrant) => {
     const myId = user?.id || user?._id || 'local';
     try {
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/presentation/grant`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/presentation/grant`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -4641,7 +4731,7 @@ export default function MeetingRoom() {
   const handleRevokeSlideControl = async (targetUserId) => {
     const myId = user?.id || user?._id || 'local';
     try {
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/presentation/revoke`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/presentation/revoke`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -4668,7 +4758,7 @@ export default function MeetingRoom() {
   const handleStopAllSlideControl = async () => {
     const myId = user?.id || user?._id || 'local';
     try {
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/presentation/stop-control`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/presentation/stop-control`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ presenterId: myId })
@@ -4691,7 +4781,7 @@ export default function MeetingRoom() {
     const myId = user?.id || user?._id || 'local';
     const myName = user?.name || 'You';
     try {
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/presentation/navigate`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/presentation/navigate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -4723,7 +4813,7 @@ export default function MeetingRoom() {
   const handleEndPresentationSession = async () => {
     const myId = user?.id || user?._id || 'local';
     try {
-      await fetch(`http://localhost:5000/api/meetings/${meetingId}/presentation/end`, {
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/presentation/end`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ presenterId: myId })
@@ -4805,7 +4895,7 @@ export default function MeetingRoom() {
   useEffect(() => {
     const fetchMeetingMeta = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/meetings/pre-join-check/${meetingId}`);
+        const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/pre-join-check/${meetingId}`);
         const data = await res.json();
         if (data.success && data.meeting) {
           if (data.meeting.title) setMeetingTitle(data.meeting.title);
@@ -4863,7 +4953,7 @@ export default function MeetingRoom() {
     setSecuritySettings(prev => ({ ...prev, lockMeeting: nextLocked, meetingLocked: nextLocked }));
     try {
       const token = localStorage.getItem('token');
-      await fetch(`http://localhost:5000/api/meetings/${meetingId}/security/lock`, {
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/security/lock`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -4881,7 +4971,7 @@ export default function MeetingRoom() {
   const handleToggleWaitingRoom = async (enabled) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/security/waiting-room`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/security/waiting-room`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -4907,7 +4997,7 @@ export default function MeetingRoom() {
   const handleToggleHideProfilePictures = async (hide) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/security/hide-profile-pictures`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/security/hide-profile-pictures`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -4929,7 +5019,7 @@ export default function MeetingRoom() {
   const handleUpdateParticipantPermissions = async (perms) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/security/permissions`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/security/permissions`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -4961,7 +5051,7 @@ export default function MeetingRoom() {
   const handleUpdateScreenSharePolicy = async (whoCanShareScreen) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/security/screen-sharing`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/security/screen-sharing`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -4987,7 +5077,7 @@ export default function MeetingRoom() {
   const handleResumeActivities = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/security/resume-activities`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/security/resume-activities`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -5019,7 +5109,7 @@ export default function MeetingRoom() {
     setSecuritySettings(updated);
     try {
       const token = localStorage.getItem('token');
-      await fetch(`http://localhost:5000/api/meetings/${meetingId}/security`, {
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/security`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -5037,7 +5127,7 @@ export default function MeetingRoom() {
   const fetchEncryptionData = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/security/encryption`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/security/encryption`, {
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
       });
       const data = await res.json();
@@ -5052,7 +5142,7 @@ export default function MeetingRoom() {
   const registerEndpointEncryption = async (clientType = 'DESKTOP') => {
     try {
       const token = localStorage.getItem('token');
-      await fetch(`http://localhost:5000/api/meetings/${meetingId}/security/encryption/register-endpoint`, {
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/security/encryption/register-endpoint`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -5072,7 +5162,7 @@ export default function MeetingRoom() {
   const handleSwitchEncryption = async (type) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/security/encryption`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/security/encryption`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -5102,7 +5192,7 @@ export default function MeetingRoom() {
   const handleVerifySecurityCode = async (code) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/security/encryption/verify-code`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/security/encryption/verify-code`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -5172,7 +5262,7 @@ export default function MeetingRoom() {
   const fetchWatermarkData = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/security/watermark`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/security/watermark`, {
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
       });
       const data = await res.json();
@@ -5190,7 +5280,7 @@ export default function MeetingRoom() {
   const assignAudioSignature = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/security/watermark/assign-audio-signature`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/security/watermark/assign-audio-signature`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -5220,7 +5310,7 @@ export default function MeetingRoom() {
   const handleSaveWatermarkSettings = async (newSettings) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/security/watermark`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/security/watermark`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -5247,7 +5337,7 @@ export default function MeetingRoom() {
 
   const handleTraceAudioLeak = async (signatureQuery) => {
     const token = localStorage.getItem('token');
-    const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/security/watermark/trace-audio-leak`, {
+    const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/security/watermark/trace-audio-leak`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -5262,7 +5352,7 @@ export default function MeetingRoom() {
   const fetchLiveStreamData = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/livestream`, {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/livestream`, {
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
       });
       const data = await res.json();
@@ -5276,7 +5366,7 @@ export default function MeetingRoom() {
 
   const handleStartLiveStream = async () => {
     const token = localStorage.getItem('token');
-    const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/livestream/start`, {
+    const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/livestream/start`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -5294,7 +5384,7 @@ export default function MeetingRoom() {
 
   const handleStopLiveStream = async () => {
     const token = localStorage.getItem('token');
-    const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/livestream/stop`, {
+    const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/livestream/stop`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -5312,7 +5402,7 @@ export default function MeetingRoom() {
 
   const handleSaveLiveStreamConfig = async (config) => {
     const token = localStorage.getItem('token');
-    const res = await fetch(`http://localhost:5000/api/meetings/${meetingId}/livestream/configure`, {
+    const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/livestream/configure`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -5335,7 +5425,7 @@ export default function MeetingRoom() {
     const interval = setInterval(async () => {
       try {
         const token = localStorage.getItem('token');
-        await fetch(`http://localhost:5000/api/meetings/${meetingId}/livestream/update-viewers`, {
+        await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/livestream/update-viewers`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -7384,7 +7474,7 @@ export default function MeetingRoom() {
               onClose={() => setShowSecurityModal(false)}
               securitySettings={securitySettings}
               isMeetingLocked={isMeetingLocked}
-              isHostOrCoHost={user?.id === 'host' || coHosts.includes(user?.id)}
+              isHostOrCoHost={isHostOrCoHost}
               waitingQueueCount={waitingRoomQueue?.length || 0}
               onToggleLock={handleToggleLock}
               onToggleWaitingRoom={handleToggleWaitingRoom}

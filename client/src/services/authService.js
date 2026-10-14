@@ -1,4 +1,5 @@
-const API_BASE_URL = 'http://localhost:5000/api/auth';
+import { API_BASE_URL as ROOT_API_URL } from '../utils/apiConfig';
+const API_BASE_URL = `${ROOT_API_URL}/auth`;
 
 export const authService = {
   login: async (email, password) => {
