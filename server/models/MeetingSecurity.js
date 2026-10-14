@@ -210,6 +210,10 @@ const meetingSecuritySchema = new mongoose.Schema({
       type: Boolean,
       default: true
     },
+    canReact: {
+      type: Boolean,
+      default: true
+    },
     canRequestRecording: {
       type: Boolean,
       default: true

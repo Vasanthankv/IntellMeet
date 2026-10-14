@@ -72,6 +72,7 @@ async function getOrCreateSecurityDoc(meetingId) {
         canShareScreen: meeting?.securitySettings?.allowShareScreen !== undefined ? !!meeting.securitySettings.allowShareScreen : true,
         canRename: meeting?.securitySettings?.allowRename !== undefined ? !!meeting.securitySettings.allowRename : true,
         canShareWhiteboard: meeting?.securitySettings?.allowWhiteboard !== undefined ? !!meeting.securitySettings.allowWhiteboard : true,
+        canReact: meeting?.securitySettings?.allowReactions !== undefined ? !!meeting.securitySettings.allowReactions : true,
         canRequestRecording: true
       },
       watermark: {
@@ -347,7 +348,8 @@ router.put('/permissions', protect, async (req, res) => {
           'securitySettings.allowRename': security.participantPermissions.canRename,
           'securitySettings.allowUnmute': security.participantPermissions.canUnmute,
           'securitySettings.allowStartVideo': security.participantPermissions.canStartVideo,
-          'securitySettings.allowWhiteboard': security.participantPermissions.canShareWhiteboard
+          'securitySettings.allowWhiteboard': security.participantPermissions.canShareWhiteboard,
+          'securitySettings.allowReactions': security.participantPermissions.canReact
         }
       }
     );
@@ -356,6 +358,12 @@ router.put('/permissions', protect, async (req, res) => {
     if (io) {
       io.to(meetingId).emit('permissions-updated', security.participantPermissions);
       io.to(meetingId).emit('security-settings-updated', security);
+      if (permissions.canChat !== undefined) {
+        io.to(meetingId).emit('chat-permission-updated', permissions.canChat);
+      }
+      if (permissions.canReact !== undefined) {
+        io.to(meetingId).emit('reaction-settings-updated', { allowReactions: permissions.canReact });
+      }
     }
 
     res.json({
@@ -445,6 +453,7 @@ router.post('/suspend-activities', protect, async (req, res) => {
       canShareScreen: false,
       canChat: 'none',
       canShareWhiteboard: false,
+      canReact: false,
       canRename: false,
       canRequestRecording: false
     };
@@ -468,7 +477,8 @@ router.post('/suspend-activities', protect, async (req, res) => {
           'securitySettings.allowStartVideo': false,
           'securitySettings.allowShareScreen': false,
           'securitySettings.allowChat': 'none',
-          'securitySettings.allowWhiteboard': false
+          'securitySettings.allowWhiteboard': false,
+          'securitySettings.allowReactions': false
         }
       }
     );
@@ -479,6 +489,8 @@ router.post('/suspend-activities', protect, async (req, res) => {
       io.to(meetingId).emit('meeting-lock-toggled', { meetingLocked: true });
       io.to(meetingId).emit('permissions-updated', security.participantPermissions);
       io.to(meetingId).emit('security-settings-updated', security);
+      io.to(meetingId).emit('chat-permission-updated', 'none');
+      io.to(meetingId).emit('reaction-settings-updated', { allowReactions: false });
     }
 
     res.json({
@@ -509,6 +521,7 @@ router.post('/resume-activities', protect, async (req, res) => {
       canShareScreen: security.whoCanShareScreen !== 'hostOnly',
       canChat: 'everyone',
       canShareWhiteboard: true,
+      canReact: true,
       canRename: true,
       canRequestRecording: true
     };
@@ -530,7 +543,8 @@ router.post('/resume-activities', protect, async (req, res) => {
           'securitySettings.allowStartVideo': true,
           'securitySettings.allowShareScreen': security.participantPermissions.canShareScreen,
           'securitySettings.allowChat': 'everyone',
-          'securitySettings.allowWhiteboard': true
+          'securitySettings.allowWhiteboard': true,
+          'securitySettings.allowReactions': true
         }
       }
     );
@@ -540,6 +554,8 @@ router.post('/resume-activities', protect, async (req, res) => {
       io.to(meetingId).emit('activities-resumed');
       io.to(meetingId).emit('permissions-updated', security.participantPermissions);
       io.to(meetingId).emit('security-settings-updated', security);
+      io.to(meetingId).emit('chat-permission-updated', 'everyone');
+      io.to(meetingId).emit('reaction-settings-updated', { allowReactions: true });
     }
 
     res.json({

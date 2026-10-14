@@ -1128,7 +1128,25 @@ export default function MeetingRoom() {
       });
 
       socketRef.current.on('permissions-updated', (newPerms) => {
-        setSecuritySettings(prev => ({ ...prev, ...newPerms }));
+        if (!newPerms) return;
+        setSecuritySettings(prev => ({
+          ...prev,
+          ...newPerms,
+          allowChat: newPerms.canChat !== undefined ? newPerms.canChat : prev.allowChat,
+          allowUnmute: newPerms.canUnmute !== undefined ? newPerms.canUnmute : prev.allowUnmute,
+          allowStartVideo: newPerms.canStartVideo !== undefined ? newPerms.canStartVideo : prev.allowStartVideo,
+          allowShareScreen: newPerms.canShareScreen !== undefined ? newPerms.canShareScreen : prev.allowShareScreen,
+          allowRename: newPerms.canRename !== undefined ? newPerms.canRename : prev.allowRename,
+          allowWhiteboard: newPerms.canShareWhiteboard !== undefined ? newPerms.canShareWhiteboard : prev.allowWhiteboard,
+          allowReactions: newPerms.canReact !== undefined ? newPerms.canReact : prev.allowReactions,
+          participantPermissions: { ...(prev.participantPermissions || {}), ...newPerms }
+        }));
+        if (newPerms.canChat !== undefined) {
+          setChatPermission(newPerms.canChat);
+        }
+        if (newPerms.canReact !== undefined) {
+          setReactionSettings(r => ({ ...r, allowReactions: newPerms.canReact }));
+        }
         toast('Host updated meeting permissions', { icon: '🛡️' });
       });
 
@@ -1140,15 +1158,20 @@ export default function MeetingRoom() {
         setIsAudioOn(false);
         setIsVideoOn(false);
         setIsMeetingLocked(true);
+        setChatPermission('none');
+        setReactionSettings(r => ({ ...r, allowReactions: false }));
         setSecuritySettings(s => ({
           ...s,
           lockMeeting: true,
+          meetingLocked: true,
           allowChat: 'none',
           allowShareScreen: false,
           allowUnmute: false,
           allowStartVideo: false,
           allowWhiteboard: false,
-          suspendActivities: true
+          allowReactions: false,
+          suspendActivities: true,
+          participantActivitiesSuspended: true
         }));
         toast.error('Host has suspended all participant activities!', { duration: 6000 });
       });
@@ -1202,6 +1225,8 @@ export default function MeetingRoom() {
       });
 
       socketRef.current.on('activities-resumed', () => {
+        setChatPermission('everyone');
+        setReactionSettings(r => ({ ...r, allowReactions: true }));
         setSecuritySettings(s => ({
           ...s,
           suspendActivities: false,
@@ -1210,7 +1235,8 @@ export default function MeetingRoom() {
           allowStartVideo: true,
           allowShareScreen: s.whoCanShareScreen !== 'hostOnly',
           allowChat: 'everyone',
-          allowWhiteboard: true
+          allowWhiteboard: true,
+          allowReactions: true
         }));
         toast.success('Host has resumed participant activities!');
       });
@@ -2248,6 +2274,12 @@ export default function MeetingRoom() {
         socketRef.current?.emit('toggle-media-state', cleanMId || meetingId, { isVideoOn: false });
         toast('Video stopped', { icon: '🚫' });
       } else {
+        // Check host permission if video is disabled by host
+        if (!securitySettings.allowStartVideo && !isHostOrCoHost) {
+          toast.error('The host has disabled participant video.');
+          return;
+        }
+
         // Start Video: recover ended/missing track if necessary and re-enable
         let activeStream = stream || localStreamRef.current;
         let videoTrack = activeStream ? activeStream.getVideoTracks().find(track => !track.label.includes('screen')) : null;
@@ -2446,7 +2478,7 @@ export default function MeetingRoom() {
     }
 
     // Check host permission if participant is muted
-    if (!isAudioOn && !securitySettings.allowUnmute && user?.id !== 'host') {
+    if (!isAudioOn && !securitySettings.allowUnmute && !isHostOrCoHost) {
       toast.error('The host has disabled participant unmuting.');
       return;
     }
@@ -2736,7 +2768,13 @@ export default function MeetingRoom() {
 
   // Part 12: Reactions & Non-Verbal Feedback Handlers (12.1 - 12.17)
   const handleSendReaction = (emoji) => {
-    if (!reactionSettings.allowReactions) {
+    const isReactionAllowed = reactionSettings.allowReactions && 
+      securitySettings?.participantPermissions?.canReact !== false && 
+      securitySettings?.allowReactions !== false && 
+      !securitySettings?.suspendActivities && 
+      !securitySettings?.participantActivitiesSuspended;
+
+    if (!isReactionAllowed && !isHostOrCoHost) {
       toast.error('The host has disabled emoji reactions');
       return;
     }
@@ -2766,7 +2804,7 @@ export default function MeetingRoom() {
   };
 
   const handleToggleHandRaised = () => {
-    if (!reactionSettings.allowRaiseHand) {
+    if (!reactionSettings.allowRaiseHand && !isHostOrCoHost) {
       toast.error('The host has disabled hand raising');
       return;
     }
@@ -2799,7 +2837,7 @@ export default function MeetingRoom() {
   };
 
   const handleSendNonVerbal = (key) => {
-    if (!reactionSettings.allowNonVerbal) {
+    if (!reactionSettings.allowNonVerbal && !isHostOrCoHost) {
       toast.error('The host has disabled non-verbal feedback');
       return;
     }
@@ -4060,7 +4098,7 @@ export default function MeetingRoom() {
   // ==========================================
   const handleOpenShareModal = () => {
     // 13.13 Screen Share Security & Host Permissions
-    if (!securitySettings.allowShareScreen) {
+    if (!securitySettings.allowShareScreen && !isHostOrCoHost) {
       toast.error('The host has disabled screen sharing for participants.');
       return;
     }
@@ -5029,6 +5067,14 @@ export default function MeetingRoom() {
       });
       const data = await res.json();
       if (data.success) {
+        if (perms.canReact !== undefined) {
+          setReactionSettings(r => ({ ...r, allowReactions: perms.canReact }));
+          socketRef.current?.emit('host-update-reaction-settings', meetingId, { ...reactionSettings, allowReactions: perms.canReact });
+        }
+        if (perms.canChat !== undefined) {
+          setChatPermission(perms.canChat);
+          socketRef.current?.emit('chat-permission-updated', perms.canChat);
+        }
         setSecuritySettings(prev => ({
           ...prev,
           ...perms,
@@ -5038,6 +5084,7 @@ export default function MeetingRoom() {
           allowShareScreen: perms.canShareScreen !== undefined ? perms.canShareScreen : prev.allowShareScreen,
           allowRename: perms.canRename !== undefined ? perms.canRename : prev.allowRename,
           allowWhiteboard: perms.canShareWhiteboard !== undefined ? perms.canShareWhiteboard : prev.allowWhiteboard,
+          allowReactions: perms.canReact !== undefined ? perms.canReact : prev.allowReactions,
           participantPermissions: data.participantPermissions
         }));
         socketRef.current?.emit('security-update-permissions', meetingId, data.participantPermissions);
@@ -7461,6 +7508,7 @@ export default function MeetingRoom() {
           {/* Host Security Panel Button */}
           <div className="relative">
             <button 
+              id="security-toolbar-button"
               onClick={() => setShowSecurityModal(!showSecurityModal)}
               className="flex flex-col items-center justify-center w-16 h-14 rounded-lg hover:bg-[#2A2A2A] transition-colors group relative"
               title="Meeting Security Settings"
