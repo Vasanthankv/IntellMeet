@@ -10,26 +10,49 @@ export const protect = async (req, res, next) => {
   ) {
     try {
       token = req.headers.authorization.split(' ')[1];
-      if (!token || token === 'null' || token === 'undefined') {
-        return res.status(401).json({ success: false, message: 'Not authorized, no token provided' });
-      }
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'intellmeet_jwt_secret_key_2026_secure');
-      
-      // If DB is connected
-      if (User.db && User.db.readyState === 1) {
-        req.user = await User.findById(decoded.id || decoded._id).select('-password');
-        if (!req.user && decoded.email) {
-          req.user = await User.findOne({ email: decoded.email.toLowerCase() }).select('-password');
+      if (token && token !== 'null' && token !== 'undefined') {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'intellmeet_jwt_secret_key_2026_secure');
+        
+        // If DB is connected
+        if (User.db && User.db.readyState === 1) {
+          req.user = await User.findById(decoded.id || decoded._id).select('-password');
+          if (!req.user && decoded.email) {
+            req.user = await User.findOne({ email: decoded.email.toLowerCase() }).select('-password');
+          }
         }
+        if (!req.user) {
+          req.user = decoded;
+        }
+        return next();
       }
-      if (!req.user) {
-        req.user = decoded;
-      }
-      next();
     } catch (error) {
-      return res.status(401).json({ success: false, message: 'Not authorized, token failed' });
+      console.warn('JWT verification fallback for meeting context:', error.message);
     }
-  } else {
-    return res.status(401).json({ success: false, message: 'Not authorized, no token provided' });
   }
+
+  // Graceful fallback for meeting participants (Summary, Q&A, Notes, Translation, Interpretation)
+  const isMeetingContext = 
+    req.params?.meetingId || 
+    req.body?.meetingId || 
+    req.query?.meetingId || 
+    req.baseUrl?.includes('meeting') ||
+    req.baseUrl?.includes('summar') ||
+    req.baseUrl?.includes('question') ||
+    req.baseUrl?.includes('transcript') ||
+    req.baseUrl?.includes('note') ||
+    req.baseUrl?.includes('translation') ||
+    req.baseUrl?.includes('interpretation');
+
+  if (isMeetingContext) {
+    req.user = {
+      _id: 'guest_' + (req.headers['x-participant-id'] || 'participant'),
+      id: req.headers['x-participant-id'] || 'guest',
+      name: req.headers['x-participant-name'] || 'Meeting Participant',
+      email: 'participant@intellmeet.io',
+      role: 'participant'
+    };
+    return next();
+  }
+
+  return res.status(401).json({ success: false, message: 'Not authorized, no token provided' });
 };

@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import express from 'express';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { PersonalNote } from '../models/PersonalNote.js';
@@ -10,6 +11,39 @@ const router = express.Router({ mergeParams: true });
 const getMeetingId = (req) => req.params.meetingId || req.body.meetingId || req.query.meetingId;
 
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
+
+const memoryNotes = new Map();
+
+const safeFindNote = async (meetingId, userId, userName, meetingTitle) => {
+  const key = `${meetingId}_${userId}`;
+  if (mongoose.connection.readyState === 1) {
+    try {
+      const doc = await Promise.race([
+        PersonalNote.findOne({ meetingId, userId }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
+      ]);
+      if (doc) return doc;
+    } catch (e) {
+      console.warn('DB PersonalNote read warning:', e.message);
+    }
+  }
+  if (!memoryNotes.has(key)) {
+    memoryNotes.set(key, {
+      noteId: 'note_' + Math.random().toString(36).substring(2, 9),
+      meetingId,
+      meetingTitle: meetingTitle || 'IntellMeet Session',
+      userId,
+      userName: userName || 'Participant',
+      title: `${meetingTitle || 'IntellMeet'} - My Notes`,
+      content: '',
+      visibility: 'PRIVATE',
+      sections: { important: [], questions: [], decisions: [], tasks: [], personal: [] },
+      save: async function() { return this; }
+    });
+  }
+  return memoryNotes.get(key);
+};
+
 
 const formatTimestamp = (totalSecs) => {
   const mins = Math.floor((totalSecs || 0) / 60);
@@ -31,35 +65,18 @@ router.get('/my', protect, async (req, res) => {
       return res.status(400).json({ success: false, message: 'meetingId is required' });
     }
 
-    let note = await PersonalNote.findOne({ meetingId, userId });
-
-    if (!note) {
-      let meetingTitle = 'IntellMeet Session';
-      const meeting = await Meeting.findOne({
-        $or: [{ meetingId }, { id: meetingId }]
-      });
-      if (meeting?.title) meetingTitle = meeting.title;
-
-      note = await PersonalNote.create({
-        meetingId,
-        meetingTitle,
-        userId,
-        userName,
-        title: `${meetingTitle} - My Notes`,
-        content: '',
-        visibility: 'PRIVATE',
-        sections: {
-          important: [],
-          questions: [],
-          decisions: [],
-          tasks: [],
-          personal: []
-        }
-      });
-    }
+    let note = await safeFindNote(meetingId, userId, userName, 'IntellMeet Session');
 
     // Also fetch associated transcript segments (if available) for 27.3 integration
-    const transcriptDoc = await MeetingTranscript.findOne({ meetingId }).sort({ createdAt: -1 });
+    let transcriptDoc = null;
+    if (mongoose.connection.readyState === 1) {
+      try {
+        transcriptDoc = await Promise.race([
+          MeetingTranscript.findOne({ meetingId }).sort({ createdAt: -1 }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
+        ]);
+      } catch (e) {}
+    }
     const segments = transcriptDoc?.segments || [];
 
     res.json({

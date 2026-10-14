@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import express from 'express';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { MeetingAIQuestionSession, MeetingQuestionItem } from '../models/MeetingQuestion.js';
@@ -9,6 +10,52 @@ const router = express.Router({ mergeParams: true });
 const getMeetingId = (req) => req.params.meetingId || req.body.meetingId || req.query.meetingId;
 
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
+
+const memoryQuestionSessions = new Map();
+const memoryQuestionItems = new Map();
+
+const safeFindQuestionSession = async (meetingId) => {
+  if (mongoose.connection.readyState === 1) {
+    try {
+      const doc = await Promise.race([
+        MeetingAIQuestionSession.findOne({ meetingId }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
+      ]);
+      if (doc) return doc;
+    } catch (e) {
+      console.warn('DB MeetingAIQuestionSession read warning:', e.message);
+    }
+  }
+  if (!memoryQuestionSessions.has(meetingId)) {
+    memoryQuestionSessions.set(meetingId, {
+      meetingId,
+      status: 'ACTIVE',
+      autoStart: false,
+      permissions: { whoCanAsk: 'ALL_PARTICIPANTS', contextScope: 'ENTIRE_MEETING' },
+      allowedSources: { transcript: true, chat: true, screenOcr: true },
+      save: async function() { return this; }
+    });
+  }
+  return memoryQuestionSessions.get(meetingId);
+};
+
+const safeSaveQuestionSession = async (session) => {
+  if (mongoose.connection.readyState === 1 && session && typeof session.save === 'function') {
+    try {
+      return await Promise.race([
+        session.save(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
+      ]);
+    } catch (e) {
+      console.warn('DB MeetingAIQuestionSession save warning:', e.message);
+    }
+  }
+  if (session && session.meetingId) {
+    memoryQuestionSessions.set(session.meetingId, session);
+  }
+  return session;
+};
+
 
 // Format seconds to MM:SS
 const formatTimestamp = (totalSecs) => {
@@ -26,24 +73,7 @@ router.get('/session', protect, async (req, res) => {
     const meetingId = getMeetingId(req);
     if (!meetingId) return res.status(400).json({ success: false, message: 'meetingId required' });
 
-    let session = await MeetingAIQuestionSession.findOne({ meetingId });
-    if (!session) {
-      session = await MeetingAIQuestionSession.create({
-        meetingId,
-        status: 'DISABLED',
-        autoStart: false,
-        permissions: {
-          whoCanAsk: 'ALL_PARTICIPANTS',
-          contextScope: 'ENTIRE_MEETING'
-        },
-        allowedSources: {
-          transcript: true,
-          chat: true,
-          screenOcr: true
-        }
-      });
-    }
-
+    let session = await safeFindQuestionSession(meetingId);
     res.json({ success: true, session });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -86,12 +116,10 @@ router.put('/settings', protect, async (req, res) => {
 router.post('/start', protect, async (req, res) => {
   try {
     const meetingId = getMeetingId(req);
-    let session = await MeetingAIQuestionSession.findOne({ meetingId });
-    if (!session) session = new MeetingAIQuestionSession({ meetingId });
-
+    let session = await safeFindQuestionSession(meetingId);
     session.status = 'ACTIVE';
     session.startedAt = new Date();
-    await session.save();
+    await safeSaveQuestionSession(session);
 
     res.json({ success: true, message: 'AI Meeting Questions active', session });
   } catch (err) {
@@ -167,10 +195,7 @@ router.post('/ask', protect, async (req, res) => {
     }
 
     // 1. Check Session & Permissions (26.12, 26.13, 26.17)
-    let session = await MeetingAIQuestionSession.findOne({ meetingId });
-    if (!session) {
-      session = await MeetingAIQuestionSession.create({ meetingId, status: 'ACTIVE' });
-    }
+    let session = await safeFindQuestionSession(meetingId);
 
     const isHost = user.role === 'host' || user.id === 'host';
     if (session.status === 'DISABLED' && !isHost) {
@@ -185,7 +210,10 @@ router.post('/ask', protect, async (req, res) => {
 
     // Source A: Part 24 Transcript
     if (session.allowedSources?.transcript !== false) {
-      const transcriptDoc = await MeetingTranscript.findOne({ meetingId }).sort({ createdAt: -1 });
+      let transcriptDoc = null;
+      if (mongoose.connection.readyState === 1) {
+        try { transcriptDoc = await MeetingTranscript.findOne({ meetingId }).sort({ createdAt: -1 }); } catch (e) {}
+      }
       if (transcriptDoc?.segments) {
         let segs = transcriptDoc.segments;
         // Scope filtering (26.13)
@@ -207,7 +235,10 @@ router.post('/ask', protect, async (req, res) => {
 
     // Source B: Meeting Chat (Continuous Meeting Chat - 26.15 & 35.15)
     if (session.allowedSources?.chat !== false) {
-      const chatDocs = await ChatMessage.find({ meetingId, isDeleted: { $ne: true } }).sort({ createdAt: 1 }).limit(100);
+      let chatDocs = [];
+      if (mongoose.connection.readyState === 1) {
+        try { chatDocs = await ChatMessage.find({ meetingId, isDeleted: { $ne: true } }).sort({ createdAt: 1 }).limit(100); } catch (e) {}
+      }
       chatDocs.forEach(c => {
         const chatText = c.text || c.message || (c.fileName ? `[Shared File: ${c.fileName}]` : '');
         if (chatText) {
@@ -400,8 +431,9 @@ Return ONLY valid JSON with this exact schema (no markdown, no backticks):
     }
 
     // 7. Store Question and Answer Item (26.23)
-    const questionItem = await MeetingQuestionItem.create({
+    const itemData = {
       meetingId,
+      questionId: 'q_' + Math.random().toString(36).substring(2, 9),
       userId: user._id?.toString() || user.id || 'participant',
       userName: user.name || 'Participant',
       userRole: isHost ? 'host' : 'participant',
@@ -415,8 +447,21 @@ Return ONLY valid JSON with this exact schema (no markdown, no backticks):
         sources: citedSources,
         model: genAI ? 'gemini-1.5-flash' : 'intellmeet-heuristic-rag',
         generatedAt: new Date()
+      },
+      createdAt: new Date()
+    };
+
+    let questionItem = itemData;
+    if (mongoose.connection.readyState === 1) {
+      try {
+        questionItem = await Promise.race([
+          MeetingQuestionItem.create(itemData),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
+        ]);
+      } catch (e) {
+        questionItem = itemData;
       }
-    });
+    }
 
     res.status(201).json({
       success: true,

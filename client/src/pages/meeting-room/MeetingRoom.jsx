@@ -7367,7 +7367,7 @@ export default function MeetingRoom() {
         </div>
 
         {/* Center Controls (Horizontally responsive, scrollable if window is narrow) */}
-        <div className="flex items-center justify-center gap-1.5 flex-1 min-w-0 py-1 px-2">
+        <div className="flex items-center justify-center gap-1 sm:gap-1.5 flex-1 min-w-0 py-1 px-1 overflow-x-auto no-scrollbar">
           {/* Host Security Panel Button */}
           <div className="relative">
             <button 
@@ -7796,6 +7796,221 @@ export default function MeetingRoom() {
             )}
           </div>
 
+          {/* Part 20: In-Meeting Toolbar Live Captions Button with Options Menu */}
+          <div className="flex items-center rounded-lg hover:bg-[#2A2A2A] transition-colors group relative">
+            <button 
+              onClick={toggleLiveCaptions}
+              className={`flex flex-col items-center justify-center w-14 h-14 pl-1 ${
+                showLiveCaptions ? 'text-emerald-400 font-bold' : 'text-gray-300'
+              }`}
+              title={showLiveCaptions ? 'Hide Live Captions' : 'Show Live Captions'}
+            >
+              <div className="relative">
+                <Subtitles className={`w-5 h-5 mb-1 ${showLiveCaptions ? 'text-emerald-400 scale-110' : 'text-gray-300 group-hover:text-white'} transition-transform`} />
+                {showLiveCaptions && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                )}
+              </div>
+              <span className="text-[11px] font-medium">{showLiveCaptions ? 'Captions On' : 'Captions'}</span>
+            </button>
+
+            {/* Chevron Menu Button */}
+            <button
+              onClick={() => setShowCaptionsChevronMenu(!showCaptionsChevronMenu)}
+              className="h-14 px-1 rounded-r text-gray-400 hover:text-white transition-colors flex items-center justify-center border-l border-white/5"
+              title="Caption & Translation Options"
+            >
+              <ChevronUp className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Captions Popover Menu */}
+            {showCaptionsChevronMenu && (
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-64 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl shadow-2xl p-2 z-50 text-xs text-gray-200 space-y-1 animate-in fade-in zoom-in-95 duration-100">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2 py-1 block border-b border-[#333]">
+                  Live Caption Controls
+                </span>
+
+                <button
+                  onClick={() => {
+                    toggleLiveCaptions();
+                    setShowCaptionsChevronMenu(false);
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between text-xs"
+                >
+                  <span>{showLiveCaptions ? 'Hide Captions' : 'Show Captions'}</span>
+                  {showLiveCaptions && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowTranscriptPanel(true);
+                    setShowCaptionsChevronMenu(false);
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between text-xs text-blue-300"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5" /> View Full Transcript
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowTranslationModal(true);
+                    setShowCaptionsChevronMenu(false);
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between text-xs text-purple-300 font-medium"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5 text-purple-400" /> Language Translation
+                  </span>
+                  <span className="text-[10px] bg-purple-900/60 px-1 rounded uppercase font-bold text-white">{participantTargetLanguage}</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowCaptionSettingsModal(true);
+                    setShowCaptionsChevronMenu(false);
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between text-xs"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Settings className="w-3.5 h-3.5" /> Caption Settings...
+                  </span>
+                </button>
+
+                {(isHost || user?.id === 'host' || captionSettings?.assignedCaptionerId === (user?.id || user?._id)) && (
+                  <button
+                    onClick={() => {
+                      setShowManualCaptionModal(true);
+                      setShowCaptionsChevronMenu(false);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between text-xs text-indigo-300"
+                  >
+                    <span>Manual Caption Entry...</span>
+                  </button>
+                )}
+
+                {isHost && (
+                  <div className="pt-1 border-t border-[#333]">
+                    <button
+                      onClick={() => {
+                        toggleRetainedTranscription();
+                        setShowCaptionsChevronMenu(false);
+                      }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 flex items-center justify-between text-xs font-semibold text-amber-300"
+                    >
+                      <span>{isTranscribing ? 'Stop Transcription' : 'Start Retained Transcription'}</span>
+                      {isTranscribing && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Part 21: In-Meeting Toolbar Translation Button */}
+          <button 
+            onClick={() => setShowTranslationModal(true)}
+            className={`flex flex-col items-center justify-center w-16 h-14 rounded-lg hover:bg-[#2A2A2A] transition-colors group relative ${
+              participantTranslationEnabled ? 'text-purple-400 font-bold' : 'text-gray-300'
+            }`}
+            title={`Multilingual Translation: Target language is ${participantTargetLanguage?.toUpperCase()}`}
+          >
+            <div className="relative">
+              <Globe className={`w-5 h-5 mb-1 ${participantTranslationEnabled ? 'text-purple-400 scale-110' : 'text-gray-300 group-hover:text-white'} transition-transform`} />
+              {participantTranslationEnabled && (
+                <span className="absolute -top-1 -right-2 text-[9px] bg-purple-600 text-white font-bold px-1 rounded-full uppercase shadow">
+                  {participantTargetLanguage || 'TA'}
+                </span>
+              )}
+            </div>
+            <span className="text-[11px] font-medium">Translate</span>
+          </button>
+
+          {/* Part 22: Language Interpretation Toolbar Button */}
+          <button 
+            onClick={() => setShowInterpretationModal(true)}
+            className={`flex flex-col items-center justify-center w-16 h-14 rounded-lg hover:bg-[#2A2A2A] transition-colors group relative ${
+              selectedInterpretationChannel !== 'original' || (interpretationSession?.status === 'ACTIVE') ? 'text-indigo-400 font-bold' : 'text-gray-300'
+            }`}
+            title={`Language Interpretation: ${selectedInterpretationChannel === 'original' ? 'Original Audio' : selectedInterpretationChannel.toUpperCase()}`}
+          >
+            <div className="relative">
+              <Headphones className={`w-5 h-5 mb-1 ${selectedInterpretationChannel !== 'original' ? 'text-indigo-400 scale-110' : 'text-gray-300 group-hover:text-white'} transition-transform`} />
+              {selectedInterpretationChannel !== 'original' && (
+                <span className="absolute -top-1 -right-2 text-[9px] bg-indigo-600 text-white font-bold px-1 rounded-full uppercase shadow">
+                  {selectedInterpretationChannel}
+                </span>
+              )}
+              {interpretationSession?.status === 'ACTIVE' && selectedInterpretationChannel === 'original' && (
+                <span className="absolute -top-0.5 -right-1 w-2 h-2 bg-emerald-500 rounded-full border border-[#1e1e1e]" />
+              )}
+            </div>
+            <span className="text-[11px] font-medium">Interpretation</span>
+          </button>
+
+          {/* Part 25: AI Meeting Summary Button */}
+          <button 
+            onClick={() => {
+              if (encryptionData?.type === 'E2EE') {
+                toast.error('AI Meeting Summary is disabled in End-to-End Encrypted meetings (Section 31.8 Policy)', { icon: '🔒' });
+                return;
+              }
+              setShowAISummaryModal(true);
+            }}
+            className={`flex flex-col items-center justify-center w-20 h-14 rounded-lg hover:bg-[#2A2A2A] transition-colors group relative ${
+              showAISummaryModal || meetingSummaryRecord?.status === 'ACTIVE' ? 'bg-[#2A2A2A] text-purple-400 font-bold' : 'text-gray-300'
+            } ${encryptionData?.type === 'E2EE' ? 'opacity-50 cursor-not-allowed' : ''}`}
+            title={encryptionData?.type === 'E2EE' ? 'Disabled in E2EE (Section 31.8 Policy)' : 'AI Meeting Summary (Zoom-grade Intelligence)'}
+          >
+            <BrainCircuit className="w-5 h-5 mb-1 text-purple-400 group-hover:text-purple-300" />
+            <span className="text-[11px] font-medium text-purple-400">AI Summary</span>
+            {meetingSummaryRecord?.status === 'ACTIVE' && (
+              <span className="absolute top-2 right-3 w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            )}
+          </button>
+
+          {/* Part 26: AI Meeting Questions Button */}
+          <button 
+            onClick={() => {
+              if (encryptionData?.type === 'E2EE') {
+                toast.error('AI Meeting Questions is disabled in End-to-End Encrypted meetings (Section 31.8 Policy)', { icon: '🔒' });
+                return;
+              }
+              setShowAIQuestionsDrawer(true);
+            }}
+            className={`flex flex-col items-center justify-center w-16 h-14 rounded-lg hover:bg-[#2A2A2A] transition-colors group relative ${
+              showAIQuestionsDrawer ? 'bg-[#2A2A2A] text-purple-400 font-bold' : 'text-gray-300'
+            } ${encryptionData?.type === 'E2EE' ? 'opacity-50 cursor-not-allowed' : ''}`}
+            title={encryptionData?.type === 'E2EE' ? 'Disabled in E2EE (Section 31.8 Policy)' : 'Ask AI questions about this meeting without interrupting (Zoom AI)'}
+          >
+            <HelpCircle className="w-5 h-5 mb-1 text-purple-400 group-hover:text-purple-300" />
+            <span className="text-[11px] font-medium text-purple-400">Questions</span>
+          </button>
+
+          {/* Part 27: AI / Personal Notes (My Notes) Button */}
+          <button 
+            onClick={() => setShowMyNotesDrawer(true)}
+            className={`flex flex-col items-center justify-center w-16 h-14 rounded-lg hover:bg-[#2A2A2A] transition-colors group relative ${
+              showMyNotesDrawer ? 'bg-[#2A2A2A] text-amber-400 font-bold' : 'text-gray-300'
+            }`}
+            title="My Notes: Personal notes, transcript sync, and AI enrichment (Zoom AI)"
+          >
+            <FileText className="w-5 h-5 mb-1 text-amber-400 group-hover:text-amber-300" />
+            <span className="text-[11px] font-medium text-amber-400">My Notes</span>
+          </button>
+
+          {/* Part 36: Live Agenda, Pre-reads & Shared Notes Button */}
+          <button 
+            onClick={() => setShowAgendaDrawer(true)}
+            className={`flex flex-col items-center justify-center w-16 h-14 rounded-lg hover:bg-[#2A2A2A] transition-colors group relative ${
+              showAgendaDrawer ? 'bg-[#2A2A2A] text-emerald-400 font-bold' : 'text-gray-300'
+            }`}
+            title="Meeting Agenda, Pre-reads & Shared Notes (Part 36)"
+          >
+            <ListChecks className="w-5 h-5 mb-1 text-emerald-400 group-hover:text-emerald-300" />
+            <span className="text-[11px] font-medium text-emerald-400">Agenda</span>
+          </button>
           <div className="relative">
             <button 
               onClick={() => setShowMoreMenu(!showMoreMenu)}
