@@ -767,13 +767,29 @@ export default function MeetingRoom() {
     let currentStream = null;
 
     const startRoomMediaAndSocket = async () => {
+      const mediaConstraints = {
+        video: {
+          width: { ideal: 1280, max: 1920 },
+          height: { ideal: 720, max: 1080 },
+          frameRate: { ideal: 24, max: 30 }
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      };
+
       try {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
           try {
-            currentStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            currentStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
           } catch (e1) {
             try {
-              currentStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+              currentStream = await navigator.mediaDevices.getUserMedia({ 
+                video: false, 
+                audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
+              });
               setIsVideoOn(false);
             } catch (e2) {
               console.warn('Microphone/camera unavailable or permission denied:', e2);
@@ -1934,17 +1950,22 @@ export default function MeetingRoom() {
 
 
 
+  const ICE_SERVERS = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+    { urls: 'stun:stun.services.mozilla.com' },
+    { urls: 'stun:global.stun.twilio.com:3478' }
+  ];
+
   function createPeer(userToSignal, callerID, stream, callerName) {
     const peer = new Peer({ 
       initiator: true, 
       trickle: false, 
       ...(stream ? { stream } : {}),
-      config: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:global.stun.twilio.com:3478' }
-        ]
-      }
+      config: { iceServers: ICE_SERVERS }
     });
     peer.on('signal', signal => socketRef.current.emit('sending-signal', { userToSignal, callerID, signal, callerName }));
     return peer;
@@ -1955,12 +1976,7 @@ export default function MeetingRoom() {
       initiator: false, 
       trickle: false, 
       ...(stream ? { stream } : {}),
-      config: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:global.stun.twilio.com:3478' }
-        ]
-      }
+      config: { iceServers: ICE_SERVERS }
     });
     peer.on('signal', signal => socketRef.current.emit('returning-signal', { signal, callerID }));
     peer.signal(incomingSignal);

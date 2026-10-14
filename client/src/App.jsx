@@ -1,52 +1,63 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 
 import AuthLayout from './layouts/AuthLayout';
 import AppLayout from './layouts/AppLayout';
 import ProtectedRoute from './components/ProtectedRoute';
-
-import Login from './pages/auth/Login';
-import Register from './pages/auth/Register';
-import ForgotPassword from './pages/auth/ForgotPassword';
-import Dashboard from './pages/Dashboard';
-import GenericModulePage from './pages/modules/GenericModulePage';
-import MeetingsIndex from './pages/meetings/MeetingsIndex';
-import ScheduleMeeting from './pages/meetings/ScheduleMeeting';
-import MeetingDetails from './pages/meetings/MeetingDetails';
-import MeetingRoom from './pages/meeting-room/MeetingRoom';
-import HomePage from './pages/public/HomePage';
-import JoinMeeting from './pages/public/JoinMeeting';
-import SupportPage from './pages/public/SupportPage';
-import SupportTopicPage from './pages/public/SupportTopicPage';
-import SupportArticlePage from './pages/public/SupportArticlePage';
-import SupportChatPage from './pages/public/SupportChatPage';
-import GenericInfoPage from './pages/public/GenericInfoPage';
-import PricingPage from './pages/public/PricingPage';
-import AiPage from './pages/public/AiPage';
-import ProfilePage from './pages/public/ProfilePage';
-import SettingsPage from './pages/settings/SettingsPage';
-import AdminCenterPage from './pages/admin/AdminCenterPage';
-import PasskeysPage from './pages/public/PasskeysPage';
-import NotificationsPage from './pages/public/NotificationsPage';
-import TasksPage from './pages/modules/TasksPage';
-import MeetingRegistrationPage from './pages/public/MeetingRegistrationPage';
-import AITemplateLayout from './pages/ai/AITemplateLayout';
-import AISummaryPage from './pages/ai/AISummaryPage';
-import AITranscriptPage from './pages/ai/AITranscriptPage';
-import AINotesPage from './pages/ai/AINotesPage';
-import AIRecordingPipelinePage from './pages/ai/AIRecordingPipelinePage';
-import WhiteboardDashboard from './pages/whiteboard/WhiteboardDashboard';
-import RecordingsPage from './pages/recordings/RecordingsPage';
-import PublicRecordingView from './pages/public/PublicRecordingView';
-import IntegrationsMarketplacePage from './pages/integrations/IntegrationsMarketplacePage';
-import MeetingLifecyclePage from './pages/lifecycle/MeetingLifecyclePage';
 import ErrorBoundary from './components/common/ErrorBoundary';
+
+// Lazy-loaded pages for code splitting & fast initial page load
+const Login = lazy(() => import('./pages/auth/Login'));
+const Register = lazy(() => import('./pages/auth/Register'));
+const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const GenericModulePage = lazy(() => import('./pages/modules/GenericModulePage'));
+const MeetingsIndex = lazy(() => import('./pages/meetings/MeetingsIndex'));
+const ScheduleMeeting = lazy(() => import('./pages/meetings/ScheduleMeeting'));
+const MeetingDetails = lazy(() => import('./pages/meetings/MeetingDetails'));
+const MeetingRoom = lazy(() => import('./pages/meeting-room/MeetingRoom'));
+const HomePage = lazy(() => import('./pages/public/HomePage'));
+const JoinMeeting = lazy(() => import('./pages/public/JoinMeeting'));
+const SupportPage = lazy(() => import('./pages/public/SupportPage'));
+const SupportTopicPage = lazy(() => import('./pages/public/SupportTopicPage'));
+const SupportArticlePage = lazy(() => import('./pages/public/SupportArticlePage'));
+const SupportChatPage = lazy(() => import('./pages/public/SupportChatPage'));
+const GenericInfoPage = lazy(() => import('./pages/public/GenericInfoPage'));
+const PricingPage = lazy(() => import('./pages/public/PricingPage'));
+const AiPage = lazy(() => import('./pages/public/AiPage'));
+const ProfilePage = lazy(() => import('./pages/public/ProfilePage'));
+const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'));
+const AdminCenterPage = lazy(() => import('./pages/admin/AdminCenterPage'));
+const PasskeysPage = lazy(() => import('./pages/public/PasskeysPage'));
+const NotificationsPage = lazy(() => import('./pages/public/NotificationsPage'));
+const TasksPage = lazy(() => import('./pages/modules/TasksPage'));
+const MeetingRegistrationPage = lazy(() => import('./pages/public/MeetingRegistrationPage'));
+const AITemplateLayout = lazy(() => import('./pages/ai/AITemplateLayout'));
+const AISummaryPage = lazy(() => import('./pages/ai/AISummaryPage'));
+const AITranscriptPage = lazy(() => import('./pages/ai/AITranscriptPage'));
+const AINotesPage = lazy(() => import('./pages/ai/AINotesPage'));
+const AIRecordingPipelinePage = lazy(() => import('./pages/ai/AIRecordingPipelinePage'));
+const WhiteboardDashboard = lazy(() => import('./pages/whiteboard/WhiteboardDashboard'));
+const RecordingsPage = lazy(() => import('./pages/recordings/RecordingsPage'));
+const PublicRecordingView = lazy(() => import('./pages/public/PublicRecordingView'));
+const IntegrationsMarketplacePage = lazy(() => import('./pages/integrations/IntegrationsMarketplacePage'));
+const MeetingLifecyclePage = lazy(() => import('./pages/lifecycle/MeetingLifecyclePage'));
+
+function PageFallback() {
+  return (
+    <div className="min-h-screen bg-[#141414] flex flex-col items-center justify-center text-white">
+      <div className="w-10 h-10 border-2 border-blue-500/20 border-t-blue-500 rounded-full animate-spin mb-3"></div>
+      <p className="text-xs text-gray-400 font-medium tracking-wide">Loading IntelliMeet...</p>
+    </div>
+  );
+}
 
 function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
+        <Suspense fallback={<PageFallback />}>
         <Routes>
           {/* Public Meeting & Support Routes */}
           <Route path="/" element={<HomePage />} />
@@ -110,6 +121,7 @@ function App() {
           {/* Fallback route */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       </BrowserRouter>
       <Toaster position="top-right" />
     </ErrorBoundary>
