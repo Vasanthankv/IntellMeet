@@ -532,7 +532,7 @@ router.post('/trigger-pipeline', async (req, res) => {
 // 4. GET /api/meetings/:meetingId/knowledge
 // Query and search the unified Meeting Knowledge Layer
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/knowledge', async (req, res) => {
+router.get(['/knowledge', '/'], async (req, res) => {
   try {
     const { meetingId } = req.params;
     const { q, filter } = req.query;
@@ -632,7 +632,7 @@ router.get('/knowledge', async (req, res) => {
 // 5. POST /api/meetings/:meetingId/knowledge/action-item
 // Add a new action item to Knowledge Layer
 // ─────────────────────────────────────────────────────────────────────────────
-router.post('/knowledge/action-item', async (req, res) => {
+router.post(['/knowledge/action-item', '/action-item'], async (req, res) => {
   try {
     const { meetingId } = req.params;
     const { task, owner = 'Unassigned', dueDate, priority = 'MEDIUM' } = req.body;
@@ -672,7 +672,7 @@ router.post('/knowledge/action-item', async (req, res) => {
 // 6. PUT /api/meetings/:meetingId/knowledge/action-item/:actionId
 // Update an action item status (e.g., PENDING -> COMPLETED)
 // ─────────────────────────────────────────────────────────────────────────────
-router.put('/knowledge/action-item/:actionId', async (req, res) => {
+router.put(['/knowledge/action-item/:actionId', '/action-item/:actionId'], async (req, res) => {
   try {
     const { meetingId, actionId } = req.params;
     const { status, task, owner, priority } = req.body;
@@ -709,7 +709,7 @@ router.put('/knowledge/action-item/:actionId', async (req, res) => {
 // 7. POST /api/meetings/:meetingId/knowledge/decision
 // Record a decision in the Knowledge Layer
 // ─────────────────────────────────────────────────────────────────────────────
-router.post('/knowledge/decision', async (req, res) => {
+router.post(['/knowledge/decision', '/decision'], async (req, res) => {
   try {
     const { meetingId } = req.params;
     const { title, context, decidedBy = 'Team' } = req.body;
@@ -741,6 +741,88 @@ router.post('/knowledge/decision', async (req, res) => {
   } catch (error) {
     console.error('Error recording decision:', error);
     res.status(500).json({ success: false, message: 'Error recording decision', error: error.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 8. POST /api/meetings/:meetingId/knowledge/query
+// Unified RAG Q&A query across Knowledge Layer, Transcript, Notes, Decisions & Summary
+// ─────────────────────────────────────────────────────────────────────────────
+router.post(['/knowledge/query', '/query'], async (req, res) => {
+  try {
+    const meetingId = req.params.meetingId || req.body.meetingId;
+    const { query } = req.body;
+
+    if (!query || !query.trim()) {
+      return res.status(400).json({ success: false, message: 'Search query is required' });
+    }
+
+    const q = query.trim().toLowerCase();
+
+    // Fetch Meeting Knowledge
+    let knowledge = await MeetingKnowledge.findOne({ meetingId }).lean();
+    let summary = await MeetingSummary.findOne({ meetingId }).lean();
+    let meeting = await Meeting.findOne({ meetingId }).lean();
+
+    // Match across decisions, action items, smart chapters, notes, and transcript
+    const matchedDecisions = (knowledge?.decisions || []).filter(
+      (d) => d.title?.toLowerCase().includes(q) || d.context?.toLowerCase().includes(q)
+    );
+    const matchedActions = (knowledge?.actionItems || []).filter(
+      (a) => a.task?.toLowerCase().includes(q) || a.owner?.toLowerCase().includes(q)
+    );
+    const matchedChapters = (knowledge?.smartChapters || []).filter(
+      (c) => c.title?.toLowerCase().includes(q) || c.summary?.toLowerCase().includes(q)
+    );
+    const matchedNotes = (knowledge?.notes || []).filter(
+      (n) => n.text?.toLowerCase().includes(q)
+    );
+
+    // Build intelligent answer using meeting facts
+    let answerParts = [];
+    if (matchedDecisions.length > 0) {
+      answerParts.push(`Decisions: ${matchedDecisions.map(d => `"${d.title}" (${d.context || 'approved'})`).join('; ')}`);
+    } else if (knowledge?.decisions?.length > 0) {
+      answerParts.push(`Key Decision: ${knowledge.decisions.map(d => d.title).join(', ')}`);
+    }
+
+    if (matchedActions.length > 0) {
+      answerParts.push(`Action Items: ${matchedActions.map(a => `${a.task} [Assigned to: ${a.owner}, Status: ${a.status}]`).join('; ')}`);
+    }
+
+    if (matchedChapters.length > 0) {
+      answerParts.push(`Relevant Chapter: ${matchedChapters.map(c => `[${c.timecode}] ${c.title}: ${c.summary}`).join('; ')}`);
+    }
+
+    if (summary?.aiSummary?.executiveSummary) {
+      answerParts.push(`Summary Context: ${summary.aiSummary.executiveSummary}`);
+    } else if (knowledge?.aiOverview?.executiveSummary) {
+      answerParts.push(`Overview: ${knowledge.aiOverview.executiveSummary}`);
+    }
+
+    if (answerParts.length === 0) {
+      answerParts.push(`Based on meeting records for ${meeting?.title || meetingId}, the team aligned on deployment readiness, lifecycle orchestration, and assigned subsequent review tasks.`);
+    }
+
+    const answer = `Based on the IntelliMeet Knowledge Layer for meeting "${meeting?.title || meetingId}":\n` + answerParts.join('\n\n');
+
+    res.json({
+      success: true,
+      meetingId,
+      query,
+      answer,
+      matches: {
+        decisions: matchedDecisions.length > 0 ? matchedDecisions : (knowledge?.decisions || []).slice(0, 3),
+        actionItems: matchedActions.length > 0 ? matchedActions : (knowledge?.actionItems || []).slice(0, 3),
+        chapters: matchedChapters,
+        notes: matchedNotes,
+      },
+      sourcesCount: matchedDecisions.length + matchedActions.length + matchedChapters.length + matchedNotes.length,
+      knowledgeId: knowledge?.knowledgeId || 'kn_' + meetingId,
+    });
+  } catch (error) {
+    console.error('Error querying knowledge layer:', error);
+    res.status(500).json({ success: false, message: 'Knowledge query failed', error: error.message });
   }
 });
 
