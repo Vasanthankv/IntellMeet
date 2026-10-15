@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { API_BASE_URL } from '../../utils/apiConfig';
 import {
   BarChart2, TrendingUp, Clock, Users, ShieldCheck, FileText, Download,
   Search, Calendar, Filter, ArrowUpRight, Activity, Wifi, Monitor,
@@ -33,7 +34,7 @@ export default function AnalyticsReportsView() {
   // Fetch Overview
   const fetchOverview = async () => {
     try {
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/analytics/overview?range=${range}&department=${department}`);
+      const res = await fetch(`${API_BASE_URL}/analytics/overview?range=${range}&department=${department}`);
       const data = await res.json();
       if (data.success) {
         setOverviewData(data);
@@ -55,7 +56,7 @@ export default function AnalyticsReportsView() {
         department,
         type: typeFilter,
       });
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/analytics/meetings?${queryParams}`);
+      const res = await fetch(`${API_BASE_URL}/analytics/meetings?${queryParams}`);
       const data = await res.json();
       if (data.success) {
         setMeetingsData(data);
@@ -70,7 +71,7 @@ export default function AnalyticsReportsView() {
   // Fetch Hosts
   const fetchHosts = async () => {
     try {
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/analytics/hosts?range=${range}`);
+      const res = await fetch(`${API_BASE_URL}/analytics/hosts?range=${range}`);
       const data = await res.json();
       if (data.success) {
         setHostsData(data.hosts || []);
@@ -83,7 +84,7 @@ export default function AnalyticsReportsView() {
   // Fetch Quality
   const fetchQuality = async () => {
     try {
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/analytics/quality?range=${range}`);
+      const res = await fetch(`${API_BASE_URL}/analytics/quality?range=${range}`);
       const data = await res.json();
       if (data.success) {
         setQualityData(data);
@@ -96,7 +97,7 @@ export default function AnalyticsReportsView() {
   // Fetch Features
   const fetchFeatures = async () => {
     try {
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/analytics/features?range=${range}`);
+      const res = await fetch(`${API_BASE_URL}/analytics/features?range=${range}`);
       const data = await res.json();
       if (data.success) {
         setFeaturesData(data);
@@ -109,7 +110,7 @@ export default function AnalyticsReportsView() {
   // Fetch AI
   const fetchAI = async () => {
     try {
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/analytics/ai?range=${range}`);
+      const res = await fetch(`${API_BASE_URL}/analytics/ai?range=${range}`);
       const data = await res.json();
       if (data.success) {
         setAiData(data);
@@ -124,7 +125,7 @@ export default function AnalyticsReportsView() {
     setSelectedMeetingId(meetingId);
     setLoadingParticipants(true);
     try {
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/analytics/meetings/${meetingId}/participants`);
+      const res = await fetch(`${API_BASE_URL}/analytics/meetings/${meetingId}/participants`);
       const data = await res.json();
       if (data.success) {
         setParticipantModalData(data);
@@ -140,13 +141,13 @@ export default function AnalyticsReportsView() {
 
   // Download Meetings CSV
   const handleDownloadMeetingsCsv = () => {
-    window.open(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/analytics/export/meetings.csv?range=${range}&department=${department}`, '_blank');
+    window.open(`${API_BASE_URL}/analytics/export/meetings.csv?range=${range}&department=${department}`, '_blank');
     toast.success('Downloading meeting history report CSV...');
   };
 
   // Download Attendance CSV
   const handleDownloadAttendanceCsv = (mId) => {
-    window.open(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/analytics/export/participants/${mId}.csv`, '_blank');
+    window.open(`${API_BASE_URL}/analytics/export/participants/${mId}.csv`, '_blank');
     toast.success('Downloading attendee attendance report CSV...');
   };
 

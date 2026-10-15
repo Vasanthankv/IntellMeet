@@ -29,9 +29,9 @@ export default function AppLayout() {
     account: true,
     admin: true,
     plans: true,
-    userMgmt: false,
-    accountMgmt: false,
-    advanced: false,
+    userMgmt: true,
+    accountMgmt: true,
+    advanced: true,
     support: true
   });
 
@@ -46,6 +46,25 @@ export default function AppLayout() {
 
   const isActive = (path) => {
     if (path === '/dashboard') return location.pathname === '/dashboard';
+    if (path.startsWith('/admin')) {
+      if (path === '/admin' || path === '/admin/users') {
+        const adminSubroutes = ['/admin/plans', '/admin/billing', '/admin/payments', '/admin/account', '/admin/groups', '/admin/roles', '/admin/reports', '/admin/apps', '/admin/advanced'];
+        const isSub = adminSubroutes.some(sub => location.pathname.startsWith(sub));
+        return !isSub && !location.search.includes('tab=');
+      }
+      if (path.includes('?')) {
+        const [base, queryStr] = path.split('?');
+        const searchParams = new URLSearchParams(queryStr);
+        const currentParams = new URLSearchParams(location.search);
+        let match = location.pathname === base;
+        for (const [key, val] of searchParams.entries()) {
+          if (currentParams.get(key) !== val) match = false;
+        }
+        return match;
+      }
+      const segment = path.replace('/admin/', '');
+      return location.pathname === path || location.search.includes(`tab=${segment}`);
+    }
     return location.pathname === path;
   };
 
@@ -327,42 +346,75 @@ export default function AppLayout() {
         
         {expandedMenus.admin && (
           <div className="space-y-1 pb-2">
-            <div onClick={() => toggleMenu('plans')} className="py-1.5 pl-10 pr-6 flex items-center gap-2 cursor-pointer hover:bg-gray-100 transition-colors">
-              <svg className={`w-3 h-3 text-gray-500 transition-transform ${expandedMenus.plans ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-              <p className="text-[13px] text-gray-700">Plans and Billing</p>
+            {/* Plans and Billing */}
+            <div onClick={() => toggleMenu('plans')} className="py-1.5 pl-10 pr-6 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors">
+              <div className="flex items-center gap-2">
+                <svg className={`w-3 h-3 text-gray-500 transition-transform ${expandedMenus.plans ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                <p className="text-[13px] text-gray-700 font-medium">Plans and Billing</p>
+              </div>
             </div>
             {expandedMenus.plans && (
-              <div className="space-y-1 pb-1">
-                <Link to="/admin/plans" onClick={onItemClick} className={`block py-1.5 pl-16 pr-6 text-[13px] font-medium transition-colors ${isActive('/admin/plans') ? 'text-blue-600 bg-blue-50 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'}`}>Plan Management</Link>
-                <Link to="/admin/billing" onClick={onItemClick} className={`block py-1.5 pl-16 pr-6 text-[13px] font-medium transition-colors ${isActive('/admin/billing') ? 'text-blue-600 bg-blue-50 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'}`}>Billing Management</Link>
-                <Link to="/admin/payments" onClick={onItemClick} className={`block py-1.5 pl-16 pr-6 text-[13px] font-medium transition-colors ${isActive('/admin/payments') ? 'text-blue-600 bg-blue-50 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'}`}>Payment History</Link>
+              <div className="space-y-0.5 pb-1">
+                <Link to="/admin/plans" onClick={onItemClick} className={`block py-1.5 pl-16 pr-6 text-[13px] transition-colors ${isActive('/admin/plans') ? 'text-blue-600 bg-blue-50 font-semibold border-l-2 border-blue-600' : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'}`}>Plan Management</Link>
+                <Link to="/admin/billing" onClick={onItemClick} className={`block py-1.5 pl-16 pr-6 text-[13px] transition-colors ${isActive('/admin/billing') ? 'text-blue-600 bg-blue-50 font-semibold border-l-2 border-blue-600' : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'}`}>Billing Management</Link>
+                <Link to="/admin/payments" onClick={onItemClick} className={`block py-1.5 pl-16 pr-6 text-[13px] transition-colors ${isActive('/admin/payments') ? 'text-blue-600 bg-blue-50 font-semibold border-l-2 border-blue-600' : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'}`}>Payment History</Link>
               </div>
             )}
 
-            <Link to="/admin" onClick={onItemClick} className="py-1.5 pl-10 pr-6 flex items-center gap-2 cursor-pointer hover:bg-gray-100 transition-colors">
-              <svg className="w-3 h-3 text-purple-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-              <p className="text-[13px] text-gray-700 font-medium">User Management (Admin)</p>
-            </Link>
-
-            <Link to="/admin" onClick={onItemClick} className="py-1.5 pl-10 pr-6 flex items-center gap-2 cursor-pointer hover:bg-gray-100 transition-colors">
-              <svg className="w-3 h-3 text-purple-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-              <p className="text-[13px] text-gray-700 font-medium">Account Management</p>
-            </Link>
-
-            <Link to="/admin?tab=reports" onClick={onItemClick} className="py-1.5 pl-10 pr-6 flex items-center gap-2 cursor-pointer hover:bg-gray-100 transition-colors">
-              <svg className="w-3 h-3 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-              <p className="text-[13px] text-gray-700 font-medium">Reports & Analytics</p>
-            </Link>
-
-            <Link to="/admin?tab=apps" onClick={onItemClick} className="py-1.5 pl-10 pr-6 flex items-center gap-2 cursor-pointer hover:bg-gray-100 transition-colors">
-              <svg className="w-3 h-3 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-              <p className="text-[13px] text-gray-700 font-medium">App Management (39)</p>
-            </Link>
-
-            <div onClick={() => toggleMenu('advanced')} className="py-1.5 pl-10 pr-6 flex items-center gap-2 cursor-pointer hover:bg-gray-100 transition-colors">
-              <svg className={`w-3 h-3 text-gray-500 transition-transform ${expandedMenus.advanced ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-              <p className="text-[13px] text-gray-700">Advanced</p>
+            {/* User Management */}
+            <div onClick={() => toggleMenu('userMgmt')} className="py-1.5 pl-10 pr-6 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors">
+              <div className="flex items-center gap-2">
+                <svg className={`w-3 h-3 text-gray-500 transition-transform ${expandedMenus.userMgmt ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                <p className="text-[13px] text-gray-700 font-medium">User Management (Admin)</p>
+              </div>
             </div>
+            {expandedMenus.userMgmt && (
+              <div className="space-y-0.5 pb-1">
+                <Link to="/admin/users" onClick={onItemClick} className={`block py-1.5 pl-16 pr-6 text-[13px] transition-colors ${isActive('/admin/users') ? 'text-blue-600 bg-blue-50 font-semibold border-l-2 border-blue-600' : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'}`}>Users</Link>
+                <Link to="/admin/groups" onClick={onItemClick} className={`block py-1.5 pl-16 pr-6 text-[13px] transition-colors ${isActive('/admin/groups') ? 'text-blue-600 bg-blue-50 font-semibold border-l-2 border-blue-600' : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'}`}>Groups</Link>
+                <Link to="/admin/roles" onClick={onItemClick} className={`block py-1.5 pl-16 pr-6 text-[13px] transition-colors ${isActive('/admin/roles') ? 'text-blue-600 bg-blue-50 font-semibold border-l-2 border-blue-600' : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'}`}>Roles & Permissions</Link>
+              </div>
+            )}
+
+            {/* Account Management */}
+            <div onClick={() => toggleMenu('accountMgmt')} className="py-1.5 pl-10 pr-6 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors">
+              <div className="flex items-center gap-2">
+                <svg className={`w-3 h-3 text-gray-500 transition-transform ${expandedMenus.accountMgmt ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                <p className="text-[13px] text-gray-700 font-medium">Account Management</p>
+              </div>
+            </div>
+            {expandedMenus.accountMgmt && (
+              <div className="space-y-0.5 pb-1">
+                <Link to="/admin/account" onClick={onItemClick} className={`block py-1.5 pl-16 pr-6 text-[13px] transition-colors ${isActive('/admin/account') ? 'text-blue-600 bg-blue-50 font-semibold border-l-2 border-blue-600' : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'}`}>Account Profile & Licenses</Link>
+              </div>
+            )}
+
+            {/* Reports & Analytics */}
+            <Link to="/admin/reports" onClick={onItemClick} className={`py-1.5 pl-10 pr-6 flex items-center gap-2 cursor-pointer transition-colors ${isActive('/admin/reports') ? 'text-blue-600 bg-blue-50 font-semibold border-l-2 border-blue-600' : 'hover:bg-gray-100 text-gray-700'}`}>
+              <svg className="w-3 h-3 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+              <p className="text-[13px] font-medium">Reports & Analytics</p>
+            </Link>
+
+            {/* App Management */}
+            <Link to="/admin/apps" onClick={onItemClick} className={`py-1.5 pl-10 pr-6 flex items-center gap-2 cursor-pointer transition-colors ${isActive('/admin/apps') ? 'text-blue-600 bg-blue-50 font-semibold border-l-2 border-blue-600' : 'hover:bg-gray-100 text-gray-700'}`}>
+              <svg className="w-3 h-3 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+              <p className="text-[13px] font-medium">App Management (39)</p>
+            </Link>
+
+            {/* Advanced Administration */}
+            <div onClick={() => toggleMenu('advanced')} className="py-1.5 pl-10 pr-6 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors">
+              <div className="flex items-center gap-2">
+                <svg className={`w-3 h-3 text-gray-500 transition-transform ${expandedMenus.advanced ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                <p className="text-[13px] text-gray-700 font-medium">Advanced Administration</p>
+              </div>
+            </div>
+            {expandedMenus.advanced && (
+              <div className="space-y-0.5 pb-1">
+                <Link to="/admin/advanced?sub=sso" onClick={onItemClick} className={`block py-1.5 pl-16 pr-6 text-[13px] transition-colors ${isActive('/admin/advanced?sub=sso') ? 'text-blue-600 bg-blue-50 font-semibold border-l-2 border-blue-600' : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'}`}>Single Sign-On (SSO)</Link>
+                <Link to="/admin/advanced?sub=branding" onClick={onItemClick} className={`block py-1.5 pl-16 pr-6 text-[13px] transition-colors ${isActive('/admin/advanced?sub=branding') ? 'text-blue-600 bg-blue-50 font-semibold border-l-2 border-blue-600' : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'}`}>Branding & Custom Domains</Link>
+                <Link to="/admin/advanced?sub=audit" onClick={onItemClick} className={`block py-1.5 pl-16 pr-6 text-[13px] transition-colors ${isActive('/admin/advanced?sub=audit') ? 'text-blue-600 bg-blue-50 font-semibold border-l-2 border-blue-600' : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'}`}>Security & Audit Logs</Link>
+              </div>
+            )}
           </div>
         )}
       </div>

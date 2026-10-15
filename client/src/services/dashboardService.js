@@ -1,9 +1,10 @@
-const API_BASE_URL = '${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/dashboard';
+import { API_BASE_URL } from '../utils/apiConfig';
+const DASHBOARD_API_URL = `${API_BASE_URL}/dashboard`;
 
 export const dashboardService = {
   getStats: async (token) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/stats`, {
+      const response = await fetch(`${DASHBOARD_API_URL}/stats`, {
         headers: {
           'Content-Type': 'application/json',
           Authorization: token ? `Bearer ${token}` : '',
@@ -20,7 +21,7 @@ export const dashboardService = {
 
   scheduleMeeting: async (meetingData, token) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/meetings`, {
+      const response = await fetch(`${DASHBOARD_API_URL}/meetings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -39,7 +40,7 @@ export const dashboardService = {
 
   createTask: async (taskData, token) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/tasks`, {
+      const response = await fetch(`${DASHBOARD_API_URL}/tasks`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -58,7 +59,7 @@ export const dashboardService = {
 
   toggleTask: async (taskId, token) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/toggle`, {
+      const response = await fetch(`${DASHBOARD_API_URL}/tasks/${taskId}/toggle`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

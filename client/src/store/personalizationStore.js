@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { API_BASE_URL } from '../utils/apiConfig';
 
 export const THEMES = [
   {
@@ -188,7 +189,7 @@ export const usePersonalizationStore = create((set, get) => ({
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const res = await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/personalization/preferences', {
+      const res = await fetch(`${API_BASE_URL}/personalization/preferences`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -221,7 +222,7 @@ export const usePersonalizationStore = create((set, get) => ({
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/personalization/preferences', {
+      await fetch(`${API_BASE_URL}/personalization/preferences`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -243,7 +244,7 @@ export const usePersonalizationStore = create((set, get) => ({
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/personalization/reset-toolbar', {
+      await fetch(`${API_BASE_URL}/personalization/reset-toolbar`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -257,7 +258,7 @@ export const usePersonalizationStore = create((set, get) => ({
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const res = await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/personalization/reset-all', {
+      const res = await fetch(`${API_BASE_URL}/personalization/reset-all`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });

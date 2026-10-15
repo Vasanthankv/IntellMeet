@@ -4,6 +4,7 @@ import {
   Layers, Lock, AlertTriangle, FileText, Check, X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { API_BASE_URL } from '../../utils/apiConfig';
 
 export default function AdminIntegrationsView() {
   const [apps, setApps] = useState([]);
@@ -19,8 +20,8 @@ export default function AdminIntegrationsView() {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
       const [appsRes, logsRes] = await Promise.all([
-        fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/integrations/marketplace', { headers }),
-        fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/integrations/admin/audit-logs', { headers })
+        fetch(`${API_BASE_URL}/integrations/marketplace`, { headers }),
+        fetch(`${API_BASE_URL}/integrations/admin/audit-logs`, { headers })
       ]);
 
       const [appsData, logsData] = await Promise.all([appsRes.json(), logsRes.json()]);
@@ -41,7 +42,7 @@ export default function AdminIntegrationsView() {
   const handleToggleApprovalRequired = async (integrationId, currentVal) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/integrations/admin/apps/${integrationId}/status`, {
+      const res = await fetch(`${API_BASE_URL}/integrations/admin/apps/${integrationId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -63,7 +64,7 @@ export default function AdminIntegrationsView() {
     const nextStatus = currentStatus === 'DISABLED_BY_ADMIN' ? 'ACTIVE' : 'DISABLED_BY_ADMIN';
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/integrations/admin/apps/${integrationId}/status`, {
+      const res = await fetch(`${API_BASE_URL}/integrations/admin/apps/${integrationId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
