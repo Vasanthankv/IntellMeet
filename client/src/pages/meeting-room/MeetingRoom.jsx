@@ -858,6 +858,13 @@ export default function MeetingRoom() {
           const activeStream = stream || localStreamRef.current || currentStream;
           existingUsers.forEach(u => {
             try {
+              // Destroy any stale peer connection to u.socketId
+              const existingIdx = peersRef.current.findIndex(p => p.peerID === u.socketId);
+              if (existingIdx !== -1) {
+                try { peersRef.current[existingIdx].peer?.destroy(); } catch (e) {}
+                peersRef.current.splice(existingIdx, 1);
+              }
+
               const peer = createPeer(u.socketId, socketRef.current.id, activeStream, userName);
               const peerEntry = { peerID: u.socketId, peer, name: u.userName, stream: null };
               peer.on('stream', (remoteStream) => {
@@ -912,18 +919,23 @@ export default function MeetingRoom() {
       // Existing user receives offer from newcomer and creates answer
       socketRef.current.on('user-joined', payload => {
         setSampleParticipants(prev => {
-          const existingIdx = prev.findIndex(p => p.id === payload.callerID || p.name === payload.callerName);
+          const existingIdx = prev.findIndex(p => p.id === payload.callerID || p.userId === payload.callerID);
           if (existingIdx !== -1) {
             const updated = [...prev];
-            updated[existingIdx] = { ...updated[existingIdx], id: payload.callerID };
+            updated[existingIdx] = { ...updated[existingIdx], id: payload.callerID, name: payload.callerName || updated[existingIdx].name };
             return updated;
           }
           return [...prev, { id: payload.callerID, name: payload.callerName || 'Participant', isLocal: false, isMuted: false, hasVideo: true }];
         });
-        if (playJoinLeaveChime) playChimeSound('join');
-        toast.success(`${payload.callerName || 'A participant'} joined the meeting`);
 
         try {
+          // Destroy any stale peer connection to payload.callerID
+          const existingIdx = peersRef.current.findIndex(p => p.peerID === payload.callerID);
+          if (existingIdx !== -1) {
+            try { peersRef.current[existingIdx].peer?.destroy(); } catch (e) {}
+            peersRef.current.splice(existingIdx, 1);
+          }
+
           const activeStream = stream || localStreamRef.current || currentStream;
           const peer = addPeer(payload.signal, payload.callerID, activeStream);
           const peerEntry = { peerID: payload.callerID, peer, name: payload.callerName, stream: null };
@@ -944,7 +956,7 @@ export default function MeetingRoom() {
       // Real-time camera and microphone status from remote peer
       socketRef.current.on('participant-media-status', ({ socketId, isAudioOn, isVideoOn }) => {
         setSampleParticipants(prev => prev.map(p => {
-          if (p.id === socketId) {
+          if (p.id === socketId || p.userId === socketId) {
             return {
               ...p,
               isMuted: isAudioOn !== undefined ? !isAudioOn : p.isMuted,
@@ -977,7 +989,7 @@ export default function MeetingRoom() {
         const newPeers = peersRef.current.filter(p => p.peerID !== socketId);
         peersRef.current = newPeers;
         setPeers(newPeers);
-        setSampleParticipants(prev => prev.filter(p => p.id !== socketId));
+        setSampleParticipants(prev => prev.filter(p => p.id !== socketId && p.socketId !== socketId && p.userId !== socketId));
         if (playJoinLeaveChime) playChimeSound('leave');
       });
 
@@ -1949,7 +1961,18 @@ export default function MeetingRoom() {
       }
       if (stream) stream.getTracks().forEach(track => track.stop());
       if (screenTrackRef.current) screenTrackRef.current.stop();
-      if (socketRef.current) socketRef.current.disconnect();
+      if (socketRef.current) {
+        try {
+          socketRef.current.emit('leave-room', { roomId: cleanMId || meetingId });
+          socketRef.current.disconnect();
+        } catch (e) {}
+      }
+      peersRef.current.forEach(({ peer }) => {
+        try { peer.destroy(); } catch (err) {}
+      });
+      peersRef.current = [];
+      setPeers([]);
+      setSampleParticipants([]);
     };
   }, [meetingId]);
 
@@ -2042,7 +2065,22 @@ export default function MeetingRoom() {
     { urls: 'stun:stun3.l.google.com:19302' },
     { urls: 'stun:stun4.l.google.com:19302' },
     { urls: 'stun:stun.services.mozilla.com' },
-    { urls: 'stun:global.stun.twilio.com:3478' }
+    { urls: 'stun:global.stun.twilio.com:3478' },
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    }
   ];
 
   function createPeer(userToSignal, callerID, streamToSend, callerName) {
