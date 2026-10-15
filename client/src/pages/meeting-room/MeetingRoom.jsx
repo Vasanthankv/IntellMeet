@@ -431,6 +431,9 @@ export default function MeetingRoom() {
   const [recordingLayout, setRecordingLayout] = useState('SPEAKER'); // 'SPEAKER' | 'GALLERY' | 'SHARED_SCREEN'
   const [activeRecordingId, setActiveRecordingId] = useState(null);
   const [recordingStartedAt, setRecordingStartedAt] = useState(null);
+  const activeRecordingIdRef = useRef(null);
+  const isMeetingRecordingRef = useRef(false);
+  const recordingModeRef = useRef('CLOUD');
   const [showRecordingMenu, setShowRecordingMenu] = useState(false);
   const [showRecordingSettingsModal, setShowRecordingSettingsModal] = useState(false);
   const [recordingSettings, setRecordingSettings] = useState({
@@ -979,9 +982,17 @@ export default function MeetingRoom() {
       });
 
       // Host ended the meeting for all — navigate away gracefully
-      socketRef.current.on('meeting-ended', ({ message }) => {
+      socketRef.current.on('meeting-ended', async ({ message }) => {
         toast.error(message || 'The host has ended this meeting.', { duration: 4000 });
+        if (localRecordingEngine.isRecording || isMeetingRecordingRef.current) {
+          try {
+            await handleStopRecording();
+          } catch (recErr) {
+            console.warn('Auto-save error on remote meeting-ended:', recErr);
+          }
+        }
         if (stream) stream.getTracks().forEach(track => track.stop());
+        if (screenTrackRef.current) screenTrackRef.current.stop();
         setTimeout(() => navigate(`/meetings/${meetingId}/lifecycle`), 2000);
       });
 
@@ -1933,6 +1944,9 @@ export default function MeetingRoom() {
       });
 
     return () => {
+      if (localRecordingEngine.isRecording) {
+        handleStopRecording().catch(() => {});
+      }
       if (stream) stream.getTracks().forEach(track => track.stop());
       if (screenTrackRef.current) screenTrackRef.current.stop();
       if (socketRef.current) socketRef.current.disconnect();
@@ -3169,6 +3183,9 @@ export default function MeetingRoom() {
         console.warn('Server recording start endpoint note:', apiErr);
       }
 
+      activeRecordingIdRef.current = recId;
+      isMeetingRecordingRef.current = true;
+      recordingModeRef.current = mode;
       setIsMeetingRecording(true);
       setRecordingPaused(false);
       setRecordingMode(mode);
@@ -3238,10 +3255,11 @@ export default function MeetingRoom() {
   const handleStopRecording = async () => {
     try {
       const recResult = await localRecordingEngine.stop();
-      const recordingIdToFinalize = activeRecordingId;
+      const recordingIdToFinalize = activeRecordingIdRef.current || activeRecordingId || `rec_${Date.now()}`;
+      const mode = recordingModeRef.current || recordingMode;
 
-      if (recResult && recResult.blob) {
-        if (recordingMode === 'LOCAL') {
+      if (recResult && recResult.blob && recResult.blob.size > 0) {
+        if (mode === 'LOCAL') {
           localRecordingEngine.downloadBlob(recResult.blob, recResult.filename);
           toast.success('Local recording downloaded to your computer!');
         }
@@ -3255,7 +3273,7 @@ export default function MeetingRoom() {
               'Content-Type': recResult.mimeType || 'video/webm',
               ...(token ? { Authorization: `Bearer ${token}` } : {})
             };
-            const uploadRes = await fetch(`${SOCKET_SERVER_URL}/api/recordings/${recordingIdToFinalize}/media`, {
+            const uploadRes = await fetch(`${SOCKET_SERVER_URL}/api/recordings/${recordingIdToFinalize}/media?meetingId=${encodeURIComponent(meetingId)}&title=${encodeURIComponent(meetingInfo?.title || meetingTitle || 'IntellMeet Session')}`, {
               method: 'POST',
               headers: uploadHeaders,
               body: recResult.blob
@@ -3285,12 +3303,14 @@ export default function MeetingRoom() {
         body: JSON.stringify({ recordingId: recordingIdToFinalize })
       }).catch(() => {});
 
+      isMeetingRecordingRef.current = false;
+      activeRecordingIdRef.current = null;
       setIsMeetingRecording(false);
       setRecordingPaused(false);
       setActiveRecordingId(null);
 
       socketRef.current?.emit('recording-stop', meetingId, { meetingId });
-      if (recordingMode === 'LOCAL') {
+      if (mode === 'LOCAL') {
         toast.success('Computer recording stopped and saved locally');
       }
     } catch (e) {
@@ -5010,7 +5030,20 @@ export default function MeetingRoom() {
   };
 
   const leaveMeeting = async () => {
+    // 1. If recording is active, finalize and upload to GridFS FIRST before teardown
+    if (localRecordingEngine.isRecording || isMeetingRecordingRef.current || isMeetingRecording) {
+      toast.loading('Saving and syncing meeting recording before leaving...', { id: 'leave-rec-sync' });
+      try {
+        await handleStopRecording();
+      } catch (recErr) {
+        console.warn('Auto-save recording on leave warning:', recErr);
+      } finally {
+        toast.dismiss('leave-rec-sync');
+      }
+    }
+
     if (stream) stream.getTracks().forEach(track => track.stop());
+    if (screenTrackRef.current) screenTrackRef.current.stop();
     if (socketRef.current) socketRef.current.emit('leave-room', { roomId: meetingId });
     try {
       // Part 40: End Meeting Lifecycle & Trigger Post-Meeting Processing Pipeline
@@ -5035,7 +5068,20 @@ export default function MeetingRoom() {
   };
 
   const endMeetingForAll = async () => {
+    // 1. If recording is active, finalize and upload to GridFS FIRST before teardown
+    if (localRecordingEngine.isRecording || isMeetingRecordingRef.current || isMeetingRecording) {
+      toast.loading('Saving and syncing meeting recording before ending...', { id: 'end-rec-sync' });
+      try {
+        await handleStopRecording();
+      } catch (recErr) {
+        console.warn('Auto-save recording on end meeting warning:', recErr);
+      } finally {
+        toast.dismiss('end-rec-sync');
+      }
+    }
+
     if (stream) stream.getTracks().forEach(track => track.stop());
+    if (screenTrackRef.current) screenTrackRef.current.stop();
     if (socketRef.current) socketRef.current.emit('end-meeting-for-all', { roomId: meetingId });
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('intellmeet_token');

@@ -98,6 +98,7 @@ class LocalRecordingEngine {
       }
     }
 
+    this.lastMimeType = mimeType || 'video/webm';
     this.mediaRecorder.ondataavailable = (event) => {
       if (event.data && event.data.size > 0) {
         this.recordedChunks.push(event.data);
@@ -127,32 +128,56 @@ class LocalRecordingEngine {
 
   stop() {
     return new Promise((resolve) => {
-      if (!this.mediaRecorder || this.mediaRecorder.state === 'inactive') {
-        resolve(null);
-        return;
-      }
-
-      this.mediaRecorder.onstop = () => {
-        const mimeType = this.mediaRecorder.mimeType || 'video/webm';
-        const blob = new Blob(this.recordedChunks, { type: mimeType });
+      const buildResult = (mime = 'video/webm') => {
+        if (!this.recordedChunks || this.recordedChunks.length === 0) {
+          this.isRecording = false;
+          this.isPaused = false;
+          this.mediaRecorder = null;
+          return null;
+        }
+        const safeMime = mime || this.lastMimeType || 'video/webm';
+        const blob = new Blob(this.recordedChunks, { type: safeMime });
         const url = URL.createObjectURL(blob);
         const durationSecs = Math.max(1, Math.round((Date.now() - (this.startTime || Date.now())) / 1000));
         
         this.isRecording = false;
         this.isPaused = false;
         this.mediaRecorder = null;
+        this.recordedChunks = [];
 
-        resolve({
+        return {
           blob,
           url,
-          mimeType,
+          mimeType: safeMime,
           duration: durationSecs,
           size: blob.size,
-          filename: `IntellMeet_Local_Recording_${Date.now()}.${mimeType.includes('mp4') ? 'mp4' : 'webm'}`
-        });
+          filename: `IntellMeet_Recording_${Date.now()}.${safeMime.includes('mp4') ? 'mp4' : 'webm'}`
+        };
       };
 
-      this.mediaRecorder.stop();
+      if (!this.mediaRecorder || this.mediaRecorder.state === 'inactive') {
+        const res = buildResult(this.lastMimeType);
+        resolve(res);
+        return;
+      }
+
+      this.mediaRecorder.onstop = () => {
+        const res = buildResult(this.mediaRecorder?.mimeType || this.lastMimeType);
+        resolve(res);
+      };
+
+      try {
+        if (this.mediaRecorder.state === 'recording') {
+          this.mediaRecorder.requestData();
+        }
+      } catch (e) {}
+
+      try {
+        this.mediaRecorder.stop();
+      } catch (e) {
+        const res = buildResult(this.lastMimeType);
+        resolve(res);
+      }
     });
   }
 

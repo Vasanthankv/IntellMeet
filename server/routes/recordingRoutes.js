@@ -334,20 +334,40 @@ router.post(['/:recordingId/media', '/upload'], protect, express.raw({ type: ['v
       filename
     );
 
-    const recording = await Recording.findOneAndUpdate(
-      { recordingId },
-      {
-        fileUrl: `/api/recordings/${recordingId}/stream`,
-        downloadUrl: `/api/recordings/${recordingId}/download`,
-        storageType: storageResult.storageType,
-        fileKey: storageResult.fileKey,
-        mimeType: storageResult.mimeType,
-        fileSize: storageResult.size,
+    let recording = await Recording.findOne({ recordingId });
+    if (!recording) {
+      const meetingId = req.query.meetingId || req.params.meetingId || 'general';
+      const meetingTitle = req.query.title || 'IntellMeet Meeting Recording';
+      recording = new Recording({
+        recordingId,
+        meetingId,
+        meetingTitle,
+        recordedBy: {
+          userId: req.user?._id || req.user?.id || 'host',
+          name: req.user?.name || 'Host User',
+          email: req.user?.email || '',
+          role: req.user?.role || 'host'
+        },
+        type: 'VIDEO',
         status: 'READY',
-        processingStatus: 'TRANSCRIBING'
-      },
-      { new: true }
-    );
+        startedAt: new Date(Date.now() - 30000),
+        endedAt: new Date()
+      });
+    }
+
+    recording.fileUrl = `/api/recordings/${recordingId}/stream`;
+    recording.downloadUrl = `/api/recordings/${recordingId}/download`;
+    recording.storageType = storageResult.storageType;
+    recording.fileKey = storageResult.fileKey;
+    recording.mimeType = storageResult.mimeType;
+    recording.fileSize = storageResult.size;
+    recording.status = 'READY';
+    recording.processingStatus = 'TRANSCRIBING';
+    if (!recording.duration || recording.duration === 0) {
+      // Estimate duration if missing: 1MB ~= 8s for standard 720p/15fps webm
+      recording.duration = Math.max(2, Math.round(storageResult.size / 130000));
+    }
+    await recording.save();
 
     // Asynchronously kick off transcription and summary
     if (recording) {
