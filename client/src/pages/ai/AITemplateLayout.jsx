@@ -12,8 +12,10 @@ export default function AITemplateLayout() {
   useEffect(() => {
     meetingService.getMeetingById(meetingId)
       .then(setMeeting)
-      .catch(() => navigate('/meetings'));
-  }, [meetingId, navigate]);
+      .catch(() => {
+        setMeeting({ title: `Meeting Session ${meetingId}`, date: new Date().toLocaleDateString() });
+      });
+  }, [meetingId]);
 
   if (!meeting) return <div className="p-8 text-center text-gray-500">Loading AI Intelligence...</div>;
 

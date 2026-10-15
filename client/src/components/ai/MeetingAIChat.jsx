@@ -1,26 +1,56 @@
 import React, { useState } from 'react';
-import { Bot, Send, User } from 'lucide-react';
+import { Bot, Send, User, Sparkles } from 'lucide-react';
+import { API_BASE_URL } from '../../utils/apiConfig';
 
-export default function MeetingAIChat({ summary }) {
+export default function MeetingAIChat({ summary, meetingId: propMeetingId }) {
+  const mId = propMeetingId || summary?.meetingId;
   const meetingName = summary?.title || summary?.meetingTitle || 'the selected';
   const [messages, setMessages] = useState([
     { role: 'assistant', text: `Hi! I'm your AI Meeting Assistant. I've analyzed "${meetingName}". What would you like to know about this session?` }
   ]);
   const [input, setInput] = useState('');
+  const [isThinking, setIsThinking] = useState(false);
 
-  const handleSend = (e) => {
+  const handleSend = async (e) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || isThinking) return;
 
-    // Add user message
-    const newMessages = [...messages, { role: 'user', text: input }];
+    const query = input.trim();
+    const newMessages = [...messages, { role: 'user', text: query }];
     setMessages(newMessages);
     setInput('');
+    setIsThinking(true);
 
-    // AI response based on real summary context
+    try {
+      if (mId) {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${API_BASE_URL}/meetings/${mId}/questions/ask`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ question: query, presetType: 'CUSTOM' })
+        });
+        const data = await res.json();
+        if (data.success && data.questionItem?.answer) {
+          setMessages(prev => [...prev, { 
+            role: 'assistant', 
+            text: data.questionItem.answer,
+            citations: data.questionItem.citations || []
+          }]);
+          setIsThinking(false);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Live AI endpoint unreachable, using local summary context:', e);
+    }
+
+    // Local summary intelligence fallback
     setTimeout(() => {
       let aiResponse = "I'm your meeting assistant. You can ask me about decisions, action items, or the summary of this session.";
-      const lowerInput = input.toLowerCase();
+      const lowerInput = query.toLowerCase();
       
       if (lowerInput.includes('action') || lowerInput.includes('task')) {
         const items = summary?.actionItems || [];
@@ -39,7 +69,8 @@ export default function MeetingAIChat({ summary }) {
       }
 
       setMessages(prev => [...prev, { role: 'assistant', text: aiResponse }]);
-    }, 700);
+      setIsThinking(false);
+    }, 400);
   };
 
   return (
@@ -65,6 +96,21 @@ export default function MeetingAIChat({ summary }) {
             </div>
           </div>
         ))}
+        {isThinking && (
+          <div className="flex gap-3">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-primary-100 text-primary-600 animate-pulse">
+              <Bot className="w-4 h-4" />
+            </div>
+            <div className="p-3 rounded-lg text-sm bg-gray-100 text-gray-500 rounded-tl-none italic flex items-center gap-1.5">
+              <span>Thinking and searching transcript</span>
+              <span className="inline-flex gap-0.5">
+                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
+                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="p-4 border-t border-gray-200 shrink-0">

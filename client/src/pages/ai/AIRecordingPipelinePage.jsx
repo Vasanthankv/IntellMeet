@@ -6,6 +6,7 @@ import {
   Check, Copy, ArrowRight, ExternalLink, Volume2, VolumeX, Maximize,
   ChevronRight, User, Share2
 } from 'lucide-react';
+import { API_BASE_URL } from '../../utils/apiConfig';
 import toast from 'react-hot-toast';
 
 export default function AIRecordingPipelinePage() {
@@ -44,7 +45,7 @@ export default function AIRecordingPipelinePage() {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/ai-pipeline`, {
+      const res = await fetch(`${API_BASE_URL}/meetings/${meetingId}/ai-pipeline`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       const data = await res.json();
@@ -68,7 +69,7 @@ export default function AIRecordingPipelinePage() {
     setIsRunningPipeline(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/ai-pipeline/run`, {
+      const res = await fetch(`${API_BASE_URL}/meetings/${meetingId}/ai-pipeline/run`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -100,7 +101,7 @@ export default function AIRecordingPipelinePage() {
     setIsSearching(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/ai-pipeline/search?q=${encodeURIComponent(searchQuery.trim())}`, {
+      const res = await fetch(`${API_BASE_URL}/meetings/${meetingId}/ai-pipeline/search?q=${encodeURIComponent(searchQuery.trim())}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       const data = await res.json();

@@ -385,9 +385,63 @@ router.put('/:meetingId/lock', protect, async (req, res) => {
     );
     if (!meeting) return res.status(404).json({ success: false, message: 'Meeting not found' });
     res.json({ success: true, isLocked: meeting.isLocked });
+// @route   POST /api/meetings/:meetingId/end
+// @desc    End meeting workflow (Finalize recordings, save end duration, queue AI pipeline)
+router.post('/:meetingId/end', protect, async (req, res) => {
+  try {
+    const meetingId = req.params.meetingId;
+    const meeting = await Meeting.findOne(buildMeetingQuery(meetingId));
+
+    if (!meeting) {
+      return res.status(404).json({ success: false, message: 'Meeting not found' });
+    }
+
+    meeting.status = 'ended';
+    meeting.endedAt = new Date();
+    await meeting.save();
+
+    // Finalize any active recording
+    let activeRecording = null;
+    try {
+      const { Recording } = await import('../models/Recording.js');
+      const { AIPipelineService } = await import('../services/aiPipelineService.js');
+
+      activeRecording = await Recording.findOne({
+        meetingId: meeting.meetingId,
+        status: { $in: ['RECORDING', 'PAUSED'] }
+      }).sort({ createdAt: -1 });
+
+      if (activeRecording) {
+        activeRecording.endedAt = new Date();
+        const totalSecs = Math.max(1, Math.floor((activeRecording.endedAt.getTime() - new Date(activeRecording.startedAt).getTime()) / 1000));
+        activeRecording.duration = Math.max(1, totalSecs - (activeRecording.pausedDuration || 0));
+        activeRecording.status = 'READY';
+        activeRecording.fileUrl = `/api/recordings/${activeRecording.recordingId}/stream`;
+        activeRecording.downloadUrl = `/api/recordings/${activeRecording.recordingId}/download`;
+        await activeRecording.save();
+      }
+
+      // Queue post-meeting AI intelligence in background
+      AIPipelineService.processPostMeetingIntelligence(
+        meeting.meetingId,
+        activeRecording?.recordingId,
+        meeting.title
+      ).catch(e => console.error('Meeting end AI pipeline error:', e));
+
+    } catch (pipelineErr) {
+      console.warn('Meeting end recording/AI finalize warning:', pipelineErr);
+    }
+
+    res.json({
+      success: true,
+      message: 'Meeting ended successfully. Post-meeting assets and intelligence queued.',
+      meeting,
+      recording: activeRecording
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
 export default router;
+

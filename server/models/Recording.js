@@ -31,8 +31,16 @@ const recordingSchema = new mongoose.Schema({
   },
   storageType: { 
     type: String, 
-    enum: ['LOCAL', 'CLOUD'], 
+    enum: ['LOCAL', 'CLOUD', 'GRIDFS', 'S3'], 
     default: 'CLOUD' 
+  },
+  fileKey: {
+    type: String,
+    default: ''
+  },
+  mimeType: {
+    type: String,
+    default: 'video/webm'
   },
   fileUrl: { 
     type: String, 
@@ -52,9 +60,14 @@ const recordingSchema = new mongoose.Schema({
   },
   status: { 
     type: String, 
-    enum: ['RECORDING', 'PAUSED', 'PROCESSING', 'READY', 'FAILED', 'DELETED'], 
+    enum: ['RECORDING', 'PAUSED', 'UPLOADING', 'PROCESSING', 'READY', 'FAILED', 'DELETED'], 
     default: 'RECORDING',
     index: true
+  },
+  processingStatus: {
+    type: String,
+    enum: ['IDLE', 'TRANSCRIPTION_PENDING', 'TRANSCRIBING', 'SUMMARIZING', 'COMPLETED', 'FAILED'],
+    default: 'IDLE'
   },
   layout: { 
     type: String, 

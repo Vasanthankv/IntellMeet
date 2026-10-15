@@ -1,30 +1,39 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { 
   FileText, Sparkles, BrainCircuit, CheckSquare, 
   Calendar, Clock, CheckCircle2, ChevronRight, RefreshCw, AlertCircle
 } from 'lucide-react';
+import { API_BASE_URL } from '../../utils/apiConfig';
 import TranscriptViewer from '../../components/ai/TranscriptViewer';
 import toast from 'react-hot-toast';
 
 export default function AITranscriptPage() {
+  const { meetingId } = useParams();
   const [transcriptsList, setTranscriptsList] = useState([]);
-  const [selectedMeetingId, setSelectedMeetingId] = useState('');
+  const [selectedMeetingId, setSelectedMeetingId] = useState(meetingId || '');
   const [transcriptData, setTranscriptData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isAnalyzingAI, setIsAnalyzingAI] = useState(false);
   const [activeTab, setActiveTab] = useState('transcript'); // 'transcript' | 'summary' | 'decisions' | 'actions'
 
+  useEffect(() => {
+    if (meetingId) {
+      setSelectedMeetingId(meetingId);
+    }
+  }, [meetingId]);
+
   // Load list of available meeting transcripts
   const fetchTranscriptsList = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/transcripts/all/list', {
+      const res = await fetch(`${API_BASE_URL}/transcripts/all/list`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       const data = await res.json();
       if (data.success && data.transcripts && data.transcripts.length > 0) {
         setTranscriptsList(data.transcripts);
-        if (!selectedMeetingId) {
+        if (!selectedMeetingId && !meetingId) {
           setSelectedMeetingId(data.transcripts[0].meetingId);
         }
       }
@@ -48,7 +57,7 @@ export default function AITranscriptPage() {
       setIsLoading(true);
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/transcript`, {
+        const res = await fetch(`${API_BASE_URL}/meetings/${selectedMeetingId}/transcript`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         });
         const data = await res.json();
@@ -73,7 +82,7 @@ export default function AITranscriptPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/transcript/segments/${segmentId}`, {
+      const res = await fetch(`${API_BASE_URL}/meetings/${selectedMeetingId}/transcript/segments/${segmentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ text: newText })
@@ -107,7 +116,7 @@ export default function AITranscriptPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/transcript/export?format=${format}`, {
+      const res = await fetch(`${API_BASE_URL}/meetings/${selectedMeetingId}/transcript/export?format=${format}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       const blob = await res.blob();
@@ -134,7 +143,7 @@ export default function AITranscriptPage() {
     const toastId = toast.loading('Extracting AI summary, key decisions, and action items...');
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/transcript/ai-analyze`, {
+      const res = await fetch(`${API_BASE_URL}/meetings/${selectedMeetingId}/transcript/ai-analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
       });

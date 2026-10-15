@@ -5,10 +5,13 @@ import {
   Trash2, Plus, Clock, Bookmark, ListTodo, HelpCircle, CheckCircle2,
   Send, ExternalLink, Globe, AlignLeft, Calendar
 } from 'lucide-react';
+import { API_BASE_URL } from '../../utils/apiConfig';
 import toast from 'react-hot-toast';
 
 export default function AINotesPage() {
   const { meetingId } = useParams();
+  const [notesList, setNotesList] = useState([]);
+  const [activeMeetingId, setActiveMeetingId] = useState(meetingId || '');
   const [note, setNote] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -47,14 +50,45 @@ export default function AINotesPage() {
   const [newItemCategory, setNewItemCategory] = useState('important');
   const [newItemDue, setNewItemDue] = useState('');
 
+  // Load user's notes list if no direct meetingId or to support switching
+  useEffect(() => {
+    const fetchUserNotes = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${API_BASE_URL}/notes/user/all`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        const data = await res.json();
+        if (data.success && data.notes) {
+          setNotesList(data.notes);
+          if (!activeMeetingId && data.notes.length > 0) {
+            setActiveMeetingId(data.notes[0].meetingId);
+          }
+        }
+      } catch (e) {
+        console.warn('Could not fetch user notes list:', e);
+      }
+    };
+    fetchUserNotes();
+  }, []);
+
+  useEffect(() => {
+    if (meetingId) {
+      setActiveMeetingId(meetingId);
+    }
+  }, [meetingId]);
+
   const fetchNoteAndTranscript = async () => {
-    if (!meetingId) return;
+    if (!activeMeetingId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
       // Fetch personal note
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/notes/my`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await fetch(`${API_BASE_URL}/meetings/${activeMeetingId}/notes/my`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       const data = await res.json();
       if (data.success && data.note) {
@@ -74,8 +108,8 @@ export default function AINotesPage() {
       }
 
       // Fetch transcript segments
-      const trRes = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/transcript/export?format=json`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const trRes = await fetch(`${API_BASE_URL}/meetings/${activeMeetingId}/transcript/export?format=json`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       const trData = await trRes.json();
       if (trData.success && trData.transcript?.segments) {
@@ -90,14 +124,14 @@ export default function AINotesPage() {
 
   useEffect(() => {
     fetchNoteAndTranscript();
-  }, [meetingId]);
+  }, [activeMeetingId]);
 
   const saveNoteChanges = async (updatedContent, updatedTitle, updatedSections) => {
     if (!note) return;
     setSaving(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/notes/${note.noteId || note._id}`, {
+      const res = await fetch(`${API_BASE_URL}/notes/${note.noteId || note._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -157,7 +191,7 @@ export default function AINotesPage() {
     setIsGenerating(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/notes/${note.noteId || note._id}/ai-enhance`, {
+      const res = await fetch(`${API_BASE_URL}/notes/${note.noteId || note._id}/ai-enhance`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -186,7 +220,7 @@ export default function AINotesPage() {
     setIsRefining(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/notes/${note.noteId || note._id}/ai-refine`, {
+      const res = await fetch(`${API_BASE_URL}/notes/${note.noteId || note._id}/ai-refine`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -219,7 +253,7 @@ export default function AINotesPage() {
     if (!shareEmail.trim() || !note) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/notes/${note.noteId || note._id}/share`, {
+      const res = await fetch(`${API_BASE_URL}/notes/${note.noteId || note._id}/share`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -242,7 +276,7 @@ export default function AINotesPage() {
     if (!note) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/notes/${note.noteId || note._id}/share/${emailOrId}`, {
+      const res = await fetch(`${API_BASE_URL}/notes/${note.noteId || note._id}/share/${emailOrId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -312,6 +346,22 @@ export default function AINotesPage() {
             <span>•</span>
             <span>Zoom AI My Notes feature</span>
           </p>
+          {notesList.length > 0 && (
+            <div className="flex items-center gap-1.5 mt-2">
+              <span className="text-xs text-gray-500 font-semibold">Meeting Note:</span>
+              <select
+                value={activeMeetingId}
+                onChange={(e) => setActiveMeetingId(e.target.value)}
+                className="text-xs bg-gray-50 border border-gray-300 rounded px-2 py-1 text-gray-700 font-medium focus:outline-none cursor-pointer"
+              >
+                {notesList.map((n) => (
+                  <option key={n.meetingId || n._id} value={n.meetingId}>
+                    {n.meetingTitle || n.title || n.meetingId}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

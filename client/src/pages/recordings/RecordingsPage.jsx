@@ -7,6 +7,7 @@ import {
   Volume2, VolumeX, Maximize, RotateCcw
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { API_BASE_URL, SERVER_BASE_URL } from '../../utils/apiConfig';
 import ShareRecordingModal from '../../components/recording/ShareRecordingModal';
 import SmartRecordingModal from '../../components/recording/SmartRecordingModal';
 
@@ -43,7 +44,7 @@ export default function RecordingsPage() {
     try {
       const token = localStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const url = `${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/recordings?search=${encodeURIComponent(searchQuery)}`;
+      const url = `${API_BASE_URL}/recordings?search=${encodeURIComponent(searchQuery)}`;
       const res = await fetch(url, { headers });
       const data = await res.json();
       if (data.success) {
@@ -62,7 +63,7 @@ export default function RecordingsPage() {
   }, [searchQuery]);
 
   const filteredRecordings = recordings.filter(r => {
-    const isCloud = r.storageType === 'CLOUD';
+    const isCloud = r.storageType === 'CLOUD' || r.storageType === 'GRIDFS' || r.storageType === 'S3';
     return activeTab === 'cloud' ? isCloud : !isCloud;
   });
 
@@ -71,7 +72,7 @@ export default function RecordingsPage() {
     try {
       const token = localStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/recordings/${recordingId}`, {
+      const res = await fetch(`${API_BASE_URL}/recordings/${recordingId}`, {
         method: 'DELETE',
         headers
       });
@@ -94,7 +95,7 @@ export default function RecordingsPage() {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       };
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/recordings/${recordingId}`, {
+      const res = await fetch(`${API_BASE_URL}/recordings/${recordingId}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({ meetingTitle: newTitle })
@@ -107,6 +108,26 @@ export default function RecordingsPage() {
       }
     } catch (e) {
       toast.error('Failed to rename');
+    }
+  };
+
+  const handleRetryAI = async (recordingId) => {
+    try {
+      const token = localStorage.getItem('token');
+      toast.loading('Queueing AI transcription and summary...', { id: 'retry-ai' });
+      const res = await fetch(`${API_BASE_URL}/recordings/${recordingId}/retry-ai`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('AI processing queued! Check back in ~30 seconds.', { id: 'retry-ai' });
+        fetchRecordings();
+      } else {
+        toast.error(data.message || 'Retry failed', { id: 'retry-ai' });
+      }
+    } catch (e) {
+      toast.error('Error queueing AI retry', { id: 'retry-ai' });
     }
   };
 
@@ -383,11 +404,21 @@ export default function RecordingsPage() {
                     </button>
 
                     <button
+                      onClick={() => handleRetryAI(rec.recordingId)}
+                      className="p-2 rounded-xl text-purple-600 hover:bg-purple-50 transition-colors"
+                      title="Re-run AI Transcription & Summary"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                    </button>
+
+                    <button
                       onClick={() => {
                         toast.success('Downloading recording media...');
                         const link = document.createElement('a');
-                        link.href = rec.downloadUrl || rec.fileUrl || '#';
-                        link.download = `${rec.meetingTitle}.mp4`;
+                        link.href = rec.downloadUrl 
+                          ? (rec.downloadUrl.startsWith('http') ? rec.downloadUrl : `${SERVER_BASE_URL}${rec.downloadUrl}`)
+                          : `${SERVER_BASE_URL}/api/recordings/${rec.recordingId}/download`;
+                        link.download = `${rec.meetingTitle}.webm`;
                         link.click();
                       }}
                       className="p-2 rounded-xl text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors"
@@ -436,6 +467,13 @@ export default function RecordingsPage() {
               </div>
               <div className="flex items-center gap-2">
                 <button
+                  onClick={() => handleRetryAI(selectedRecording.recordingId)}
+                  className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors"
+                  title="Re-generate AI Summary & Transcript"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> Re-analyze AI
+                </button>
+                <button
                   onClick={() => setSmartRecordingTarget(selectedRecording)}
                   className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md"
                 >
@@ -463,7 +501,11 @@ export default function RecordingsPage() {
                 <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
                   <video
                     ref={videoRef}
-                    src={selectedRecording.fileUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'}
+                    src={
+                      selectedRecording.fileUrl 
+                        ? (selectedRecording.fileUrl.startsWith('http') ? selectedRecording.fileUrl : `${SERVER_BASE_URL}${selectedRecording.fileUrl}`)
+                        : `${SERVER_BASE_URL}/api/recordings/${selectedRecording.recordingId}/stream`
+                    }
                     onTimeUpdate={handleTimeUpdate}
                     onLoadedMetadata={handleTimeUpdate}
                     onEnded={() => setIsPlaying(false)}

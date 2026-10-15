@@ -3016,48 +3016,43 @@ export default function MeetingRoom() {
     }
 
     try {
-      if (isLocal) {
-        if (!stream && peers.length === 0) {
-          toast.error('No video or audio stream available for local recording');
-          return;
-        }
+      // Always prepare mixed media stream (local camera + screen share + local mic + remote participants' audio)
+      let streamToRecord = stream;
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          const audioCtx = new AudioContextClass();
+          const audioDest = audioCtx.createMediaStreamDestination();
 
-        // Mix local and remote audio tracks so the recording captures all meeting participants
-        let streamToRecord = stream;
-        try {
-          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-          if (AudioContextClass) {
-            const audioCtx = new AudioContextClass();
-            const audioDest = audioCtx.createMediaStreamDestination();
-
-            // Connect local audio
-            if (stream && stream.getAudioTracks().length > 0) {
-              const localAudioSource = audioCtx.createMediaStreamSource(stream);
-              localAudioSource.connect(audioDest);
-            }
-
-            // Connect remote participant audio
-            peers.forEach(p => {
-              if (p.stream && p.stream.getAudioTracks().length > 0) {
-                try {
-                  const remoteAudioSource = audioCtx.createMediaStreamSource(p.stream);
-                  remoteAudioSource.connect(audioDest);
-                } catch (e) {}
-              }
-            });
-
-            // Combine video track with mixed audio track
-            const activeVideoTrack = screenTrackRef.current || stream?.getVideoTracks()[0];
-            const compositeStream = new MediaStream();
-            if (activeVideoTrack) compositeStream.addTrack(activeVideoTrack);
-            audioDest.stream.getAudioTracks().forEach(t => compositeStream.addTrack(t));
-            streamToRecord = compositeStream;
+          // Connect local audio
+          if (stream && stream.getAudioTracks().length > 0) {
+            const localAudioSource = audioCtx.createMediaStreamSource(stream);
+            localAudioSource.connect(audioDest);
           }
-        } catch (mixErr) {
-          console.warn('Audio mixing fallback to direct stream:', mixErr);
-          streamToRecord = stream;
-        }
 
+          // Connect all remote participants' audio
+          peers.forEach(p => {
+            if (p.stream && p.stream.getAudioTracks().length > 0) {
+              try {
+                const remoteAudioSource = audioCtx.createMediaStreamSource(p.stream);
+                remoteAudioSource.connect(audioDest);
+              } catch (e) {}
+            }
+          });
+
+          // Combine video track with mixed multi-participant audio
+          const activeVideoTrack = screenTrackRef.current || stream?.getVideoTracks()[0];
+          const compositeStream = new MediaStream();
+          if (activeVideoTrack) compositeStream.addTrack(activeVideoTrack);
+          audioDest.stream.getAudioTracks().forEach(t => compositeStream.addTrack(t));
+          streamToRecord = compositeStream;
+        }
+      } catch (mixErr) {
+        console.warn('Audio mixing fallback to direct stream:', mixErr);
+        streamToRecord = stream;
+      }
+
+      if (streamToRecord && streamToRecord.getTracks().length > 0) {
         localRecordingEngine.start(streamToRecord);
       }
 
@@ -3106,9 +3101,7 @@ export default function MeetingRoom() {
 
   const handlePauseRecording = async () => {
     try {
-      if (recordingMode === 'LOCAL') {
-        localRecordingEngine.pause();
-      }
+      localRecordingEngine.pause();
 
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
@@ -3127,9 +3120,7 @@ export default function MeetingRoom() {
 
   const handleResumeRecording = async () => {
     try {
-      if (recordingMode === 'LOCAL') {
-        localRecordingEngine.resume();
-      }
+      localRecordingEngine.resume();
 
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
@@ -3148,11 +3139,38 @@ export default function MeetingRoom() {
 
   const handleStopRecording = async () => {
     try {
-      if (recordingMode === 'LOCAL') {
-        const localRec = await localRecordingEngine.stop();
-        if (localRec && localRec.blob) {
-          localRecordingEngine.downloadBlob(localRec.blob, localRec.filename);
+      const recResult = await localRecordingEngine.stop();
+      const recordingIdToFinalize = activeRecordingId;
+
+      if (recResult && recResult.blob) {
+        if (recordingMode === 'LOCAL') {
+          localRecordingEngine.downloadBlob(recResult.blob, recResult.filename);
           toast.success('Local recording downloaded to your computer!');
+        } else if (recordingIdToFinalize) {
+          // Upload binary media to persistent cloud storage (MongoDB GridFS on Render)
+          toast.loading('Uploading cloud recording to persistent storage...', { id: 'rec-upload' });
+          try {
+            const token = localStorage.getItem('token');
+            const uploadHeaders = {
+              'Content-Type': recResult.mimeType || 'video/webm',
+              ...(token ? { Authorization: `Bearer ${token}` } : {})
+            };
+            const uploadRes = await fetch(`${SOCKET_SERVER_URL}/api/recordings/${recordingIdToFinalize}/media`, {
+              method: 'POST',
+              headers: uploadHeaders,
+              body: recResult.blob
+            });
+            const uploadData = await uploadRes.json();
+            if (uploadData.success) {
+              toast.success('Recording saved to cloud! AI Summary & Transcript processing.', { id: 'rec-upload' });
+            } else {
+              toast.error(uploadData.message || 'Cloud storage upload warning', { id: 'rec-upload' });
+            }
+          } catch (uploadErr) {
+            console.warn('Cloud upload error, saving local copy fallback:', uploadErr);
+            toast.error('Cloud upload interrupted; saved locally as backup.', { id: 'rec-upload' });
+            localRecordingEngine.downloadBlob(recResult.blob, recResult.filename);
+          }
         }
       }
 
@@ -3162,23 +3180,20 @@ export default function MeetingRoom() {
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       };
 
-      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/recording/stop`, {
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/recording/stop`, {
         method: 'PUT',
         headers,
-        body: JSON.stringify({ recordingId: activeRecordingId })
+        body: JSON.stringify({ recordingId: recordingIdToFinalize })
       });
 
-      const data = await res.json();
       setIsMeetingRecording(false);
       setRecordingPaused(false);
       setActiveRecordingId(null);
 
       socketRef.current?.emit('recording-stop', meetingId, { meetingId });
-      toast.success(
-        recordingMode === 'LOCAL' 
-          ? 'Computer recording stopped and saved locally' 
-          : 'Cloud recording saved! AI Summary & Transcript ready in Recordings.'
-      );
+      if (recordingMode === 'LOCAL') {
+        toast.success('Computer recording stopped and saved locally');
+      }
     } catch (e) {
       toast.error('Failed to stop recording');
     }

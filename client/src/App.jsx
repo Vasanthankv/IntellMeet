@@ -102,6 +102,12 @@ function App() {
               <Route path="/tasks" element={<TasksPage />} />
               <Route path="/recordings" element={<RecordingsPage />} />
               <Route path="/modules/recordings" element={<RecordingsPage />} />
+              <Route path="/summaries" element={<AISummaryPage />} />
+              <Route path="/modules/summaries" element={<AISummaryPage />} />
+              <Route path="/transcripts" element={<AITranscriptPage />} />
+              <Route path="/modules/transcripts" element={<AITranscriptPage />} />
+              <Route path="/notes" element={<AINotesPage />} />
+              <Route path="/modules/notes" element={<AINotesPage />} />
               <Route path="/modules/:type" element={<GenericModulePage />} />
               <Route path="/meetings" element={<MeetingsIndex />} />
               <Route path="/meetings/schedule" element={<ScheduleMeeting />} />

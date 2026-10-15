@@ -5,6 +5,7 @@ import {
   RefreshCw, X, ChevronRight, Volume2, VolumeX, Maximize, Bookmark, 
   FileText, CheckSquare, Square, User, ExternalLink, FolderPlus, Layers
 } from 'lucide-react';
+import { API_BASE_URL } from '../../utils/apiConfig';
 import toast from 'react-hot-toast';
 
 export default function SmartRecordingModal({
@@ -67,7 +68,7 @@ export default function SmartRecordingModal({
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/recordings/${recording.recordingId}/smart`, {
+      const res = await fetch(`${API_BASE_URL}/recordings/${recording.recordingId}/smart`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       const data = await res.json();
@@ -84,7 +85,7 @@ export default function SmartRecordingModal({
   const fetchPlaylists = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/recordings/playlists/all', {
+      const res = await fetch(`${API_BASE_URL}/recordings/playlists/all`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       const data = await res.json();
@@ -149,7 +150,7 @@ export default function SmartRecordingModal({
     setIsProcessingAI(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/recordings/${recording.recordingId}/smart/generate`, {
+      const res = await fetch(`${API_BASE_URL}/recordings/${recording.recordingId}/smart/generate`, {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
@@ -171,7 +172,7 @@ export default function SmartRecordingModal({
   const handleSaveClip = async (hl) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/recordings/${recording.recordingId}/smart/highlights/clip`, {
+      const res = await fetch(`${API_BASE_URL}/recordings/${recording.recordingId}/smart/highlights/clip`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -207,7 +208,7 @@ export default function SmartRecordingModal({
     const updated = [...(smartRec.highlights || []), newHL];
     try {
       const token = localStorage.getItem('token');
-      await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/recordings/${recording.recordingId}/smart/highlights`, {
+      await fetch(`${API_BASE_URL}/recordings/${recording.recordingId}/smart/highlights`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -229,7 +230,7 @@ export default function SmartRecordingModal({
     const updated = smartRec.highlights.filter(h => h.highlightId !== id);
     try {
       const token = localStorage.getItem('token');
-      await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/recordings/${recording.recordingId}/smart/highlights`, {
+      await fetch(`${API_BASE_URL}/recordings/${recording.recordingId}/smart/highlights`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -251,7 +252,7 @@ export default function SmartRecordingModal({
     );
     try {
       const token = localStorage.getItem('token');
-      await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/recordings/${recording.recordingId}/smart/chapters`, {
+      await fetch(`${API_BASE_URL}/recordings/${recording.recordingId}/smart/chapters`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -272,7 +273,7 @@ export default function SmartRecordingModal({
     if (!splitChapterModal) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/recordings/${recording.recordingId}/smart/chapters/split`, {
+      const res = await fetch(`${API_BASE_URL}/recordings/${recording.recordingId}/smart/chapters/split`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -299,7 +300,7 @@ export default function SmartRecordingModal({
     const updated = smartRec.chapters.filter(c => c.chapterId !== chId);
     try {
       const token = localStorage.getItem('token');
-      await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/recordings/${recording.recordingId}/smart/chapters`, {
+      await fetch(`${API_BASE_URL}/recordings/${recording.recordingId}/smart/chapters`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -321,7 +322,7 @@ export default function SmartRecordingModal({
     );
     try {
       const token = localStorage.getItem('token');
-      await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/recordings/${recording.recordingId}/smart/next-steps`, {
+      await fetch(`${API_BASE_URL}/recordings/${recording.recordingId}/smart/next-steps`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -347,7 +348,7 @@ export default function SmartRecordingModal({
     const updated = [...(smartRec.nextSteps || []), newStep];
     try {
       const token = localStorage.getItem('token');
-      await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/recordings/${recording.recordingId}/smart/next-steps`, {
+      await fetch(`${API_BASE_URL}/recordings/${recording.recordingId}/smart/next-steps`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -376,7 +377,7 @@ export default function SmartRecordingModal({
   const handleAddToPlaylist = async (playlistId) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/recordings/playlists/${playlistId}/add`, {
+      const res = await fetch(`${API_BASE_URL}/recordings/playlists/${playlistId}/add`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -399,7 +400,7 @@ export default function SmartRecordingModal({
     if (!newPlaylistName.trim()) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/recordings/playlists', {
+      const res = await fetch(`${API_BASE_URL}/recordings/playlists`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1053,7 +1054,7 @@ export default function SmartRecordingModal({
                           const newSettings = { ...smartRec.settings, [s.key]: e.target.checked };
                           setSmartRec(prev => ({ ...prev, settings: newSettings }));
                           const token = localStorage.getItem('token');
-                          await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/recordings/${recording.recordingId}/smart/settings`, {
+                          await fetch(`${API_BASE_URL}/recordings/${recording.recordingId}/smart/settings`, {
                             method: 'PUT',
                             headers: {
                               'Content-Type': 'application/json',

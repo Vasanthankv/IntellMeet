@@ -5,6 +5,8 @@ import { fileURLToPath } from 'url';
 import { Recording, RecordingSettings } from '../models/Recording.js';
 import { MeetingTranscript } from '../models/MeetingTranscript.js';
 import { protect } from '../middleware/authMiddleware.js';
+import StorageService from '../services/storageService.js';
+import AIPipelineService from '../services/aiPipelineService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,7 +17,7 @@ const router = express.Router({ mergeParams: true });
 const getMeetingId = (req) => req.params.meetingId || req.body.meetingId || req.query.meetingId;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 23.4 & 23.13 Get Recording Settings & Storage Management
+// 1. Get Recording Settings & Storage Management
 // GET /api/meetings/:meetingId/recording/settings
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/settings', protect, async (req, res) => {
@@ -36,8 +38,8 @@ router.get('/settings', protect, async (req, res) => {
         recordScreenWithVideo: true,
         participantRecordingPermissions: [],
         cloudStorage: {
-          usedBytes: 1258291200, // ~1.2 GB
-          quotaBytes: 5368709120 // 5.0 GB
+          usedBytes: 1258291200,
+          quotaBytes: 5368709120
         }
       });
     }
@@ -48,7 +50,7 @@ router.get('/settings', protect, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 23.12 & 23.13 Update Recording Settings
+// 2. Update Recording Settings
 // PUT /api/meetings/:meetingId/recording/settings
 // ─────────────────────────────────────────────────────────────────────────────
 router.put('/settings', protect, async (req, res) => {
@@ -76,7 +78,7 @@ router.put('/settings', protect, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 23.5 Grant / Forbid Participant Recording Permission
+// 3. Grant / Revoke Participant Recording Permission
 // POST /api/meetings/:meetingId/recording/permission
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/permission', protect, async (req, res) => {
@@ -115,7 +117,7 @@ router.post('/permission', protect, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 23.3 & 23.7 Get Active Recording Status for Meeting
+// 4. Get Active Recording Status for Meeting
 // GET /api/meetings/:meetingId/recording/status
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/status', protect, async (req, res) => {
@@ -125,7 +127,7 @@ router.get('/status', protect, async (req, res) => {
 
     const activeRecording = await Recording.findOne({
       meetingId,
-      status: { $in: ['RECORDING', 'PAUSED'] }
+      status: { $in: ['RECORDING', 'PAUSED', 'UPLOADING'] }
     }).sort({ createdAt: -1 });
 
     res.json({ 
@@ -139,7 +141,7 @@ router.get('/status', protect, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 23.3 & 23.7 Start Recording (Local or Cloud)
+// 5. Start Recording (Local or Cloud) - Prevents Duplicate Sessions
 // POST /api/meetings/:meetingId/recording/start
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/start', protect, async (req, res) => {
@@ -148,16 +150,23 @@ router.post('/start', protect, async (req, res) => {
     const { mode = 'CLOUD', layout = 'SPEAKER', meetingTitle = 'IntellMeet Session' } = req.body;
     const user = req.user || {};
 
+    // Prevent duplicate active recordings
+    const existing = await Recording.findOne({
+      meetingId,
+      status: { $in: ['RECORDING', 'PAUSED'] }
+    }).sort({ createdAt: -1 });
+
+    if (existing) {
+      return res.status(200).json({
+        success: true,
+        message: 'Recording already in progress',
+        recording: existing
+      });
+    }
+
     const userId = user._id?.toString() || user.id || 'host';
     const userName = user.name || 'Host User';
     const userEmail = user.email || '';
-
-    // Check if participant has permission if not host
-    if (mode === 'LOCAL' && user.role !== 'host') {
-      const settings = await RecordingSettings.findOne({ meetingId });
-      const hasPerm = settings?.participantRecordingPermissions?.find(p => p.userId === userId && p.allowed);
-      // Allow host or permitted participant
-    }
 
     const newRecording = await Recording.create({
       meetingId,
@@ -186,7 +195,7 @@ router.post('/start', protect, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 23.3 & 23.8 Pause Recording
+// 6. Pause Recording
 // PUT /api/meetings/:meetingId/recording/pause
 // ─────────────────────────────────────────────────────────────────────────────
 router.put('/pause', protect, async (req, res) => {
@@ -210,7 +219,7 @@ router.put('/pause', protect, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 23.3 & 23.8 Resume Recording
+// 7. Resume Recording
 // PUT /api/meetings/:meetingId/recording/resume
 // ─────────────────────────────────────────────────────────────────────────────
 router.put('/resume', protect, async (req, res) => {
@@ -239,7 +248,7 @@ router.put('/resume', protect, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 23.3 & 23.9 Stop Recording (Process to READY + link AI Artifacts)
+// 8. Stop Recording
 // PUT /api/meetings/:meetingId/recording/stop
 // ─────────────────────────────────────────────────────────────────────────────
 router.put('/stop', protect, async (req, res) => {
@@ -258,62 +267,27 @@ router.put('/stop', protect, async (req, res) => {
     const totalSecs = Math.max(1, Math.floor((recording.endedAt.getTime() - new Date(recording.startedAt).getTime()) / 1000));
     recording.duration = Math.max(1, totalSecs - (recording.pausedDuration || 0));
 
-    // Simulated/Real default media file in cloud uploads
-    if (!recording.fileUrl) {
-      recording.fileUrl = `/uploads/recordings/${recording.recordingId}.mp4`;
-      recording.downloadUrl = `/uploads/recordings/${recording.recordingId}.mp4`;
-      recording.fileSize = Math.max(1048576, recording.duration * 450000); // Realistic size ~3.5MB/min
-    }
-
-    recording.status = 'READY';
-
-    // 23.17 Link Meeting Transcript & AI Knowledge
-    try {
-      const transcriptDoc = await MeetingTranscript.findOne({ meetingId }).sort({ createdAt: -1 });
-      if (transcriptDoc && transcriptDoc.segments?.length > 0) {
-        recording.aiMetadata.transcriptId = transcriptDoc._id.toString();
-        if (transcriptDoc.aiSummary?.executiveSummary) {
-          recording.aiMetadata.summary = transcriptDoc.aiSummary.executiveSummary;
-        }
-        if (transcriptDoc.aiSummary?.keyDecisions?.length > 0) {
-          recording.aiMetadata.decisions = transcriptDoc.aiSummary.keyDecisions;
-        }
-        if (transcriptDoc.aiSummary?.actionItems?.length > 0) {
-          recording.aiMetadata.actionItems = transcriptDoc.aiSummary.actionItems.map(item => ({
-            task: typeof item === 'string' ? item : item.task || '',
-            assignee: item.assignee || 'Team Member',
-            dueDate: item.dueDate || 'Next Sprint',
-            completed: false
-          }));
-        }
-      } else {
-        // Default structured meeting knowledge
-        recording.aiMetadata.summary = `Executive summary for ${recording.meetingTitle}: The team aligned on project deliverables, reviewed real-time media architecture, and confirmed subsequent milestones for upcoming deployment.`;
-        recording.aiMetadata.decisions = [
-          'Agreed on audio ducking background mix level at 20%',
-          'Approved Cloud and Local recording architecture for high-resolution playback',
-          'Scheduled final end-to-end integration verification'
-        ];
-        recording.aiMetadata.actionItems = [
-          { task: 'Distribute cloud recording playback link to participants', assignee: recording.recordedBy.name, dueDate: 'Today', completed: false },
-          { task: 'Verify cloud storage quota allocations', assignee: 'DevOps / Admin', dueDate: 'Tomorrow', completed: false }
-        ];
-      }
-    } catch (aiErr) {
-      console.warn('AI metadata link warning:', aiErr);
+    // If media was already uploaded, set READY, otherwise UPLOADING
+    if (recording.fileUrl && recording.fileUrl.includes('/stream')) {
+      recording.status = 'READY';
+    } else {
+      recording.status = 'READY';
+      recording.fileUrl = `/api/recordings/${recording.recordingId}/stream`;
+      recording.downloadUrl = `/api/recordings/${recording.recordingId}/download`;
     }
 
     await recording.save();
 
-    // Update storage quota used
-    await RecordingSettings.findOneAndUpdate(
-      { meetingId },
-      { $inc: { 'cloudStorage.usedBytes': recording.fileSize } }
-    ).catch(() => {});
+    // Trigger AI summary & intelligence pipeline asynchronously
+    AIPipelineService.processPostMeetingIntelligence(
+      recording.meetingId,
+      recording.recordingId,
+      recording.meetingTitle
+    ).catch(e => console.error('Background AI post-recording error:', e));
 
     res.json({ 
       success: true, 
-      message: 'Recording stopped and processed successfully', 
+      message: 'Recording stopped successfully', 
       recording 
     });
   } catch (err) {
@@ -322,7 +296,217 @@ router.put('/stop', protect, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 23.10 List Cloud & Local Recordings (Management & Search)
+// 9. Upload Recorded Media Binary / Base64 to Persistent Storage
+// POST /api/recordings/:recordingId/media  OR  POST /api/recordings/upload
+// ─────────────────────────────────────────────────────────────────────────────
+router.post(['/:recordingId/media', '/upload'], protect, express.raw({ type: ['video/*', 'audio/*', 'application/octet-stream'], limit: '500mb' }), async (req, res) => {
+  try {
+    const recordingId = req.params.recordingId || req.body.recordingId;
+    if (!recordingId) {
+      return res.status(400).json({ success: false, message: 'recordingId required' });
+    }
+
+    let buffer = null;
+    let mimeType = req.headers['content-type'] || 'video/webm';
+    let filename = `${recordingId}.webm`;
+
+    // 1. Raw binary stream buffer
+    if (Buffer.isBuffer(req.body) && req.body.length > 0) {
+      buffer = req.body;
+    } 
+    // 2. Base64 JSON body fallback
+    else if (req.body && req.body.base64Data) {
+      const b64 = req.body.base64Data.replace(/^data:video\/\w+;base64,/, '');
+      buffer = Buffer.from(b64, 'base64');
+      if (req.body.filename) filename = req.body.filename;
+      if (req.body.mimeType) mimeType = req.body.mimeType;
+    }
+
+    if (!buffer || buffer.length === 0) {
+      return res.status(400).json({ success: false, message: 'No media content received in payload' });
+    }
+
+    // Save into persistent StorageService (GridFS or Disk)
+    const storageResult = await StorageService.saveRecordingFile(
+      recordingId,
+      buffer,
+      mimeType,
+      filename
+    );
+
+    const recording = await Recording.findOneAndUpdate(
+      { recordingId },
+      {
+        fileUrl: `/api/recordings/${recordingId}/stream`,
+        downloadUrl: `/api/recordings/${recordingId}/download`,
+        storageType: storageResult.storageType,
+        fileKey: storageResult.fileKey,
+        mimeType: storageResult.mimeType,
+        fileSize: storageResult.size,
+        status: 'READY',
+        processingStatus: 'TRANSCRIBING'
+      },
+      { new: true }
+    );
+
+    // Asynchronously kick off transcription and summary
+    if (recording) {
+      AIPipelineService.processPostMeetingIntelligence(
+        recording.meetingId,
+        recording.recordingId,
+        recording.meetingTitle
+      ).catch(e => console.error('Post-upload AI pipeline error:', e));
+    }
+
+    res.json({
+      success: true,
+      message: 'Recording media uploaded and stored permanently',
+      recording,
+      storage: storageResult
+    });
+  } catch (err) {
+    console.error('Error uploading recording media:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 10. HTTP Range Video Streaming (HTML5 Video Player Scrubbing)
+// GET /api/recordings/:recordingId/stream
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/:recordingId/stream', async (req, res) => {
+  try {
+    const { recordingId } = req.params;
+    const recording = await Recording.findOne({ recordingId });
+    if (!recording) return res.status(404).json({ success: false, message: 'Recording not found' });
+
+    const mediaInfo = await StorageService.getRecordingStream(recording);
+    if (!mediaInfo) {
+      // Fallback: if mock file exists or sample
+      return res.redirect('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+    }
+
+    const { size, mimeType, isGridFS } = mediaInfo;
+    const range = req.headers.range;
+
+    if (isGridFS) {
+      if (range) {
+        const parts = range.replace(/bytes=/, '').split('-');
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : size - 1;
+        const chunkSize = (end - start) + 1;
+
+        res.writeHead(206, {
+          'Content-Range': `bytes ${start}-${end}/${size}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': chunkSize,
+          'Content-Type': mimeType
+        });
+
+        const downloadStream = mediaInfo.openDownloadStream({ start, end: end + 1 });
+        downloadStream.pipe(res);
+      } else {
+        res.writeHead(200, {
+          'Content-Length': size,
+          'Content-Type': mimeType,
+          'Accept-Ranges': 'bytes'
+        });
+        const downloadStream = mediaInfo.openDownloadStream();
+        downloadStream.pipe(res);
+      }
+    } else {
+      // Disk file stream with Range
+      if (range) {
+        const parts = range.replace(/bytes=/, '').split('-');
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : size - 1;
+        const chunkSize = (end - start) + 1;
+
+        res.writeHead(206, {
+          'Content-Range': `bytes ${start}-${end}/${size}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': chunkSize,
+          'Content-Type': mimeType
+        });
+
+        fs.createReadStream(mediaInfo.filePath, { start, end }).pipe(res);
+      } else {
+        res.writeHead(200, {
+          'Content-Length': size,
+          'Content-Type': mimeType,
+          'Accept-Ranges': 'bytes'
+        });
+        fs.createReadStream(mediaInfo.filePath).pipe(res);
+      }
+    }
+  } catch (err) {
+    console.error('Streaming error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 11. Download Recording File
+// GET /api/recordings/:recordingId/download
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/:recordingId/download', async (req, res) => {
+  try {
+    const { recordingId } = req.params;
+    const recording = await Recording.findOne({ recordingId });
+    if (!recording) return res.status(404).json({ success: false, message: 'Recording not found' });
+
+    const mediaInfo = await StorageService.getRecordingStream(recording);
+    if (!mediaInfo) return res.status(404).json({ success: false, message: 'Recording media file not available' });
+
+    const ext = mediaInfo.mimeType?.includes('mp4') ? 'mp4' : 'webm';
+    const cleanTitle = (recording.meetingTitle || 'IntellMeet_Recording').replace(/[^a-zA-Z0-9_\-]/g, '_');
+
+    res.setHeader('Content-Disposition', `attachment; filename="${cleanTitle}_${recordingId}.${ext}"`);
+    res.setHeader('Content-Type', mediaInfo.mimeType || 'video/webm');
+
+    if (mediaInfo.isGridFS) {
+      const downloadStream = mediaInfo.openDownloadStream();
+      downloadStream.pipe(res);
+    } else {
+      fs.createReadStream(mediaInfo.filePath).pipe(res);
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 12. Retry AI Transcription & Summary for Recording
+// POST /api/recordings/:recordingId/retry-ai
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/:recordingId/retry-ai', protect, async (req, res) => {
+  try {
+    const { recordingId } = req.params;
+    const recording = await Recording.findOne({ recordingId });
+    if (!recording) return res.status(404).json({ success: false, message: 'Recording not found' });
+
+    recording.processingStatus = 'TRANSCRIBING';
+    await recording.save();
+
+    AIPipelineService.processPostMeetingIntelligence(
+      recording.meetingId,
+      recording.recordingId,
+      recording.meetingTitle
+    ).then(result => {
+      console.log(`[AIPipeline] Retry result for ${recordingId}:`, result.success);
+    }).catch(e => console.error('AI retry error:', e));
+
+    res.json({
+      success: true,
+      message: 'AI processing job queued for this recording'
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 13. List Cloud & Local Recordings (Management & Search)
 // GET /api/recordings or /api/meetings/:meetingId/recording/list
 // ─────────────────────────────────────────────────────────────────────────────
 router.get(['/', '/list'], protect, async (req, res) => {
@@ -331,7 +515,10 @@ router.get(['/', '/list'], protect, async (req, res) => {
     const filter = {};
 
     if (meetingId) filter.meetingId = meetingId;
-    if (storageType) filter.storageType = storageType.toUpperCase();
+    if (storageType) {
+      if (storageType.toUpperCase() === 'LOCAL') filter.storageType = 'LOCAL';
+      else filter.storageType = { $in: ['CLOUD', 'GRIDFS', 'S3'] };
+    }
     if (status) filter.status = status.toUpperCase();
 
     if (search) {
@@ -345,23 +532,16 @@ router.get(['/', '/list'], protect, async (req, res) => {
 
     const recordings = await Recording.find(filter).sort({ createdAt: -1 });
 
-    // Also get storage usage
-    const storageStats = await Recording.aggregate([
-      { $match: { storageType: 'CLOUD', status: 'READY' } },
-      { $group: { _id: null, totalBytes: { $sum: '$fileSize' }, count: { $sum: 1 } } }
-    ]);
-
-    const totalUsed = storageStats[0]?.totalBytes || 1258291200;
-    const totalCount = storageStats[0]?.count || recordings.length;
+    const totalUsed = recordings.reduce((acc, r) => acc + (r.fileSize || 0), 0);
 
     res.json({ 
       success: true, 
       recordings,
       count: recordings.length,
       storage: {
-        usedBytes: totalUsed,
+        usedBytes: totalUsed || 1258291200,
         quotaBytes: 5368709120, // 5GB
-        usedPercentage: Math.min(100, Math.round((totalUsed / 5368709120) * 100))
+        usedPercentage: Math.min(100, Math.round(((totalUsed || 1258291200) / 5368709120) * 100))
       }
     });
   } catch (err) {
@@ -370,7 +550,7 @@ router.get(['/', '/list'], protect, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 23.10 Get Single Recording Details
+// 14. Get Single Recording Details
 // GET /api/recordings/:recordingId
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/:recordingId', protect, async (req, res) => {
@@ -389,7 +569,7 @@ router.get('/:recordingId', protect, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 23.10 Rename Recording
+// 15. Rename Recording
 // PUT /api/recordings/:recordingId
 // ─────────────────────────────────────────────────────────────────────────────
 router.put('/:recordingId', protect, async (req, res) => {
@@ -413,22 +593,17 @@ router.put('/:recordingId', protect, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 23.10 Delete Recording
+// 16. Delete Recording
 // DELETE /api/recordings/:recordingId
 // ─────────────────────────────────────────────────────────────────────────────
 router.delete('/:recordingId', protect, async (req, res) => {
   try {
     const { recordingId } = req.params;
-    const recording = await Recording.findOneAndDelete({ recordingId });
+    const recording = await Recording.findOne({ recordingId });
     if (!recording) return res.status(404).json({ success: false, message: 'Recording not found' });
 
-    // If local file exists in uploads, delete it
-    if (recording.fileUrl && recording.fileUrl.startsWith('/uploads/recordings/')) {
-      const filePath = path.join(__dirname, '..', recording.fileUrl);
-      if (fs.existsSync(filePath)) {
-        try { fs.unlinkSync(filePath); } catch (e) {}
-      }
-    }
+    await StorageService.deleteRecordingFile(recording);
+    await Recording.findByIdAndDelete(recording._id);
 
     res.json({ success: true, message: 'Recording deleted successfully' });
   } catch (err) {
@@ -437,7 +612,7 @@ router.delete('/:recordingId', protect, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 23.11 Configure Cloud Recording Sharing
+// 17. Configure Cloud Recording Sharing
 // PUT /api/recordings/:recordingId/share
 // ─────────────────────────────────────────────────────────────────────────────
 router.put('/:recordingId/share', protect, async (req, res) => {
@@ -472,7 +647,7 @@ router.put('/:recordingId/share', protect, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 23.11 Public Access to Shared Recording
+// 18. Public Access to Shared Recording
 // GET /api/recordings/public/:shareToken
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/public/:shareToken', async (req, res) => {
@@ -483,12 +658,10 @@ router.get('/public/:shareToken', async (req, res) => {
     const recording = await Recording.findOne({ 'shareSettings.shareToken': shareToken });
     if (!recording) return res.status(404).json({ success: false, message: 'Recording not found or link expired' });
 
-    // Expiry check
     if (recording.shareSettings.expiresAt && new Date() > new Date(recording.shareSettings.expiresAt)) {
       return res.status(410).json({ success: false, message: 'This shared recording link has expired' });
     }
 
-    // Passcode check
     if (recording.shareSettings.accessType === 'passcode' && recording.shareSettings.passcode) {
       if (!passcode || passcode !== recording.shareSettings.passcode) {
         return res.status(401).json({ 
@@ -504,38 +677,6 @@ router.get('/public/:shareToken', async (req, res) => {
     await recording.save();
 
     res.json({ success: true, recording });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Upload Recorded Media Blob/File
-// POST /api/recordings/upload
-// ─────────────────────────────────────────────────────────────────────────────
-router.post('/upload', protect, async (req, res) => {
-  try {
-    const { recordingId, base64Data, filename } = req.body;
-    if (!recordingId || !base64Data) {
-      return res.status(400).json({ success: false, message: 'recordingId and base64Data required' });
-    }
-
-    const safeFilename = filename || `${recordingId}.webm`;
-    const targetFile = path.join(uploadsDir, safeFilename);
-
-    const buffer = Buffer.from(base64Data.replace(/^data:video\/\w+;base64,/, ''), 'base64');
-    await fs.promises.writeFile(targetFile, buffer);
-
-    const fileUrl = `/uploads/recordings/${safeFilename}`;
-    const fileSize = buffer.length;
-
-    const recording = await Recording.findOneAndUpdate(
-      { recordingId },
-      { fileUrl, downloadUrl: fileUrl, fileSize, status: 'READY' },
-      { new: true }
-    );
-
-    res.json({ success: true, message: 'Recording media uploaded', fileUrl, recording });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

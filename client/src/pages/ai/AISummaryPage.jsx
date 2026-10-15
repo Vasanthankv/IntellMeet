@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { 
   Sparkles, BrainCircuit, RefreshCw, Share2, 
   ShieldCheck, Download, Plus, LayoutTemplate, AlertCircle
 } from 'lucide-react';
+import { API_BASE_URL } from '../../utils/apiConfig';
 import AISummaryCard from '../../components/ai/AISummaryCard';
 import ActionItemList from '../../components/ai/ActionItemList';
 import DecisionsList from '../../components/ai/DecisionsList';
@@ -11,25 +13,32 @@ import ShareSummaryModal from '../../components/ai/ShareSummaryModal';
 import toast from 'react-hot-toast';
 
 export default function AISummaryPage() {
+  const { meetingId } = useParams();
   const [summariesList, setSummariesList] = useState([]);
-  const [selectedMeetingId, setSelectedMeetingId] = useState('');
+  const [selectedMeetingId, setSelectedMeetingId] = useState(meetingId || '');
   const [currentSummary, setCurrentSummary] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState('GENERAL');
 
+  useEffect(() => {
+    if (meetingId) {
+      setSelectedMeetingId(meetingId);
+    }
+  }, [meetingId]);
+
   // Load list of past meeting summaries
   const fetchSummariesList = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/summaries/all/list', {
+      const res = await fetch(`${API_BASE_URL}/summaries/all/list`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       const data = await res.json();
       if (data.success && data.summaries) {
         setSummariesList(data.summaries);
-        if (data.summaries.length > 0 && !selectedMeetingId) {
+        if (data.summaries.length > 0 && !selectedMeetingId && !meetingId) {
           setSelectedMeetingId(data.summaries[0].meetingId);
         }
       }
@@ -53,7 +62,7 @@ export default function AISummaryPage() {
       setIsLoading(true);
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/summary`, {
+        const res = await fetch(`${API_BASE_URL}/meetings/${selectedMeetingId}/summary`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         });
         const data = await res.json();
@@ -84,7 +93,7 @@ export default function AISummaryPage() {
     const toastId = toast.loading('AI is processing transcript to generate meeting summary...');
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/summary/generate`, {
+      const res = await fetch(`${API_BASE_URL}/meetings/${selectedMeetingId}/summary/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ template: chosenTemplate })
@@ -109,7 +118,7 @@ export default function AISummaryPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/summary/approve`, {
+      const res = await fetch(`${API_BASE_URL}/meetings/${selectedMeetingId}/summary/approve`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -128,7 +137,7 @@ export default function AISummaryPage() {
     if (!selectedMeetingId) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/summary`, {
+      const res = await fetch(`${API_BASE_URL}/meetings/${selectedMeetingId}/summary`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ overview: newText })
@@ -148,7 +157,7 @@ export default function AISummaryPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/summary/action-items/${actionItemId}`, {
+      const res = await fetch(`${API_BASE_URL}/meetings/${selectedMeetingId}/summary/action-items/${actionItemId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ status: nextStatus })
@@ -173,7 +182,7 @@ export default function AISummaryPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/summary/action-items`, {
+      const res = await fetch(`${API_BASE_URL}/meetings/${selectedMeetingId}/summary/action-items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(newAction)
@@ -194,7 +203,7 @@ export default function AISummaryPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/summary/action-items/${actionItemId}`, {
+      const res = await fetch(`${API_BASE_URL}/meetings/${selectedMeetingId}/summary/action-items/${actionItemId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -217,7 +226,7 @@ export default function AISummaryPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/summary/decisions`, {
+      const res = await fetch(`${API_BASE_URL}/meetings/${selectedMeetingId}/summary/decisions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(newDec)
@@ -238,7 +247,7 @@ export default function AISummaryPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/summary/decisions/${decisionId}`, {
+      const res = await fetch(`${API_BASE_URL}/meetings/${selectedMeetingId}/summary/decisions/${decisionId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -258,7 +267,7 @@ export default function AISummaryPage() {
   // Share handlers (25.12, 25.13)
   const handleShareEmail = async (recipients) => {
     const token = localStorage.getItem('token');
-    const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/summary/share/email`, {
+    const res = await fetch(`${API_BASE_URL}/meetings/${selectedMeetingId}/summary/share/email`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ recipients })
@@ -273,7 +282,7 @@ export default function AISummaryPage() {
 
   const handleShareChat = async () => {
     const token = localStorage.getItem('token');
-    const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${selectedMeetingId}/summary/share/chat`, {
+    const res = await fetch(`${API_BASE_URL}/meetings/${selectedMeetingId}/summary/share/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
     });
