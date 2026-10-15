@@ -7391,7 +7391,7 @@ export default function MeetingRoom() {
 
       {/* Bottom Control Bar (Part 37 Theme Support) */}
       <div 
-        className="h-[68px] flex items-center justify-between px-3 shrink-0 transition-all duration-300 border-t relative"
+        className="h-[68px] flex items-center justify-between px-3 shrink-0 transition-all duration-300 border-t relative overflow-visible z-30"
         style={{
           backgroundColor: (THEMES.find(t => t.id === personalTheme) || THEMES[0]).toolbarBg,
           borderColor: (THEMES.find(t => t.id === personalTheme) || THEMES[0]).panelBg || '#333'
@@ -7443,10 +7443,12 @@ export default function MeetingRoom() {
 
               {/* Audio Context Popup Menu */}
               {showAudioMenu && (
-                <div 
-                  className="absolute bottom-full left-0 mb-3 w-72 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl shadow-2xl py-2 z-50 text-xs text-gray-300 divide-y divide-[#2F2F2F] select-none"
-                  onClick={(e) => e.stopPropagation()}
-                >
+                <>
+                  <div className="fixed inset-0 z-[90]" onClick={() => setShowAudioMenu(false)} />
+                  <div 
+                    className="absolute bottom-full left-0 mb-3 w-72 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl shadow-2xl py-2 z-[100] text-xs text-gray-300 divide-y divide-[#2F2F2F] select-none"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                   {/* Select Microphone (Section 7.3) */}
                   <div className="p-2 space-y-1">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 px-2 block">
@@ -7521,7 +7523,8 @@ export default function MeetingRoom() {
                     </button>
                   </div>
                 </div>
-              )}
+              </>
+            )}
             </div>
           )}
 
@@ -7545,7 +7548,9 @@ export default function MeetingRoom() {
 
             {/* Video Context Menu (Sections 8.2, 8.3, 8.5, 8.6, 8.7) */}
             {showVideoMenu && (
-              <div className="absolute bottom-full left-0 mb-3 w-64 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl shadow-2xl p-1 z-50 text-xs text-gray-200 divide-y divide-[#2F2F2F] animate-in fade-in zoom-in-95 duration-100">
+              <>
+                <div className="fixed inset-0 z-[90]" onClick={() => setShowVideoMenu(false)} />
+                <div className="absolute bottom-full left-0 mb-3 w-64 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl shadow-2xl p-1 z-[100] text-xs text-gray-200 divide-y divide-[#2F2F2F] animate-in fade-in zoom-in-95 duration-100">
                 {/* Select Camera Section (8.2) */}
                 <div className="p-2 space-y-1">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 px-2 block">
@@ -7621,12 +7626,13 @@ export default function MeetingRoom() {
                   </button>
                 </div>
               </div>
-            )}
+            </>
+          )}
           </div>
         </div>
 
-        {/* Center Controls (Horizontally responsive, scrollable if window is narrow) */}
-        <div className="flex items-center justify-center gap-1 sm:gap-1.5 flex-1 min-w-0 py-1 px-1 overflow-x-auto no-scrollbar">
+        {/* Center Controls (Horizontally responsive, overflow-visible so popovers are never clipped) */}
+        <div className="flex items-center justify-center gap-1 sm:gap-1.5 flex-1 min-w-0 py-1 px-1 overflow-visible">
           {/* Host Security Panel Button */}
           <button 
             id="security-toolbar-button"
@@ -7716,7 +7722,9 @@ export default function MeetingRoom() {
 
             {/* Screen Sharing Popover Menu (13.10 & 13.11) */}
             {showShareChevronMenu && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl shadow-2xl p-2 z-50 text-xs text-gray-200 space-y-1 animate-in fade-in zoom-in-95 duration-100">
+              <>
+                <div className="fixed inset-0 z-[90]" onClick={() => setShowShareChevronMenu(false)} />
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl shadow-2xl p-2 z-[100] text-xs text-gray-200 space-y-1 animate-in fade-in zoom-in-95 duration-100">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2 py-1 block border-b border-[#333]">
                   Sharing Permissions (Host Tools)
                 </span>
@@ -7815,7 +7823,8 @@ export default function MeetingRoom() {
                   <Sliders className="w-3.5 h-3.5" />
                 </button>
               </div>
-            )}
+            </>
+          )}
           </div>
 
           {/* Part 15: Annotation Toggle Toolbar Button (15.1, 15.11) - Only visible when screen sharing */}
@@ -7916,8 +7925,8 @@ export default function MeetingRoom() {
             
             {showReactions && (
               <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowReactions(false)} />
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl shadow-2xl p-3 z-50 flex flex-col gap-3 w-72 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100">
+                <div className="fixed inset-0 z-[90]" onClick={() => setShowReactions(false)} />
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl shadow-2xl p-3 z-[100] flex flex-col gap-3 w-72 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100">
                 {/* Tier 1: Emoji Reactions (12.1, 12.11) */}
                 <div>
                   <div className="flex items-center justify-between pb-1.5 mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-[#333]">
@@ -8070,7 +8079,9 @@ export default function MeetingRoom() {
 
             {/* Captions Popover Menu */}
             {showCaptionsChevronMenu && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-64 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl shadow-2xl p-2 z-50 text-xs text-gray-200 space-y-1 animate-in fade-in zoom-in-95 duration-100">
+              <>
+                <div className="fixed inset-0 z-[90]" onClick={() => setShowCaptionsChevronMenu(false)} />
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-64 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl shadow-2xl p-2 z-[100] text-xs text-gray-200 space-y-1 animate-in fade-in zoom-in-95 duration-100">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2 py-1 block border-b border-[#333]">
                   Live Caption Controls
                 </span>
@@ -8150,7 +8161,8 @@ export default function MeetingRoom() {
                   </div>
                 )}
               </div>
-            )}
+            </>
+          )}
           </div>
 
           {/* Part 21: In-Meeting Toolbar Translation Button */}
@@ -8270,9 +8282,9 @@ export default function MeetingRoom() {
 
             {showMoreMenu && (
               <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowMoreMenu(false)} />
+                <div className="fixed inset-0 z-[90]" onClick={() => setShowMoreMenu(false)} />
                 <div 
-                  className="absolute bottom-full right-0 mb-3 w-72 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl shadow-2xl p-2 z-50 text-xs text-gray-200 divide-y divide-[#2F2F2F] animate-in fade-in zoom-in-95 duration-100 max-h-[80vh] overflow-y-auto no-scrollbar"
+                  className="absolute bottom-full right-0 mb-3 w-72 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl shadow-2xl p-2 z-[100] text-xs text-gray-200 divide-y divide-[#2F2F2F] animate-in fade-in zoom-in-95 duration-100 max-h-[80vh] overflow-y-auto no-scrollbar"
                   onClick={(e) => e.stopPropagation()}
                 >
                 {/* Section 1: Collaboration & Tools */}
@@ -8577,37 +8589,40 @@ export default function MeetingRoom() {
           <div className="relative">
             {/* Dropdown panel — opens above the button */}
             {showLeaveDropdown && (
-              <div className="absolute bottom-full right-0 mb-2 w-56 bg-[#1A1A1A] border border-[#3A3A3A] rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
-                {/* Host-only: End for all */}
-                {isHost && (
+              <>
+                <div className="fixed inset-0 z-[90]" onClick={() => setShowLeaveDropdown(false)} />
+                <div className="absolute bottom-full right-0 mb-2 w-56 bg-[#1A1A1A] border border-[#3A3A3A] rounded-xl shadow-2xl overflow-hidden z-[100] animate-in fade-in slide-in-from-bottom-2 duration-150">
+                  {/* Host-only: End for all */}
+                  {isHost && (
+                    <button
+                      onClick={() => { setShowLeaveDropdown(false); endMeetingForAll(); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-[13px] font-semibold text-white bg-[#E02828] hover:bg-[#C01F1F] transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                      End Meeting for All
+                    </button>
+                  )}
+                  {/* Divider only when host (both options visible) */}
+                  {isHost && <div className="h-px bg-[#333]" />}
+                  {/* Leave meeting (both host & participants) */}
                   <button
-                    onClick={() => { setShowLeaveDropdown(false); endMeetingForAll(); }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-[13px] font-semibold text-white bg-[#E02828] hover:bg-[#C01F1F] transition-colors"
+                    onClick={() => { setShowLeaveDropdown(false); leaveMeeting(); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-[13px] font-semibold text-[#E02828] hover:bg-[#2A2A2A] transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    Leave Meeting
+                  </button>
+                  {/* Cancel */}
+                  <div className="h-px bg-[#333]" />
+                  <button
+                    onClick={() => setShowLeaveDropdown(false)}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-[13px] text-gray-400 hover:bg-[#2A2A2A] transition-colors"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-                    End Meeting for All
+                    Cancel
                   </button>
-                )}
-                {/* Divider only when host (both options visible) */}
-                {isHost && <div className="h-px bg-[#333]" />}
-                {/* Leave meeting (both host & participants) */}
-                <button
-                  onClick={() => { setShowLeaveDropdown(false); leaveMeeting(); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-[13px] font-semibold text-[#E02828] hover:bg-[#2A2A2A] transition-colors"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                  Leave Meeting
-                </button>
-                {/* Cancel */}
-                <div className="h-px bg-[#333]" />
-                <button
-                  onClick={() => setShowLeaveDropdown(false)}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-[13px] text-gray-400 hover:bg-[#2A2A2A] transition-colors"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-                  Cancel
-                </button>
-              </div>
+                </div>
+              </>
             )}
 
             {/* Red button row: [  End / Leave ▲ ] */}

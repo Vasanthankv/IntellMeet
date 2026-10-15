@@ -21,8 +21,8 @@ export default function RecordingMenuPopover({
 
   return (
     <>
-      <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-80 bg-[#1A1A1A] border border-[#333] rounded-2xl shadow-2xl p-3 z-50 text-gray-200 space-y-3 animate-in fade-in zoom-in-95 duration-150">
+      <div className="fixed inset-0 z-[90]" onClick={onClose} />
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-80 bg-[#1A1A1A] border border-[#333] rounded-2xl shadow-2xl p-3 z-[100] text-gray-200 space-y-3 animate-in fade-in zoom-in-95 duration-150">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-white/10 pb-2">
         <div className="flex items-center gap-2">
