@@ -541,6 +541,13 @@ export default function RecordingsPage() {
                   <Share2 className="w-3.5 h-3.5" /> Share
                 </button>
                 <button
+                  onClick={() => handleDelete(selectedRecording.recordingId)}
+                  className="px-3 py-1.5 rounded-xl bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300 border border-red-500/30 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Delete Recording"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Delete
+                </button>
+                <button
                   onClick={() => setSelectedRecording(null)}
                   className="p-1.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
                 >
