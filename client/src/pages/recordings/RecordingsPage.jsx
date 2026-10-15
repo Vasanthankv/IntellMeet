@@ -16,11 +16,13 @@ export default function RecordingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('cloud'); // 'cloud' | 'local'
   const [searchQuery, setSearchQuery] = useState('');
-  const [storageStats, setStorageStats] = useState({ usedBytes: 1258291200, quotaBytes: 5368709120, usedPercentage: 24 });
+  const [storageStats, setStorageStats] = useState({ usedBytes: 0, quotaBytes: 5368709120, usedPercentage: 0 });
   
   // Selected recording for player modal
   const [selectedRecording, setSelectedRecording] = useState(null);
   const [playerTab, setPlayerTab] = useState('summary'); // 'summary' | 'decisions' | 'actions' | 'transcript' | 'chat'
+  const [recordingTranscript, setRecordingTranscript] = useState([]);
+  const [isLoadingTranscript, setIsLoadingTranscript] = useState(false);
   
   // Share modal state
   const [shareRecording, setShareRecording] = useState(null);
@@ -50,6 +52,29 @@ export default function RecordingsPage() {
     setVideoLoadError(false);
     setIsPlaying(false);
     setCurrentTime(0);
+    setRecordingTranscript([]);
+
+    if (selectedRecording?.recordingId) {
+      setIsLoadingTranscript(true);
+      const token = localStorage.getItem('token') || localStorage.getItem('intellmeet_token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      fetch(`${API_BASE_URL}/recordings/${selectedRecording.recordingId}/transcript`, { headers })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && Array.isArray(data.segments)) {
+            setRecordingTranscript(data.segments);
+          } else {
+            setRecordingTranscript([]);
+          }
+        })
+        .catch(err => {
+          console.error("Error fetching recording transcript:", err);
+          setRecordingTranscript([]);
+        })
+        .finally(() => {
+          setIsLoadingTranscript(false);
+        });
+    }
   }, [selectedRecording?.recordingId]);
 
   const handleLocalFileSelect = (e) => {
@@ -365,7 +390,7 @@ export default function RecordingsPage() {
 
                   {/* Duration Tag */}
                   <span className="absolute bottom-3 right-3 bg-black/80 backdrop-blur-sm text-white font-mono text-[11px] font-bold px-2 py-0.5 rounded-md">
-                    {formatSecs(rec.duration || 120)}
+                    {formatSecs(rec.duration || 0)}
                   </span>
 
                   {/* Mode & Status Badge */}
@@ -437,9 +462,9 @@ export default function RecordingsPage() {
                       </span>
                       <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3 text-gray-400" />
-                        {formatSecs(rec.duration || 120)}
+                        {formatSecs(rec.duration || 0)}
                       </span>
-                      <span>{formatBytes(rec.fileSize || 15728640)}</span>
+                      <span>{formatBytes(rec.fileSize || 0)}</span>
                     </div>
 
                     {/* AI Preview badge */}
@@ -589,7 +614,6 @@ export default function RecordingsPage() {
                         ? (selectedRecording.fileUrl.startsWith('http') ? selectedRecording.fileUrl : `${SERVER_BASE_URL}${selectedRecording.fileUrl}`)
                         : `${SERVER_BASE_URL}/api/recordings/${selectedRecording.recordingId}/stream`)
                     }
-                    crossOrigin="anonymous"
                     onError={() => {
                       if (!localFileBlobUrl) setVideoLoadError(true);
                     }}
@@ -686,7 +710,7 @@ export default function RecordingsPage() {
                         {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                       </button>
                       <span className="font-mono text-[11px] text-gray-300">
-                        {formatSecs(currentTime)} / {formatSecs(duration || selectedRecording.duration || 120)}
+                        {formatSecs(currentTime)} / {formatSecs(duration || selectedRecording.duration || 0)}
                       </span>
                     </div>
 
@@ -740,92 +764,122 @@ export default function RecordingsPage() {
                 <div className="p-5 flex-1 overflow-y-auto space-y-4 text-xs">
                   {playerTab === 'summary' && (
                     <div className="space-y-4">
-                      <div className="p-3.5 bg-purple-950/30 border border-purple-800/40 rounded-2xl text-purple-200">
-                        <span className="font-bold uppercase tracking-wider text-[10px] text-purple-400 block mb-1">
-                          Executive Overview
-                        </span>
-                        <p className="leading-relaxed text-[11px]">
-                          {selectedRecording.aiMetadata?.summary || 'Executive summary generated from real-time session audio. Key architectural milestones and recording policies reviewed.'}
-                        </p>
-                      </div>
+                      {selectedRecording.aiMetadata?.summary ? (
+                        <div className="p-3.5 bg-purple-950/30 border border-purple-800/40 rounded-2xl text-purple-200">
+                          <span className="font-bold uppercase tracking-wider text-[10px] text-purple-400 block mb-1">
+                            Executive Overview
+                          </span>
+                          <p className="leading-relaxed text-[11px]">
+                            {selectedRecording.aiMetadata.summary}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="p-6 text-center text-gray-400 bg-white/5 rounded-2xl border border-white/10">
+                          <Sparkles className="w-6 h-6 mx-auto mb-2 text-purple-400 opacity-60" />
+                          <p className="text-xs font-semibold text-gray-300">No AI Summary available</p>
+                          <p className="text-[11px] text-gray-500 mt-1">AI summaries are generated from real spoken meeting transcripts.</p>
+                        </div>
+                      )}
 
-                      <div className="space-y-2">
-                        <span className="font-bold text-gray-300 block text-xs">Highlights</span>
-                        <ul className="list-disc list-inside space-y-1 text-gray-400 text-[11px]">
-                          <li>Meeting opened with review of media pipeline & WebRTC streaming</li>
-                          <li>Evaluated Cloud storage allocations and local computer recording</li>
-                          <li>Confirmed 100% compliance with Zoom recording architecture specification</li>
-                        </ul>
-                      </div>
+                      {selectedRecording.aiMetadata?.highlights?.length > 0 && (
+                        <div className="space-y-2">
+                          <span className="font-bold text-gray-300 block text-xs">Highlights</span>
+                          <ul className="list-disc list-inside space-y-1 text-gray-400 text-[11px]">
+                            {selectedRecording.aiMetadata.highlights.map((hl, i) => (
+                              <li key={i}>{hl}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {playerTab === 'decisions' && (
                     <div className="space-y-2.5">
                       <span className="font-bold text-gray-300 block text-xs">Key Meeting Decisions</span>
-                      {(selectedRecording.aiMetadata?.decisions?.length > 0 ? selectedRecording.aiMetadata.decisions : [
-                        'Agreed on dual-recording architecture (Local Computer & Cloud Recording)',
-                        'Established 20% ducking mix level for interpretation background audio',
-                        'Approved deployment schedule for upcoming production release'
-                      ]).map((dec, i) => (
-                        <div key={i} className="p-3 bg-[#242424] border border-white/5 rounded-xl flex items-start gap-2.5">
-                          <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
-                            <Check className="w-3 h-3" />
+                      {selectedRecording.aiMetadata?.decisions?.length > 0 ? (
+                        selectedRecording.aiMetadata.decisions.map((dec, i) => (
+                          <div key={i} className="p-3 bg-[#242424] border border-white/5 rounded-xl flex items-start gap-2.5">
+                            <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                              <Check className="w-3 h-3" />
+                            </div>
+                            <span className="text-gray-200 text-xs leading-snug">{dec}</span>
                           </div>
-                          <span className="text-gray-200 text-xs leading-snug">{dec}</span>
+                        ))
+                      ) : (
+                        <div className="p-6 text-center text-gray-400 bg-white/5 rounded-2xl border border-white/10">
+                          <CheckSquare className="w-6 h-6 mx-auto mb-2 text-emerald-400 opacity-60" />
+                          <p className="text-xs font-semibold text-gray-300">No decisions recorded</p>
+                          <p className="text-[11px] text-gray-500 mt-1">Decisions made during the meeting will appear here.</p>
                         </div>
-                      ))}
+                      )}
                     </div>
                   )}
 
                   {playerTab === 'actions' && (
                     <div className="space-y-2.5">
                       <span className="font-bold text-gray-300 block text-xs">Action Items & Deliverables</span>
-                      {(selectedRecording.aiMetadata?.actionItems?.length > 0 ? selectedRecording.aiMetadata.actionItems : [
-                        { task: 'Distribute cloud recording playback link to participants', assignee: 'Host', dueDate: 'Today' },
-                        { task: 'Verify cloud storage quota allocations', assignee: 'DevOps / Admin', dueDate: 'Tomorrow' },
-                        { task: 'Prepare slide deck for subsequent sync', assignee: 'Presenter', dueDate: 'Friday' }
-                      ]).map((item, i) => (
-                        <div key={i} className="p-3 bg-[#242424] border border-white/5 rounded-xl flex items-start justify-between gap-3">
-                          <div className="flex items-start gap-2.5">
-                            <input type="checkbox" className="mt-1 accent-purple-600 rounded" />
-                            <div>
-                              <span className="font-semibold text-white block text-xs">{item.task}</span>
-                              <span className="text-[10px] text-gray-400">Assignee: {item.assignee}</span>
+                      {selectedRecording.aiMetadata?.actionItems?.length > 0 ? (
+                        selectedRecording.aiMetadata.actionItems.map((item, i) => (
+                          <div key={i} className="p-3 bg-[#242424] border border-white/5 rounded-xl flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-2.5">
+                              <input type="checkbox" className="mt-1 accent-purple-600 rounded" />
+                              <div>
+                                <span className="font-semibold text-white block text-xs">{item.task || item.text || item}</span>
+                                {item.assignee && <span className="text-[10px] text-gray-400">Assignee: {item.assignee}</span>}
+                              </div>
                             </div>
+                            {item.dueDate && (
+                              <span className="text-[10px] bg-purple-950 text-purple-300 px-2 py-0.5 rounded border border-purple-800/50 shrink-0">
+                                {item.dueDate}
+                              </span>
+                            )}
                           </div>
-                          <span className="text-[10px] bg-purple-950 text-purple-300 px-2 py-0.5 rounded border border-purple-800/50 shrink-0">
-                            {item.dueDate}
-                          </span>
+                        ))
+                      ) : (
+                        <div className="p-6 text-center text-gray-400 bg-white/5 rounded-2xl border border-white/10">
+                          <CheckSquare className="w-6 h-6 mx-auto mb-2 text-blue-400 opacity-60" />
+                          <p className="text-xs font-semibold text-gray-300">No action items detected</p>
+                          <p className="text-[11px] text-gray-500 mt-1">Action items assigned during the meeting will appear here.</p>
                         </div>
-                      ))}
+                      )}
                     </div>
                   )}
 
                   {playerTab === 'transcript' && (
                     <div className="space-y-2">
-                      <span className="font-bold text-gray-300 block text-xs">Searchable Transcript (23.17)</span>
-                      {[
-                        { time: '00:05', speaker: 'Host', text: 'Welcome everyone to our IntellMeet project session.' },
-                        { time: '00:18', speaker: 'Host', text: 'Today we are reviewing the full recording architecture including local and cloud options.' },
-                        { time: '00:42', speaker: 'Priya', text: 'The dual recording modes provide great flexibility for participants without cloud quota.' },
-                        { time: '01:10', speaker: 'Host', text: 'Exactly. Cloud recordings will automatically generate transcripts and AI summaries.' }
-                      ].map((seg, i) => (
-                        <div 
-                          key={i} 
-                          onClick={() => {
-                            const [m, s] = seg.time.split(':').map(Number);
-                            if (videoRef.current) videoRef.current.currentTime = m * 60 + s;
-                          }}
-                          className="p-2.5 rounded-xl hover:bg-white/5 cursor-pointer border border-transparent hover:border-white/5 transition-all"
-                        >
-                          <div className="flex items-center justify-between text-[10px] text-gray-400 mb-0.5">
-                            <span className="font-bold text-purple-400">{seg.speaker}</span>
-                            <span className="font-mono text-gray-500">{seg.time}</span>
+                      <span className="font-bold text-gray-300 block text-xs">Searchable Transcript</span>
+                      {isLoadingTranscript ? (
+                        <div className="p-6 text-center text-gray-400">Loading transcript...</div>
+                      ) : recordingTranscript.length > 0 ? (
+                        recordingTranscript.map((seg, i) => (
+                          <div 
+                            key={i} 
+                            onClick={() => {
+                              if (seg.seconds !== undefined && videoRef.current) {
+                                videoRef.current.currentTime = seg.seconds;
+                              } else if (seg.time && videoRef.current) {
+                                const parts = seg.time.split(':').map(Number);
+                                const s = parts.length === 2 ? parts[0] * 60 + parts[1] : parts[0] * 3600 + parts[1] * 60 + parts[2];
+                                videoRef.current.currentTime = s;
+                              }
+                            }}
+                            className="p-2.5 rounded-xl hover:bg-white/5 cursor-pointer border border-transparent hover:border-white/5 transition-all"
+                          >
+                            <div className="flex items-center justify-between text-[10px] text-gray-400 mb-0.5">
+                              <span className="font-bold text-purple-400">{seg.speaker || 'Participant'}</span>
+                              <span className="font-mono text-gray-500">{seg.time || '00:00'}</span>
+                            </div>
+                            <p className="text-gray-300 text-xs">{seg.text}</p>
                           </div>
-                          <p className="text-gray-300 text-xs">{seg.text}</p>
+                        ))
+                      ) : (
+                        <div className="p-6 text-center text-gray-400 bg-white/5 rounded-2xl border border-white/10">
+                          <FileText className="w-6 h-6 mx-auto mb-2 text-purple-400 opacity-60" />
+                          <p className="text-xs font-semibold text-gray-300">No transcript available</p>
+                          <p className="text-[11px] text-gray-500 mt-1">Spoken speech from participants will be transcribed here when captions or microphone audio are recorded.</p>
                         </div>
-                      ))}
+                      )}
                     </div>
                   )}
                 </div>

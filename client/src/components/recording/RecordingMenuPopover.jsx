@@ -15,7 +15,7 @@ export default function RecordingMenuPopover({
   onChangeLayout,
   canRecordLocal = true,
   canRecordCloud = true,
-  storageStats = { usedBytes: 1258291200, quotaBytes: 5368709120, usedPercentage: 24 }
+  storageStats = { usedBytes: 0, quotaBytes: 5368709120, usedPercentage: 0 }
 }) {
   if (!isOpen) return null;
 

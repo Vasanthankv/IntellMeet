@@ -31,22 +31,39 @@ export const AIPipelineService = {
 
       let segments = transcriptDoc.segments || [];
 
-      // If segments were captured during meeting via speech recognition
+      // If no segments were captured during meeting
       if (segments.length === 0) {
-        console.log(`[AIPipeline] No live transcript segments found for ${meetingId}. Generating baseline meeting context.`);
-        segments = [
-          { speakerName: 'Host', text: `Welcome everyone to ${meetingTitle}. Today we are reviewing project objectives, milestone deliverables, and key decisions.`, startTime: 0, endTime: 12 },
-          { speakerName: 'Engineering', text: 'All core WebRTC, audio mixing, and recording storage components have been integrated and validated.', startTime: 14, endTime: 28 },
-          { speakerName: 'Product', text: 'The enterprise administration console, plan management, and billing workflows are operational.', startTime: 30, endTime: 45 },
-          { speakerName: 'Host', text: 'Excellent progress. Let us confirm the next sprint goals and deploy to production.', startTime: 47, endTime: 58 }
-        ];
+        console.log(`[AIPipeline] No live transcript segments found for ${meetingId}. Setting truthful empty state.`);
+        let summaryDoc = await MeetingSummary.findOne({ meetingId }).sort({ createdAt: -1 });
+        if (!summaryDoc) {
+          summaryDoc = new MeetingSummary({ meetingId, meetingTitle });
+        }
+        summaryDoc.status = 'COMPLETED';
+        summaryDoc.overview = '';
+        summaryDoc.keyDiscussionPoints = [];
+        summaryDoc.decisions = [];
+        summaryDoc.actionItems = [];
+        summaryDoc.questions = [];
+        await summaryDoc.save();
 
-        transcriptDoc.segments = segments;
-        transcriptDoc.status = 'COMPLETED';
-        await transcriptDoc.save();
+        if (recordingId) {
+          await Recording.findOneAndUpdate(
+            { recordingId },
+            {
+              processingStatus: 'COMPLETED',
+              aiMetadata: {
+                transcriptId: transcriptDoc._id.toString(),
+                summary: '',
+                decisions: [],
+                actionItems: []
+              }
+            }
+          );
+        }
+        return { success: true, message: 'No transcript segments recorded for this meeting', summary: summaryDoc };
       }
 
-      // 2. Generate structured AI Summary via Gemini
+      // 2. Generate structured AI Summary via Gemini from REAL segments
       const formattedTranscript = segments.map((s, idx) => {
         const mins = Math.floor((s.startTime || idx * 10) / 60);
         const secs = String(Math.floor((s.startTime || idx * 10) % 60)).padStart(2, '0');
@@ -63,27 +80,27 @@ You are an executive corporate meeting intelligence assistant for IntellMeet.
 Meeting Title: ${meetingTitle}
 Meeting ID: ${meetingId}
 
-Analyze this transcript and produce a high-value meeting summary:
+Analyze this actual meeting transcript and produce a factual, high-value summary based strictly on what was spoken:
 ${formattedTranscript}
 
 Return ONLY valid JSON with this exact schema (no markdown, no backticks, raw JSON):
 {
-  "overview": "A 2-4 sentence executive overview of the meeting",
-  "keyDiscussionPoints": ["Discussion point 1", "Discussion point 2", "Discussion point 3"],
+  "overview": "A 2-4 sentence executive overview of the meeting based strictly on the transcript",
+  "keyDiscussionPoints": ["Discussion point 1", "Discussion point 2"],
   "decisions": [
     {
-      "description": "Clear statement of the decision made",
+      "description": "Clear statement of actual decision made",
       "decidedBy": ["Name"]
     }
   ],
   "actionItems": [
     {
-      "task": "Actionable task description",
-      "assignee": "Responsible person name",
-      "dueDate": "Deadline or timeframe"
+      "task": "Actionable task mentioned",
+      "assignee": "Responsible person if mentioned or Unassigned",
+      "dueDate": "Deadline if mentioned or null"
     }
   ],
-  "openQuestions": ["Unresolved question or follow up"]
+  "openQuestions": ["Unresolved question mentioned"]
 }
 `;
 
@@ -91,31 +108,21 @@ Return ONLY valid JSON with this exact schema (no markdown, no backticks, raw JS
           const rawText = response.response?.text() || '';
           const cleanedJson = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
           aiResult = JSON.parse(cleanedJson);
-          console.log('[AIPipeline] Gemini summary generated successfully.');
+          console.log('[AIPipeline] Gemini summary generated successfully from real transcript.');
         } catch (geminiErr) {
-          console.warn('[AIPipeline] Gemini generation warning, using structured fallback:', geminiErr.message);
+          console.warn('[AIPipeline] Gemini generation warning, synthesizing factual overview from real text:', geminiErr.message);
         }
       }
 
       if (!aiResult) {
+        // Honest summary from real segments without hallucinating names
+        const sampleText = segments.slice(0, 3).map(s => s.text).join(' ');
         aiResult = {
-          overview: `Executive summary for ${meetingTitle}: The team met to align on deliverables, reviewed the media recording and persistence architecture, and confirmed subsequent milestones for upcoming deployment.`,
-          keyDiscussionPoints: [
-            'Reviewed multi-participant WebRTC recording and audio ducking pipeline',
-            'Verified persistent storage synchronization and playback range streaming',
-            'Confirmed enterprise billing, license pools, and compliance settings'
-          ],
-          decisions: [
-            { description: 'Approved persistent recording architecture for high-resolution playback', decidedBy: ['Team Lead'] },
-            { description: 'Scheduled final end-to-end integration verification', decidedBy: ['Host'] }
-          ],
-          actionItems: [
-            { task: 'Distribute meeting playback and transcript link to attendees', assignee: 'Host', dueDate: 'Today' },
-            { task: 'Monitor cloud storage quota allocations', assignee: 'Admin', dueDate: 'Tomorrow' }
-          ],
-          openQuestions: [
-            'Will international dial-in numbers be added in the next sprint?'
-          ]
+          overview: sampleText ? `Summary based on recorded discussion: ${sampleText.slice(0, 200)}...` : '',
+          keyDiscussionPoints: segments.slice(0, 5).map(s => s.text.slice(0, 100)),
+          decisions: [],
+          actionItems: [],
+          openQuestions: []
         };
       }
 

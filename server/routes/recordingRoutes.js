@@ -363,7 +363,10 @@ router.post(['/:recordingId/media', '/upload'], protect, express.raw({ type: ['v
     recording.fileSize = storageResult.size;
     recording.status = 'READY';
     recording.processingStatus = 'TRANSCRIBING';
-    if (!recording.duration || recording.duration === 0) {
+    const clientDuration = parseInt(req.query.duration || req.headers['x-recording-duration'], 10);
+    if (clientDuration && clientDuration > 0) {
+      recording.duration = clientDuration;
+    } else if (!recording.duration || recording.duration === 0) {
       // Estimate duration if missing: 1MB ~= 8s for standard 720p/15fps webm
       recording.duration = Math.max(2, Math.round(storageResult.size / 130000));
     }
@@ -391,7 +394,7 @@ router.post(['/:recordingId/media', '/upload'], protect, express.raw({ type: ['v
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 10. HTTP Range Video Streaming (HTML5 Video Player Scrubbing)
+// 10. HTTP Range Video Streaming (HTML5 Video Player Scrubbing) with Full CORS
 // GET /api/recordings/:recordingId/stream
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/:recordingId/stream', async (req, res) => {
@@ -414,6 +417,13 @@ router.get('/:recordingId/stream', async (req, res) => {
     const { size, mimeType, isGridFS } = mediaInfo;
     const range = req.headers.range;
 
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+      'Access-Control-Allow-Headers': 'Range, Authorization, Content-Type, Origin, Accept',
+      'Access-Control-Expose-Headers': 'Content-Range, Content-Length, Accept-Ranges'
+    };
+
     if (isGridFS) {
       if (range) {
         const parts = range.replace(/bytes=/, '').split('-');
@@ -422,6 +432,7 @@ router.get('/:recordingId/stream', async (req, res) => {
         const chunkSize = (end - start) + 1;
 
         res.writeHead(206, {
+          ...corsHeaders,
           'Content-Range': `bytes ${start}-${end}/${size}`,
           'Accept-Ranges': 'bytes',
           'Content-Length': chunkSize,
@@ -432,6 +443,7 @@ router.get('/:recordingId/stream', async (req, res) => {
         downloadStream.pipe(res);
       } else {
         res.writeHead(200, {
+          ...corsHeaders,
           'Content-Length': size,
           'Content-Type': mimeType,
           'Accept-Ranges': 'bytes'
@@ -448,6 +460,7 @@ router.get('/:recordingId/stream', async (req, res) => {
         const chunkSize = (end - start) + 1;
 
         res.writeHead(206, {
+          ...corsHeaders,
           'Content-Range': `bytes ${start}-${end}/${size}`,
           'Accept-Ranges': 'bytes',
           'Content-Length': chunkSize,
@@ -457,6 +470,7 @@ router.get('/:recordingId/stream', async (req, res) => {
         fs.createReadStream(mediaInfo.filePath, { start, end }).pipe(res);
       } else {
         res.writeHead(200, {
+          ...corsHeaders,
           'Content-Length': size,
           'Content-Type': mimeType,
           'Accept-Ranges': 'bytes'
@@ -466,6 +480,37 @@ router.get('/:recordingId/stream', async (req, res) => {
     }
   } catch (err) {
     console.error('Streaming error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 10b. Get Real Transcript for Recording
+// GET /api/recordings/:recordingId/transcript
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/:recordingId/transcript', protect, async (req, res) => {
+  try {
+    const { recordingId } = req.params;
+    const recording = await Recording.findOne({ recordingId });
+    if (!recording) return res.status(404).json({ success: false, message: 'Recording not found' });
+
+    const transcript = await MeetingTranscript.findOne({ meetingId: recording.meetingId }).sort({ createdAt: -1 });
+    const segments = (transcript?.segments || []).map((s, idx) => ({
+      segmentId: s.segmentId || String(idx),
+      speaker: s.speakerName || 'Speaker',
+      text: s.text,
+      time: s.startTime !== undefined 
+        ? `${String(Math.floor(s.startTime / 60)).padStart(2, '0')}:${String(Math.floor(s.startTime % 60)).padStart(2, '0')}`
+        : `${String(Math.floor((idx * 4) / 60)).padStart(2, '0')}:${String(Math.floor((idx * 4) % 60)).padStart(2, '0')}`
+    }));
+
+    res.json({
+      success: true,
+      recordingId,
+      meetingId: recording.meetingId,
+      segments
+    });
+  } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -564,9 +609,9 @@ router.get(['/', '/list'], protect, async (req, res) => {
       recordings,
       count: recordings.length,
       storage: {
-        usedBytes: totalUsed || 1258291200,
+        usedBytes: totalUsed,
         quotaBytes: 5368709120, // 5GB
-        usedPercentage: Math.min(100, Math.round(((totalUsed || 1258291200) / 5368709120) * 100))
+        usedPercentage: Math.min(100, Math.round((totalUsed / 5368709120) * 100))
       }
     });
   } catch (err) {

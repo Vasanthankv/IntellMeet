@@ -156,7 +156,7 @@ export default function ShareSummaryModal({
             <div className="flex items-center gap-2">
               <input
                 type="text"
-                placeholder="Enter emails (e.g. dev@company.com, arun@gmail.com)"
+                placeholder="Enter emails (e.g. dev@company.com, team@company.com)"
                 value={emailRecipients}
                 onChange={(e) => setEmailRecipients(e.target.value)}
                 className="flex-1 bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"

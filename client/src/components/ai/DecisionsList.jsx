@@ -67,7 +67,7 @@ export default function DecisionsList({
           />
           <input
             type="text"
-            placeholder="Decided by participants (comma separated, e.g. Vasanthan, Arun)"
+            placeholder="Decided by participants (comma separated, e.g. Alex, Sam)"
             value={participants}
             onChange={(e) => setParticipants(e.target.value)}
             className="w-full text-xs p-2 bg-white border border-gray-300 rounded-lg focus:outline-none"

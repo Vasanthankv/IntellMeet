@@ -111,15 +111,18 @@ router.post('/:recordingId/smart/generate', protect, async (req, res) => {
     const transcriptDoc = await MeetingTranscript.findOne({ meetingId: smartRec.meetingId }).sort({ createdAt: -1 });
     let segments = transcriptDoc?.segments || [];
 
-    // Fallback dialogue segments if transcript is not yet populated
     if (segments.length === 0) {
-      segments = [
-        { speakerName: 'Host (Arun)', text: 'Welcome everyone to our project architecture and deployment review.', startTime: 0, endTime: 15 },
-        { speakerName: 'Lead Engineer (Priya)', text: 'I completed the backend microservices and database migration scripts.', startTime: 45, endTime: 75 },
-        { speakerName: 'DevOps (Vasanthan)', text: 'We evaluated AWS versus Azure and decided to proceed with AWS Elastic Beanstalk.', startTime: 120, endTime: 165 },
-        { speakerName: 'QA Lead (Kiran)', text: 'Database load testing will be conducted on Friday morning prior to production rollout.', startTime: 210, endTime: 250 },
-        { speakerName: 'Host (Arun)', text: 'Great. Let us make sure AWS credentials and billing alerts are set up before Thursday.', startTime: 280, endTime: 320 }
-      ];
+      smartRec.status = 'COMPLETED';
+      smartRec.highlights = [];
+      smartRec.chapters = [];
+      smartRec.nextSteps = [];
+      smartRec.topics = [];
+      await smartRec.save();
+      return res.json({
+        success: true,
+        message: 'No transcript segments available for this recording yet.',
+        smartRecording: smartRec
+      });
     }
 
     const formattedTranscript = segments.map(s => 

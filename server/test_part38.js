@@ -75,7 +75,7 @@ async function runTests() {
       body: JSON.stringify({
         sessionId: `sess_p2_${Date.now()}`,
         userId: 'user_p2',
-        userName: 'Priya Sharma',
+        userName: 'Participant Two',
         meetingId: testMeetingId,
         bandwidthUp: 0.8,
         bandwidthDown: 1.4,

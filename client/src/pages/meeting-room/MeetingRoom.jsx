@@ -3271,16 +3271,17 @@ export default function MeetingRoom() {
             const token = getAuthToken();
             const uploadHeaders = {
               'Content-Type': recResult.mimeType || 'video/webm',
+              'X-Recording-Duration': String(recResult.duration || 0),
               ...(token ? { Authorization: `Bearer ${token}` } : {})
             };
-            const uploadRes = await fetch(`${SOCKET_SERVER_URL}/api/recordings/${recordingIdToFinalize}/media?meetingId=${encodeURIComponent(meetingId)}&title=${encodeURIComponent(meetingInfo?.title || meetingTitle || 'IntellMeet Session')}`, {
+            const uploadRes = await fetch(`${SOCKET_SERVER_URL}/api/recordings/${recordingIdToFinalize}/media?meetingId=${encodeURIComponent(meetingId)}&title=${encodeURIComponent(meetingInfo?.title || meetingTitle || 'IntellMeet Session')}&duration=${recResult.duration || 0}`, {
               method: 'POST',
               headers: uploadHeaders,
               body: recResult.blob
             });
             const uploadData = await uploadRes.json();
             if (uploadData.success) {
-              toast.success('Recording ready to watch in dashboard & AI summary processing!', { id: 'rec-upload' });
+              toast.success('Recording saved to cloud and ready to watch in dashboard!', { id: 'rec-upload' });
             } else {
               toast.dismiss('rec-upload');
             }
@@ -4591,54 +4592,7 @@ export default function MeetingRoom() {
     }
   };
 
-  // Part 14: Simulate Simultaneous Multi-Screen Sharing (Section 14.1)
-  const handleSimulateMultiShare = () => {
-    const myId = user?.id || user?._id || 'local';
-    const myName = user?.name || 'You';
 
-    const simulatedSessions = [
-      {
-        id: 'sim-arun',
-        sharerId: 'guest-2',
-        sharerName: 'Arun',
-        sourceName: 'Visual Studio Code',
-        type: 'IDE',
-        audioEnabled: true,
-        videoOptimization: true,
-        status: 'ACTIVE',
-        startedAt: new Date()
-      },
-      {
-        id: 'sim-priya',
-        sharerId: 'guest-3',
-        sharerName: 'Priya',
-        sourceName: 'Google Chrome',
-        type: 'BROWSER',
-        audioEnabled: false,
-        videoOptimization: false,
-        status: 'ACTIVE',
-        startedAt: new Date()
-      }
-    ];
-
-    if (isScreenSharing && screenShareDetails) {
-      simulatedSessions.unshift({
-        id: myId,
-        sharerId: myId,
-        sharerName: myName,
-        sourceName: screenShareDetails.sourceName || 'Entire Screen',
-        type: screenShareDetails.type || 'SCREEN',
-        audioEnabled: screenShareDetails.audioEnabled,
-        videoOptimization: screenShareDetails.videoOptimization,
-        status: 'ACTIVE',
-        startedAt: new Date()
-      });
-    }
-
-    setActiveShareSessions(simulatedSessions);
-    setIsScreenSharing(true);
-    toast.success('Simulated simultaneous multi-screen sharing (Arun & Priya)');
-  };
 
   const handleUpdateSharingSettings = async (newSettings) => {
     setSharingSettings(newSettings);
@@ -7797,18 +7751,7 @@ export default function MeetingRoom() {
                   {sharingSettings.mode === 'multiple' && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
                 </button>
 
-                {sharingSettings.mode === 'multiple' && (
-                  <button
-                    onClick={() => {
-                      handleSimulateMultiShare();
-                      setShowShareChevronMenu(false);
-                    }}
-                    className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-blue-600/20 text-blue-400 hover:text-blue-300 font-semibold flex items-center justify-between transition-colors"
-                  >
-                    <span>Simulate Multi-Share (Arun & Priya)</span>
-                    <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                  </button>
-                )}
+
 
                 <div className="my-1 border-t border-[#333]"></div>
 

@@ -98,9 +98,9 @@ export const DEFAULT_PRESENTATION_SLIDES = [
     subtitle: 'Collaborative Team & Client Presentations',
     category: 'Team Presentation Workflow',
     bullets: [
-      'Simultaneous authorization: Arun (Product), Priya (Engineering), Karthik (Design)',
+      'Simultaneous authorization: Grant multiple active controllers across teams',
       'Any authorized controller can advance or retreat slides synchronously',
-      'Real-time HUD indicator alerts attendees who navigated (e.g. "Arun moved to Slide 7")',
+      'Real-time HUD indicator alerts attendees who navigated (e.g. "Controller moved to Slide 7")',
       'Presenter retains master authority to revoke any participant or stop all slide control instantly'
     ],
     notes: 'Perfect for panel discussions, cross-functional sprints, and joint sales pitches.',

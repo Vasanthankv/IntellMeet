@@ -90,7 +90,7 @@ export default function ActionItemList({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <input
               type="text"
-              placeholder="Assignee (e.g. Arun)"
+              placeholder="Assignee (e.g. Alex)"
               value={newAssignee}
               onChange={(e) => setNewAssignee(e.target.value)}
               className="text-xs p-2 bg-white border border-gray-300 rounded-lg focus:outline-none"

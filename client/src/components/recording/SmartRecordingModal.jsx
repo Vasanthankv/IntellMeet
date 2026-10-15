@@ -1211,7 +1211,7 @@ export default function SmartRecordingModal({
                       type="text"
                       value={nsAssignee}
                       onChange={(e) => setNsAssignee(e.target.value)}
-                      placeholder="e.g. Arun"
+                      placeholder="e.g. Alex"
                       className="w-full bg-[#181818] border border-gray-700 rounded-xl p-2 text-white"
                     />
                   </div>

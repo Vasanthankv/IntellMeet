@@ -202,11 +202,19 @@ router.post('/generate', protect, async (req, res) => {
     let segments = transcriptDoc?.segments || [];
 
     if (segments.length === 0) {
-      segments = [
-        { speakerName: 'Host', text: 'Welcome everyone to the meeting. Let us review the project deliverables, architecture milestones, and deployment timeline.', startTime: 0 },
-        { speakerName: 'Team', text: 'All core features and unit tests are passing smoothly. We are preparing production release sign-off.', startTime: 15 },
-        { speakerName: 'Lead', text: 'We agree on the target schedule. Final deployment actions will be completed on schedule.', startTime: 30 }
-      ];
+      summary.status = 'COMPLETED';
+      summary.overview = '';
+      summary.keyDiscussionPoints = [];
+      summary.decisions = [];
+      summary.actionItems = [];
+      summary.questions = [];
+      summary.nextSteps = [];
+      await safeSaveSummary(summary);
+      return res.status(200).json({
+        success: true,
+        message: 'No transcript segments recorded for this meeting yet. Enable live captions or speak during the meeting to generate an AI summary.',
+        summary
+      });
     }
 
     summary.status = 'PROCESSING';

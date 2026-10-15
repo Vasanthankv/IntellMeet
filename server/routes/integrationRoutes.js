@@ -710,13 +710,13 @@ router.post('/webhooks/test', authOrGuest, async (req, res) => {
         sub.lastDeliveryStatus = 200;
         sub.lastDeliveryPayload = {
           event,
-          meetingId: 'MTG-7492-SAMPLE',
-          topic: 'IntelliMeet Platform Review',
-          host: 'Vasanthan',
-          durationMinutes: 48,
+          meetingId: 'MTG-TEST-WEBHOOK',
+          topic: 'IntelliMeet Platform Test Event',
+          host: 'Host',
+          durationMinutes: 10,
           timestamp: new Date().toISOString(),
-          summary: 'All backend and AI models deployed successfully.',
-          actionItems: [{ assignee: 'Arun', task: 'Run integration test suite' }]
+          summary: 'Platform integration test payload.',
+          actionItems: [{ assignee: 'Lead', task: 'Run integration test suite' }]
         };
         await sub.save();
       }

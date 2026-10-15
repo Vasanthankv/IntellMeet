@@ -79,50 +79,19 @@ export async function runAIRecordingPipeline(meetingId, recordingId, io = null) 
     let transcriptDoc = await MeetingTranscript.findOne({ meetingId: pipeline.meetingId }).sort({ createdAt: -1 });
     let segments = transcriptDoc?.segments || [];
 
-    // Fallback dialogue if transcript is empty
     if (segments.length === 0) {
-      segments = [
-        {
-          meetingId: pipeline.meetingId,
-          speakerId: 'usr_arun',
-          speakerName: 'Arun',
-          text: 'The backend microservice API is now fully implemented and passing unit tests.',
-          startTime: 10,
-          endTime: 25
-        },
-        {
-          meetingId: pipeline.meetingId,
-          speakerId: 'usr_priya',
-          speakerName: 'Priya',
-          text: 'Database schema migration scripts and load tests will be completed by Friday.',
-          startTime: 40,
-          endTime: 65
-        },
-        {
-          meetingId: pipeline.meetingId,
-          speakerId: 'usr_vasanthan',
-          speakerName: 'Vasanthan',
-          text: 'We agreed to deploy the cloud infrastructure on AWS next week.',
-          startTime: 90,
-          endTime: 120
-        },
-        {
-          meetingId: pipeline.meetingId,
-          speakerId: 'usr_arun',
-          speakerName: 'Arun',
-          text: 'Action item: configure AWS Elastic Beanstalk and set up CloudWatch billing alarms.',
-          startTime: 140,
-          endTime: 175
-        }
-      ];
-
-      if (!transcriptDoc) {
-        transcriptDoc = await MeetingTranscript.create({
-          meetingId: pipeline.meetingId,
-          status: 'COMPLETED',
-          segments
-        });
-      }
+      pipeline.transcriptId = transcriptDoc?.transcriptId || 'tr_' + Date.now();
+      pipeline.stages.transcript.status = 'COMPLETED';
+      pipeline.stages.transcript.count = 0;
+      pipeline.stages.summary.status = 'COMPLETED';
+      pipeline.stages.chapters.status = 'COMPLETED';
+      pipeline.stages.highlights.status = 'COMPLETED';
+      pipeline.stages.actionItems.status = 'COMPLETED';
+      pipeline.stages.analytics.status = 'COMPLETED';
+      pipeline.currentStage = 'COMPLETED';
+      pipeline.progress = 100;
+      await pipeline.save();
+      return pipeline;
     }
 
     pipeline.transcriptId = transcriptDoc?.transcriptId || 'tr_' + Date.now();
@@ -284,51 +253,9 @@ Return ONLY valid JSON (no markdown):
         }
       ];
 
-      const defaultNextSteps = [
-        { task: 'Complete database testing before Friday deployment', assignedTo: 'Priya (QA)', dueDate: 'Friday', status: 'OPEN' },
-        { task: 'Configure AWS Elastic Beanstalk and set billing alerts', assignedTo: 'Arun (DevOps)', dueDate: 'Thursday', status: 'OPEN' },
-        { task: 'Distribute recording replay and transcript to stakeholders', assignedTo: 'Host', dueDate: 'Today', status: 'OPEN' }
-      ];
-
-      const defaultTopics = [
-        { topicName: 'Backend Architecture', keywords: ['API', 'Microservices', 'Node.js'], startTime: 10, endTime: 65, relevanceScore: 0.95 },
-        { topicName: 'Cloud Deployment', keywords: ['AWS', 'Elastic Beanstalk', 'CloudWatch'], startTime: 90, endTime: 120, relevanceScore: 0.93 },
-        { topicName: 'Database Testing', keywords: ['MongoDB', 'Migration', 'Performance'], startTime: 40, endTime: 90, relevanceScore: 0.90 }
-      ];
-
-      const defaultAnalytics = {
-        talkSpeed: {
-          wpmAverage: 136,
-          perSpeaker: [
-            { speakerName: 'Arun', wpm: 140 },
-            { speakerName: 'Priya', wpm: 132 },
-            { speakerName: 'Vasanthan', wpm: 136 }
-          ]
-        },
-        talkListenRatio: [
-          { speakerName: 'Arun', talkPercentage: 45, listenPercentage: 55, talkTimeSeconds: 120 },
-          { speakerName: 'Priya', talkPercentage: 30, listenPercentage: 70, talkTimeSeconds: 80 },
-          { speakerName: 'Vasanthan', talkPercentage: 25, listenPercentage: 75, talkTimeSeconds: 65 }
-        ],
-        longestMonologue: {
-          speakerName: 'Arun',
-          durationSeconds: 35,
-          startTime: 140,
-          textSnippet: 'Action item: configure AWS Elastic Beanstalk and set up CloudWatch billing alarms.'
-        },
-        fillerWords: {
-          totalCount: 4,
-          perSpeaker: [
-            { speakerName: 'Arun', count: 2, words: [{ word: 'um', count: 2 }] },
-            { speakerName: 'Priya', count: 2, words: [{ word: 'like', count: 2 }] }
-          ]
-        },
-        patience: {
-          score: 93,
-          interruptionCount: 1,
-          responseLagSecondsAverage: 1.1
-        }
-      };
+      const defaultNextSteps = [];
+      const defaultTopics = [];
+      const defaultAnalytics = null;
 
       if (!smartRec) {
         smartRec = await SmartRecording.create({
