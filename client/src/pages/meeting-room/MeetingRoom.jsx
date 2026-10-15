@@ -103,7 +103,27 @@ export default function MeetingRoom() {
   const { user } = useAuthStore();
   const getAuthToken = () => (typeof localStorage !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('intellmeet_token') || '') : '');
 
-  const [isHost, setIsHost] = useState(true);
+  const [isHost, setIsHost] = useState(false);
+  const [userRole, setUserRole] = useState('PARTICIPANT');
+  const [isCoHost, setIsCoHost] = useState(false);
+  const [effectivePermissions, setEffectivePermissions] = useState({
+    joinMeeting: true,
+    controlOwnMedia: true,
+    viewHearOthers: true,
+    useChatReactions: true,
+    manageWaitingRoom: false,
+    admitRejectParticipants: false,
+    removeParticipants: false,
+    assignRevokeCoHost: false,
+    changeMeetingSecurity: false,
+    changeUserPermissions: false,
+    screenSharing: true,
+    startStopRecording: false,
+    manageCaptions: true,
+    accessTranscriptsAI: true,
+    endMeetingForAll: false,
+    leaveMeeting: true,
+  });
   const [showLeaveDropdown, setShowLeaveDropdown] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [meetingInfo, setMeetingInfo] = useState({ title: `${user?.name || 'User'}'s Meeting`, meetingId });
@@ -118,16 +138,41 @@ export default function MeetingRoom() {
     const fetchMeeting = async () => {
       try {
         const cleanMeetingId = meetingId ? meetingId.replace(/[\s-]/g, '') : '';
+        const token = getAuthToken();
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+        // Fetch meeting info
         const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${encodeURIComponent(cleanMeetingId || meetingId || '')}`);
         const data = await res.json();
         if (data.success && data.meeting) {
           setMeetingInfo(data.meeting);
           const currentUserId = user?.id || user?._id;
-          const hostId = data.meeting.host || data.meeting.hostId;
+          const hostId = data.meeting.host?._id || data.meeting.host || data.meeting.hostId;
           const isUserHost = Boolean(
             currentUserId && hostId && String(currentUserId) === String(hostId)
-          ) || user?.role === 'Host' || user?.role === 'Administrator' || !hostId;
+          );
           setIsHost(isUserHost);
+          if (isUserHost) {
+            setUserRole('HOST');
+          }
+        }
+
+        // Authoritatively query user role & permissions from server
+        try {
+          const roleRes = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${encodeURIComponent(cleanMeetingId || meetingId || '')}/my-role`, {
+            headers
+          });
+          const roleData = await roleRes.json();
+          if (roleData.success) {
+            setUserRole(roleData.role);
+            setIsHost(roleData.isHost);
+            setIsCoHost(roleData.isCoHost);
+            if (roleData.permissions) {
+              setEffectivePermissions(roleData.permissions);
+            }
+          }
+        } catch (e) {
+          console.warn('Meeting role check note:', e);
         }
       } catch (err) {
         console.warn('Meeting info fetch note:', err);
@@ -257,7 +302,7 @@ export default function MeetingRoom() {
 
   // Meeting Roles State (Host, Co-host, Participant)
   const [coHosts, setCoHosts] = useState([]);
-  const isHostOrCoHost = Boolean(isHost || user?.id === 'host' || user?._id === 'host' || coHosts?.includes(user?.id) || coHosts?.includes(user?._id));
+  const isHostOrCoHost = Boolean(isHost || isCoHost || coHosts?.includes(user?.id) || coHosts?.includes(user?._id));
   const [activeParticipantMenu, setActiveParticipantMenu] = useState(null);
   const [sampleParticipants, setSampleParticipants] = useState([]);
 
@@ -760,7 +805,11 @@ export default function MeetingRoom() {
   }, [chatMessages, showRightPanel]);
 
   useEffect(() => {
-    socketRef.current = io(SOCKET_SERVER_URL);
+    const token = getAuthToken();
+    socketRef.current = io(SOCKET_SERVER_URL, {
+      auth: { token },
+      query: { token }
+    });
     const storedGuestName = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('intellmeet_guest_name') : null;
     const userId = user?.id || user?._id || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('intellmeet_guest_id') : null) || 'u_' + Math.floor(Math.random() * 10000);
     const userName = user?.name || storedGuestName || 'Guest';
@@ -1275,6 +1324,23 @@ export default function MeetingRoom() {
         setWaitingRoomQueue([]);
         toast.success('All waiting attendees admitted');
         if (playJoinLeaveChime) playChimeSound('join');
+      });
+
+      // Server-authoritative meeting role assignment
+      socketRef.current.on('meeting-role-assigned', (rolePayload) => {
+        if (rolePayload) {
+          setUserRole(rolePayload.role);
+          setIsHost(Boolean(rolePayload.isHost));
+          setIsCoHost(Boolean(rolePayload.isCoHost));
+          if (rolePayload.permissions) {
+            setEffectivePermissions(rolePayload.permissions);
+          }
+        }
+      });
+
+      // Server authorization rejection
+      socketRef.current.on('security-action-denied', (errPayload) => {
+        toast.error(errPayload?.reason || 'You do not have permission to perform this action.');
       });
 
       // Part 31: Encryption Socket Listeners (31.5, 31.6, 31.13)
@@ -7233,22 +7299,26 @@ export default function MeetingRoom() {
                     <span>Invite</span>
                   </button>
 
-                  <button 
-                    onClick={() => setShowMuteAllModal(true)}
-                    className="flex-1 bg-[#242424] hover:bg-[#333] border border-[#333] text-gray-200 text-xs font-semibold py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1.5"
-                    title="Mute all participants"
-                  >
-                    <VolumeX className="w-3.5 h-3.5 text-red-400" />
-                    <span>Mute All</span>
-                  </button>
+                  {isHostOrCoHost && (
+                    <button 
+                      onClick={() => setShowMuteAllModal(true)}
+                      className="flex-1 bg-[#242424] hover:bg-[#333] border border-[#333] text-gray-200 text-xs font-semibold py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                      title="Mute all participants"
+                    >
+                      <VolumeX className="w-3.5 h-3.5 text-red-400" />
+                      <span>Mute All</span>
+                    </button>
+                  )}
 
-                  <button 
-                    onClick={() => setShowParticipantsMoreMenu(!showParticipantsMoreMenu)}
-                    className="px-2.5 py-1.5 bg-[#242424] hover:bg-[#333] border border-[#333] text-gray-200 rounded-lg transition-colors text-xs font-semibold flex items-center justify-center"
-                    title="Host tools and permissions"
-                  >
-                    <MoreHorizontal className="w-4 h-4" />
-                  </button>
+                  {isHostOrCoHost && (
+                    <button 
+                      onClick={() => setShowParticipantsMoreMenu(!showParticipantsMoreMenu)}
+                      className="px-2.5 py-1.5 bg-[#242424] hover:bg-[#333] border border-[#333] text-gray-200 rounded-lg transition-colors text-xs font-semibold flex items-center justify-center"
+                      title="Host tools and permissions"
+                    >
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+                  )}
 
                   {/* Host Tools & Permissions Popup Menu (11.13 - 11.20) */}
                   {showParticipantsMoreMenu && (
@@ -7671,21 +7741,23 @@ export default function MeetingRoom() {
 
         {/* Center Controls (Horizontally responsive, overflow-visible so popovers are never clipped) */}
         <div className="flex items-center justify-center gap-1 sm:gap-1.5 flex-1 min-w-0 py-1 px-1 overflow-visible">
-          {/* Host Security Panel Button */}
-          <button 
-            id="security-toolbar-button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowSecurityModal(prev => !prev);
-            }}
-            className={`flex flex-col items-center justify-center w-16 h-14 rounded-lg transition-colors group relative ${
-              showSecurityModal ? 'bg-[#2A2A2A] text-white' : 'hover:bg-[#2A2A2A]'
-            }`}
-            title="Meeting Security Settings"
-          >
-            <Shield className={`w-5 h-5 mb-1 ${isMeetingLocked ? 'text-amber-400' : 'text-gray-300 group-hover:text-white'}`} />
-            <span className="text-[11px] font-medium text-gray-300">Security</span>
-          </button>
+          {/* Host Security Panel Button (Zoom-Style: Host & Co-host only) */}
+          {isHostOrCoHost && (
+            <button 
+              id="security-toolbar-button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowSecurityModal(prev => !prev);
+              }}
+              className={`flex flex-col items-center justify-center w-16 h-14 rounded-lg transition-colors group relative ${
+                showSecurityModal ? 'bg-[#2A2A2A] text-white' : 'hover:bg-[#2A2A2A]'
+              }`}
+              title="Meeting Security Settings"
+            >
+              <Shield className={`w-5 h-5 mb-1 ${isMeetingLocked ? 'text-amber-400' : 'text-gray-300 group-hover:text-white'}`} />
+              <span className="text-[11px] font-medium text-gray-300">Security</span>
+            </button>
+          )}
 
           {/* Participants Button */}
           <button 

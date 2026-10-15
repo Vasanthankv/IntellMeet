@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import Meeting from '../models/Meeting.js';
 import MeetingRegistration from '../models/MeetingRegistration.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { getMeetingUserRole } from '../services/meetingAuthorizationService.js';
 
 const router = express.Router();
 
@@ -85,6 +86,25 @@ router.post('/', protect, async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ message: error.message });
+  }
+});
+
+// @route   GET /api/meetings/:meetingId/my-role
+// @desc    Authoritatively get user role and permissions for the meeting
+router.get('/:meetingId/my-role', protect, async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?._id;
+    const auth = await getMeetingUserRole(req.params.meetingId, userId);
+    return res.json({
+      success: true,
+      role: auth.role,
+      isHost: auth.isHost,
+      isCoHost: auth.isCoHost,
+      permissions: auth.permissions,
+      meetingTitle: auth.meeting?.title || 'Meeting'
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
   }
 });
 

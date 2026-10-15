@@ -11,6 +11,9 @@ import meetingRoutes from './routes/meetingRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import MeetingParticipant from './models/MeetingParticipant.js';
 import ParticipantFeedback from './models/ParticipantFeedback.js';
+import Meeting from './models/Meeting.js';
+import jwt from 'jsonwebtoken';
+import { getMeetingUserRole, buildMeetingQuery } from './services/meetingAuthorizationService.js';
 
 dotenv.config();
 
@@ -155,12 +158,70 @@ app.get('/api/health', (req, res) => {
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
 
-  socket.on('join-room', async (roomId, userId, userName) => {
+  // Extract user identity from handshake auth if available
+  try {
+    const token = socket.handshake.auth?.token;
+    if (token && token !== 'null' && token !== 'undefined') {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'intellmeet_jwt_secret_key_2026_secure');
+      socket.verifiedUserId = decoded.id || decoded._id;
+      socket.verifiedUserName = decoded.name;
+      socket.verifiedEmail = decoded.email;
+    }
+  } catch (err) {}
+
+  // Central server-side permission validator for this socket
+  const verifySocketPermission = async (action, capability) => {
+    if (socket.isHost) return true;
+    if (socket.permissions && socket.permissions[capability] === true) return true;
+    const cleanRoomId = (socket.roomId || '').replace(/[\s-]/g, '');
+    const currentAuth = await getMeetingUserRole(cleanRoomId || socket.roomId, socket.userId, socket.id);
+    if (currentAuth.isHost || (currentAuth.permissions && currentAuth.permissions[capability] === true)) {
+      socket.role = currentAuth.role;
+      socket.isHost = currentAuth.isHost;
+      socket.isCoHost = currentAuth.isCoHost;
+      socket.permissions = currentAuth.permissions;
+      return true;
+    }
+    console.warn(`[SECURITY VIOLATION BLOCKED] Socket ${socket.id} (user: ${socket.userId}, role: ${socket.role}) denied action: ${action} (${capability})`);
+    socket.emit('security-action-denied', { action, capability, message: `Access Denied: You do not have permission to ${action}.` });
+    return false;
+  };
+
+  socket.on('join-room', async (roomId, userId, userName, clientAuthToken) => {
     socket.join(roomId);
-    socket.userId = userId;
-    socket.userName = userName;
+
+    let effectiveUserId = socket.verifiedUserId;
+    let effectiveUserName = socket.verifiedUserName;
+
+    if (!effectiveUserId && clientAuthToken) {
+      try {
+        const decoded = jwt.verify(clientAuthToken, process.env.JWT_SECRET || 'intellmeet_jwt_secret_key_2026_secure');
+        effectiveUserId = decoded.id || decoded._id;
+        effectiveUserName = decoded.name;
+      } catch (e) {}
+    }
+
+    socket.userId = effectiveUserId || userId || socket.id;
+    socket.userName = effectiveUserName || userName || 'Participant';
     socket.roomId = roomId;
-    console.log(`User ${userName} (${userId}) joined room ${roomId}`);
+
+    // Server-side authoritative role computation
+    const cleanRoomId = roomId ? roomId.replace(/[\s-]/g, '') : '';
+    const authResult = await getMeetingUserRole(cleanRoomId || roomId, socket.userId, socket.id);
+    socket.role = authResult.role;
+    socket.isHost = authResult.isHost;
+    socket.isCoHost = authResult.isCoHost;
+    socket.permissions = authResult.permissions;
+
+    // Authoritative role assignment sent to client
+    socket.emit('meeting-role-assigned', {
+      role: authResult.role,
+      isHost: authResult.isHost,
+      isCoHost: authResult.isCoHost,
+      permissions: authResult.permissions
+    });
+
+    console.log(`User ${socket.userName} (${socket.userId}) joined room ${roomId} as [${authResult.role}]`);
 
     try {
       const clients = await io.in(roomId).fetchSockets();
@@ -177,7 +238,7 @@ io.on('connection', (socket) => {
     }
 
     // Tell everyone else in the room that a new user joined
-    socket.to(roomId).emit('user-connected', userId, userName, socket.id);
+    socket.to(roomId).emit('user-connected', socket.userId, socket.userName, socket.id);
   });
 
   // WebRTC Signaling
@@ -287,97 +348,158 @@ io.on('connection', (socket) => {
   });
 
   // Part 11: Participant Management & Controls Signaling
-  socket.on('host-mute-participant', (roomId, participantId) => {
+  socket.on('host-mute-participant', async (roomId, participantId) => {
+    if (!await verifySocketPermission('mute participant', 'changeUserPermissions')) return;
     io.to(roomId).emit('participant-muted', participantId);
   });
 
-  socket.on('host-ask-unmute', (roomId, { targetParticipantId, hostName }) => {
+  socket.on('host-ask-unmute', async (roomId, { targetParticipantId, hostName }) => {
+    if (!await verifySocketPermission('ask participant to unmute', 'changeUserPermissions')) return;
     io.to(roomId).emit('host-asked-unmute', { targetParticipantId, hostName });
   });
 
-  socket.on('host-mute-all', (roomId, { allowUnmute }) => {
+  socket.on('host-mute-all', async (roomId, { allowUnmute }) => {
+    if (!await verifySocketPermission('mute all participants', 'changeUserPermissions')) return;
     io.to(roomId).emit('all-participants-muted', { allowUnmute });
   });
 
-  socket.on('host-stop-video', (roomId, participantId) => {
+  socket.on('host-stop-video', async (roomId, participantId) => {
+    if (!await verifySocketPermission('stop participant video', 'changeUserPermissions')) return;
     io.to(roomId).emit('participant-video-stopped', participantId);
   });
 
-  socket.on('host-ask-start-video', (roomId, { targetParticipantId, hostName }) => {
+  socket.on('host-ask-start-video', async (roomId, { targetParticipantId, hostName }) => {
+    if (!await verifySocketPermission('ask participant to start video', 'changeUserPermissions')) return;
     io.to(roomId).emit('host-asked-start-video', { targetParticipantId, hostName });
   });
 
-  socket.on('host-make-cohost', (roomId, { participantId, isCoHost }) => {
+  socket.on('host-make-cohost', async (roomId, { participantId, isCoHost }) => {
+    if (!await verifySocketPermission('assign co-host', 'assignRevokeCoHost')) return;
+    try {
+      const cleanMId = (roomId || '').replace(/[\s-]/g, '');
+      await MeetingParticipant.findOneAndUpdate(
+        { meetingId: { $in: [roomId, cleanMId] }, $or: [{ participantId }, { userId: participantId }] },
+        { 
+          role: isCoHost ? 'CO_HOST' : 'PARTICIPANT',
+          ...(isCoHost ? { coHostPermissions: { manageWaitingRoom: true, admitRejectParticipants: true, removeParticipants: false, changeMeetingSecurity: false, changeUserPermissions: false, startStopRecording: false, manageCaptions: true, endMeetingForAll: false } } : {})
+        }
+      );
+    } catch (e) {
+      console.warn('Error persisting co-host update:', e);
+    }
     io.to(roomId).emit('participant-cohost-assigned', { participantId, isCoHost });
   });
 
-  socket.on('host-make-host', (roomId, { newHostId, newHostName }) => {
+  socket.on('host-make-host', async (roomId, { newHostId, newHostName }) => {
+    if (!socket.isHost) {
+      console.warn(`[SECURITY BLOCKED] Non-host socket ${socket.id} tried to transfer host ownership.`);
+      socket.emit('security-action-denied', { action: 'transfer host', message: 'Only the meeting Host can transfer host ownership.' });
+      return;
+    }
+    try {
+      const cleanMId = (roomId || '').replace(/[\s-]/g, '');
+      const meeting = await Meeting.findOne(buildMeetingQuery(cleanMId || roomId));
+      if (meeting) {
+        meeting.host = newHostId;
+        meeting.hostName = newHostName;
+        await meeting.save();
+      }
+    } catch (e) {}
     io.to(roomId).emit('participant-host-transferred', { newHostId, newHostName });
   });
 
-  socket.on('host-remove-participant', (roomId, { participantId, name }) => {
+  socket.on('host-remove-participant', async (roomId, { participantId, name }) => {
+    if (!await verifySocketPermission('remove participant', 'removeParticipants')) return;
     io.to(roomId).emit('participant-removed', { participantId, name });
   });
 
   socket.on('participant-rename', (roomId, { participantId, newName }) => {
+    if (participantId !== socket.id && participantId !== socket.userId) {
+      verifySocketPermission('rename other participant', 'changeUserPermissions').then(allowed => {
+        if (allowed) io.to(roomId).emit('participant-renamed', { participantId, newName });
+      });
+      return;
+    }
     io.to(roomId).emit('participant-renamed', { participantId, newName });
   });
 
-  socket.on('host-update-permissions', (roomId, permissions) => {
+  socket.on('host-update-permissions', async (roomId, permissions) => {
+    if (!await verifySocketPermission('update permissions', 'changeUserPermissions')) return;
     io.to(roomId).emit('permissions-updated', permissions);
   });
 
-  socket.on('host-suspend-activities', (roomId) => {
+  socket.on('host-suspend-activities', async (roomId) => {
+    if (!await verifySocketPermission('suspend activities', 'changeMeetingSecurity')) return;
     io.to(roomId).emit('activities-suspended');
   });
 
-  socket.on('admit-waiting-participant', (roomId, { participantId, name }) => {
-    io.to(roomId).emit('waiting-participant-admitted', { participantId, name });
+  socket.on('admit-waiting-participant', async (roomId, { participantId, name, socketId }) => {
+    if (!await verifySocketPermission('admit waiting participant', 'admitRejectParticipants')) return;
+    io.to(socketId || participantId).emit('admission-approved', { roomId });
+    io.to(roomId).emit('waiting-participant-admitted', { socketId, participantId, name });
   });
 
-  socket.on('admit-all-waiting-participants', (roomId) => {
+  socket.on('reject-waiting-participant', async (roomId, { participantId, socketId }) => {
+    if (!await verifySocketPermission('reject waiting participant', 'admitRejectParticipants')) return;
+    io.to(socketId || participantId).emit('admission-rejected');
+    io.to(roomId).emit('waiting-participant-rejected', { socketId, participantId });
+  });
+
+  socket.on('admit-all-waiting-participants', async (roomId) => {
+    if (!await verifySocketPermission('admit all waiting participants', 'admitRejectParticipants')) return;
+    io.to(`${roomId}-waiting`).emit('admission-approved', { roomId });
     io.to(roomId).emit('all-waiting-admitted');
   });
 
   // ── Part 30: In-Meeting Security Real-Time Events (30.15) ─────────────
-  socket.on('security-update-settings', (roomId, settings) => {
+  socket.on('security-update-settings', async (roomId, settings) => {
+    if (!await verifySocketPermission('update security settings', 'changeMeetingSecurity')) return;
     io.to(roomId).emit('security-settings-updated', settings);
   });
 
-  socket.on('security-toggle-lock', (roomId, { meetingLocked }) => {
+  socket.on('security-toggle-lock', async (roomId, { meetingLocked }) => {
+    if (!await verifySocketPermission('toggle meeting lock', 'changeMeetingSecurity')) return;
     io.to(roomId).emit('meeting-lock-toggled', { meetingLocked });
   });
 
-  socket.on('security-toggle-waiting-room', (roomId, { waitingRoomEnabled }) => {
+  socket.on('security-toggle-waiting-room', async (roomId, { waitingRoomEnabled }) => {
+    if (!await verifySocketPermission('toggle waiting room', 'manageWaitingRoom')) return;
     io.to(roomId).emit('waiting-room-toggled', { waitingRoomEnabled });
   });
 
-  socket.on('security-toggle-hide-profile-pictures', (roomId, { hideProfilePictures }) => {
+  socket.on('security-toggle-hide-profile-pictures', async (roomId, { hideProfilePictures }) => {
+    if (!await verifySocketPermission('toggle profile pictures', 'changeMeetingSecurity')) return;
     io.to(roomId).emit('hide-profile-pictures-toggled', { hideProfilePictures });
   });
 
-  socket.on('security-update-permissions', (roomId, permissions) => {
+  socket.on('security-update-permissions', async (roomId, permissions) => {
+    if (!await verifySocketPermission('update participant permissions', 'changeUserPermissions')) return;
     io.to(roomId).emit('permissions-updated', permissions);
   });
 
-  socket.on('security-update-share-policy', (roomId, { whoCanShareScreen }) => {
+  socket.on('security-update-share-policy', async (roomId, { whoCanShareScreen }) => {
+    if (!await verifySocketPermission('update screen share policy', 'changeMeetingSecurity')) return;
     io.to(roomId).emit('screen-share-policy-updated', { whoCanShareScreen });
   });
 
-  socket.on('security-suspend-activities', (roomId) => {
+  socket.on('security-suspend-activities', async (roomId) => {
+    if (!await verifySocketPermission('suspend activities', 'changeMeetingSecurity')) return;
     io.to(roomId).emit('activities-suspended');
     io.to(roomId).emit('meeting-lock-toggled', { meetingLocked: true });
   });
 
-  socket.on('security-resume-activities', (roomId) => {
+  socket.on('security-resume-activities', async (roomId) => {
+    if (!await verifySocketPermission('resume activities', 'changeMeetingSecurity')) return;
     io.to(roomId).emit('activities-resumed');
   });
 
-  socket.on('security-remove-participant', (roomId, payload) => {
+  socket.on('security-remove-participant', async (roomId, payload) => {
+    if (!await verifySocketPermission('remove participant', 'removeParticipants')) return;
     io.to(roomId).emit('participant-removed', payload);
   });
 
-  socket.on('security-admit-waiting', (roomId, payload) => {
+  socket.on('security-admit-waiting', async (roomId, payload) => {
+    if (!await verifySocketPermission('admit waiting participant', 'admitRejectParticipants')) return;
     io.to(roomId).emit('waiting-participant-admitted', payload);
   });
 
@@ -1022,12 +1144,12 @@ io.on('connection', (socket) => {
   });
 
   // Host ends meeting for all participants
-  socket.on('end-meeting-for-all', ({ roomId }) => {
-    if (roomId) {
-      // Notify all other participants in the room to leave
-      socket.to(roomId).emit('meeting-ended', { message: 'The host has ended this meeting.' });
-      console.log(`Host ${socket.id} ended meeting for all in room ${roomId}`);
-    }
+  socket.on('end-meeting-for-all', async ({ roomId }) => {
+    if (!roomId) return;
+    if (!await verifySocketPermission('end meeting for all', 'endMeetingForAll')) return;
+    // Notify all other participants in the room to leave
+    socket.to(roomId).emit('meeting-ended', { message: 'The host has ended this meeting.' });
+    console.log(`Verified Host ${socket.userId} (${socket.id}) ended meeting for all in room ${roomId}`);
   });
 
   // Explicit leave-room (before disconnect) — notifies peers immediately

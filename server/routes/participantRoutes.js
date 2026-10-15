@@ -2,6 +2,8 @@ import express from 'express';
 import MeetingParticipant from '../models/MeetingParticipant.js';
 import ParticipantFeedback from '../models/ParticipantFeedback.js';
 import Meeting from '../models/Meeting.js';
+import { protect } from '../middleware/authMiddleware.js';
+import { getMeetingUserRole, requireMeetingCapability } from '../services/meetingAuthorizationService.js';
 
 const router = express.Router({ mergeParams: true });
 
@@ -38,7 +40,6 @@ router.post('/:meetingId/participants/join', async (req, res) => {
       userId,
       displayName,
       email,
-      role = 'participant',
       audioState = 'unmuted',
       videoState = 'on',
       isWaiting = false,
@@ -48,11 +49,16 @@ router.post('/:meetingId/participants/join', async (req, res) => {
       return res.status(400).json({ success: false, message: 'participantId and displayName required' });
     }
 
+    // Authoritative Server-Side Role Computation (Never trust client-supplied role)
+    const cleanMId = (meetingId || '').replace(/[\s-]/g, '');
+    const auth = await getMeetingUserRole(cleanMId || meetingId, userId, participantId);
+    const authoritativeRole = auth.role;
+
     let participant = await MeetingParticipant.findOne({ meetingId, participantId });
 
     if (participant) {
       participant.displayName = displayName;
-      participant.role = role;
+      participant.role = authoritativeRole;
       participant.audioState = audioState;
       participant.videoState = videoState;
       participant.isWaiting = isWaiting;
@@ -62,10 +68,10 @@ router.post('/:meetingId/participants/join', async (req, res) => {
       participant = new MeetingParticipant({
         meetingId,
         participantId,
-        userId,
+        userId: userId || participantId,
         displayName,
         email,
-        role,
+        role: authoritativeRole,
         audioState,
         videoState,
         isWaiting,
@@ -74,7 +80,7 @@ router.post('/:meetingId/participants/join', async (req, res) => {
       await participant.save();
     }
 
-    res.status(201).json({ success: true, participant });
+    res.status(201).json({ success: true, participant, role: authoritativeRole, isHost: auth.isHost, permissions: auth.permissions });
   } catch (error) {
     console.error('Error joining participant:', error);
     res.status(500).json({ success: false, message: 'Server error joining participant' });
@@ -82,10 +88,29 @@ router.post('/:meetingId/participants/join', async (req, res) => {
 });
 
 // PUT update participant state (role, mute, video, rename, hand)
-router.put('/:meetingId/participants/:participantId', async (req, res) => {
+router.put('/:meetingId/participants/:participantId', protect, async (req, res) => {
   try {
     const { meetingId, participantId } = req.params;
-    const updates = req.body;
+    const updates = { ...req.body };
+
+    const callerId = req.user?.id || req.user?._id;
+    const callerAuth = await getMeetingUserRole(meetingId, callerId);
+
+    // If caller attempts to modify another user's role or co-host permissions
+    if (updates.role || updates.coHostPermissions) {
+      if (!callerAuth.isHost) {
+        return res.status(403).json({ success: false, message: 'Forbidden: Only the meeting Host can assign or change participant roles.' });
+      }
+    }
+
+    // If caller attempts to modify another user's mute/video/state
+    const isSelf = String(participantId) === String(callerId);
+    if (!isSelf && !callerAuth.isHost && !callerAuth.permissions?.changeUserPermissions) {
+      delete updates.audioState;
+      delete updates.videoState;
+      delete updates.isHandRaised;
+      delete updates.displayName;
+    }
 
     const participant = await MeetingParticipant.findOneAndUpdate(
       { meetingId, participantId },
@@ -105,9 +130,16 @@ router.put('/:meetingId/participants/:participantId', async (req, res) => {
 });
 
 // DELETE participant (remove or leave)
-router.delete('/:meetingId/participants/:participantId', async (req, res) => {
+router.delete('/:meetingId/participants/:participantId', protect, async (req, res) => {
   try {
     const { meetingId, participantId } = req.params;
+    const callerId = req.user?.id || req.user?._id;
+    const callerAuth = await getMeetingUserRole(meetingId, callerId);
+
+    const isSelf = String(participantId) === String(callerId);
+    if (!isSelf && !callerAuth.isHost && !callerAuth.permissions?.removeParticipants) {
+      return res.status(403).json({ success: false, message: 'Forbidden: You do not have permission to remove this participant.' });
+    }
 
     const participant = await MeetingParticipant.findOneAndUpdate(
       { meetingId, participantId },
@@ -122,8 +154,8 @@ router.delete('/:meetingId/participants/:participantId', async (req, res) => {
   }
 });
 
-// POST Suspend Participant Activities (Section 11.14)
-router.post('/:meetingId/suspend-activities', async (req, res) => {
+// POST Suspend Participant Activities (Section 11.14) - Host / authorized Co-Host only
+router.post('/:meetingId/suspend-activities', protect, requireMeetingCapability('changeMeetingSecurity'), async (req, res) => {
   try {
     const { meetingId } = req.params;
 
