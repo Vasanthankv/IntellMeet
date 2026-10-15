@@ -382,8 +382,13 @@ router.get('/:recordingId/stream', async (req, res) => {
 
     const mediaInfo = await StorageService.getRecordingStream(recording);
     if (!mediaInfo) {
-      // Fallback: if mock file exists or sample
-      return res.redirect('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+      return res.status(404).json({ 
+        success: false, 
+        isLocal: recording.storageType === 'LOCAL', 
+        message: recording.storageType === 'LOCAL' 
+          ? 'This recording was downloaded directly to your local computer' 
+          : 'Recording media not found or processing' 
+      });
     }
 
     const { size, mimeType, isGridFS } = mediaInfo;

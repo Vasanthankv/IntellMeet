@@ -39,6 +39,61 @@ export default function RecordingsPage() {
   const [duration, setDuration] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
+  const [localFileBlobUrl, setLocalFileBlobUrl] = useState(null);
+  const [videoLoadError, setVideoLoadError] = useState(false);
+  const [isUploadingToCloud, setIsUploadingToCloud] = useState(false);
+  const localFileInputRef = useRef(null);
+  const cloudUploadInputRef = useRef(null);
+
+  useEffect(() => {
+    setLocalFileBlobUrl(null);
+    setVideoLoadError(false);
+    setIsPlaying(false);
+    setCurrentTime(0);
+  }, [selectedRecording?.recordingId]);
+
+  const handleLocalFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setLocalFileBlobUrl(url);
+      setVideoLoadError(false);
+      toast.success(`Loaded "${file.name}" for instant playback!`);
+    }
+  };
+
+  const handleUploadLocalFileToCloud = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedRecording) return;
+    setIsUploadingToCloud(true);
+    const toastId = toast.loading(`Uploading "${file.name}" to cloud storage...`);
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('intellmeet_token');
+      const headers = {
+        'Content-Type': file.type || 'video/webm',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      };
+      const res = await fetch(`${SERVER_BASE_URL}/api/recordings/${selectedRecording.recordingId}/media`, {
+        method: 'POST',
+        headers,
+        body: file
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Uploaded to Cloud! Permanent streaming active.', { id: toastId });
+        fetchRecordings();
+        setSelectedRecording(prev => prev ? { ...prev, fileSize: file.size, storageType: 'GRIDFS', fileUrl: `/api/recordings/${prev.recordingId}/stream` } : null);
+        setLocalFileBlobUrl(URL.createObjectURL(file));
+        setVideoLoadError(false);
+      } else {
+        toast.error(data.message || 'Upload failed', { id: toastId });
+      }
+    } catch (err) {
+      toast.error('Network error during upload', { id: toastId });
+    } finally {
+      setIsUploadingToCloud(false);
+    }
+  };
 
   const fetchRecordings = async () => {
     try {
@@ -501,20 +556,75 @@ export default function RecordingsPage() {
                 <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
                   <video
                     ref={videoRef}
+                    key={localFileBlobUrl || selectedRecording?.recordingId}
                     src={
-                      selectedRecording.fileUrl 
+                      localFileBlobUrl ||
+                      (selectedRecording.fileUrl 
                         ? (selectedRecording.fileUrl.startsWith('http') ? selectedRecording.fileUrl : `${SERVER_BASE_URL}${selectedRecording.fileUrl}`)
-                        : `${SERVER_BASE_URL}/api/recordings/${selectedRecording.recordingId}/stream`
+                        : `${SERVER_BASE_URL}/api/recordings/${selectedRecording.recordingId}/stream`)
                     }
+                    crossOrigin="anonymous"
+                    onError={() => {
+                      if (!localFileBlobUrl) setVideoLoadError(true);
+                    }}
                     onTimeUpdate={handleTimeUpdate}
                     onLoadedMetadata={handleTimeUpdate}
                     onEnded={() => setIsPlaying(false)}
                     className="w-full h-full object-contain"
                   />
-                  {!isPlaying && (
+
+                  {/* Local Computer Recording Info & Playback Prompt */}
+                  {(videoLoadError || (selectedRecording.storageType === 'LOCAL' && selectedRecording.fileSize === 0 && !localFileBlobUrl)) && (
+                    <div className="absolute inset-0 bg-gradient-to-b from-[#141414]/90 via-[#1a1a1a]/95 to-[#111] backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-20">
+                      <div className="w-14 h-14 rounded-2xl bg-blue-500/20 border border-blue-500/40 text-blue-400 flex items-center justify-center mb-3 shadow-inner">
+                        <Laptop className="w-7 h-7" />
+                      </div>
+                      <h4 className="text-sm font-bold text-white mb-1">
+                        Local Computer Recording
+                      </h4>
+                      <p className="text-xs text-gray-400 max-w-sm mb-4 leading-relaxed">
+                        This session was saved directly to your computer's <span className="text-blue-400 font-semibold">Downloads</span> folder when you chose &ldquo;Record on this Computer&rdquo;.
+                      </p>
+
+                      <input 
+                        type="file" 
+                        ref={localFileInputRef}
+                        accept="video/*" 
+                        onChange={handleLocalFileSelect} 
+                        className="hidden" 
+                      />
+                      <input 
+                        type="file" 
+                        ref={cloudUploadInputRef}
+                        accept="video/*" 
+                        onChange={handleUploadLocalFileToCloud} 
+                        className="hidden" 
+                      />
+
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        <button
+                          onClick={() => localFileInputRef.current?.click()}
+                          className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center gap-2 shadow-lg shadow-blue-500/20 transition-all cursor-pointer"
+                        >
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                          <span>Select Downloaded File & Play</span>
+                        </button>
+                        <button
+                          onClick={() => cloudUploadInputRef.current?.click()}
+                          disabled={isUploadingToCloud}
+                          className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-gray-200 hover:text-white font-semibold text-xs flex items-center gap-2 border border-white/10 transition-all cursor-pointer"
+                        >
+                          <Cloud className="w-3.5 h-3.5 text-purple-400" />
+                          <span>{isUploadingToCloud ? 'Uploading...' : 'Sync to Cloud'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!isPlaying && (!videoLoadError && !(selectedRecording.storageType === 'LOCAL' && selectedRecording.fileSize === 0 && !localFileBlobUrl)) && (
                     <button
                       onClick={togglePlay}
-                      className="absolute inset-0 m-auto w-16 h-16 rounded-full bg-purple-600/80 hover:bg-purple-600 text-white flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-110 shadow-2xl"
+                      className="absolute inset-0 m-auto w-16 h-16 rounded-full bg-purple-600/80 hover:bg-purple-600 text-white flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-110 shadow-2xl z-10 cursor-pointer"
                     >
                       <Play className="w-8 h-8 fill-current translate-x-0.5" />
                     </button>

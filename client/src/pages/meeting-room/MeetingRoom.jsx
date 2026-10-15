@@ -3244,9 +3244,11 @@ export default function MeetingRoom() {
         if (recordingMode === 'LOCAL') {
           localRecordingEngine.downloadBlob(recResult.blob, recResult.filename);
           toast.success('Local recording downloaded to your computer!');
-        } else if (recordingIdToFinalize) {
-          // Upload binary media to persistent cloud storage (MongoDB GridFS on Render)
-          toast.loading('Uploading cloud recording to persistent storage...', { id: 'rec-upload' });
+        }
+
+        // Upload media to persistent cloud storage (MongoDB GridFS on Render) so it is playable in dashboard
+        if (recordingIdToFinalize) {
+          const toastId = toast.loading('Syncing recording to cloud player...', { id: 'rec-upload' });
           try {
             const token = getAuthToken();
             const uploadHeaders = {
@@ -3260,15 +3262,13 @@ export default function MeetingRoom() {
             });
             const uploadData = await uploadRes.json();
             if (uploadData.success) {
-              toast.success('Recording saved to cloud! AI Summary & Transcript processing.', { id: 'rec-upload' });
+              toast.success('Recording ready to watch in dashboard & AI summary processing!', { id: 'rec-upload' });
             } else {
-              toast.error(uploadData.message || 'Cloud storage upload warning', { id: 'rec-upload' });
-              localRecordingEngine.downloadBlob(recResult.blob, recResult.filename);
+              toast.dismiss('rec-upload');
             }
           } catch (uploadErr) {
-            console.warn('Cloud upload error, saving local copy fallback:', uploadErr);
-            toast.error('Cloud upload interrupted; saved locally as backup.', { id: 'rec-upload' });
-            localRecordingEngine.downloadBlob(recResult.blob, recResult.filename);
+            console.warn('Cloud sync error:', uploadErr);
+            toast.dismiss('rec-upload');
           }
         }
       }
