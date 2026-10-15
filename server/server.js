@@ -413,7 +413,7 @@ io.on('connection', (socket) => {
 
   // Part 12: Reactions & Non-Verbal Feedback Real-Time Events (12.1 - 12.17)
   socket.on('send-reaction', (roomId, reactionData) => {
-    io.to(roomId).emit('receive-reaction', reactionData);
+    socket.to(roomId).emit('receive-reaction', reactionData);
   });
 
   socket.on('toggle-hand', async (roomId, { participantId, isRaised, name }) => {

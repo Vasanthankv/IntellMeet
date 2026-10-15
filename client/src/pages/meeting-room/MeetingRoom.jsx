@@ -1346,7 +1346,9 @@ export default function MeetingRoom() {
       });
 
       // Part 12: Real-time reactions and non-verbal feedback listeners
-      socketRef.current.on('receive-reaction', ({ emoji, senderName }) => {
+      socketRef.current.on('receive-reaction', ({ emoji, senderName, senderId }) => {
+        const myId = user?.id || user?._id || 'local';
+        if (senderId && String(senderId) === String(myId)) return;
         const newEmoji = {
           id: Date.now() + Math.random(),
           emoji,
@@ -3193,7 +3195,7 @@ export default function MeetingRoom() {
           // Upload binary media to persistent cloud storage (MongoDB GridFS on Render)
           toast.loading('Uploading cloud recording to persistent storage...', { id: 'rec-upload' });
           try {
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('token') || localStorage.getItem('intellmeet_token');
             const uploadHeaders = {
               'Content-Type': recResult.mimeType || 'video/webm',
               ...(token ? { Authorization: `Bearer ${token}` } : {})
@@ -3217,7 +3219,7 @@ export default function MeetingRoom() {
         }
       }
 
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || localStorage.getItem('intellmeet_token');
       const headers = {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {})
@@ -3530,10 +3532,13 @@ export default function MeetingRoom() {
     setIsGeneratingMeetingSummary(true);
     const toastId = toast.loading('AI is analyzing transcript to synthesize meeting summary...');
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || localStorage.getItem('intellmeet_token');
       const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/summary/generate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ template })
       });
       const data = await res.json();
@@ -3910,6 +3915,7 @@ export default function MeetingRoom() {
   // Part 22: Language Interpretation Handlers (22.1 - 22.23)
   // ==========================================
   const currentUserId = user?.id || user?._id || 'local';
+  const getAuthToken = () => localStorage.getItem('token') || localStorage.getItem('intellmeet_token');
   const currentUserInterpreterLanguage = interpretationSession?.languages?.find(
     l => l.interpreterId && (l.interpreterId === currentUserId || (user?.email && l.interpreterEmail === user.email))
   );
@@ -3919,6 +3925,7 @@ export default function MeetingRoom() {
   const handleSelectInterpretationChannel = async (channel) => {
     setSelectedInterpretationChannel(channel);
     try {
+      const token = getAuthToken();
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
       await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/interpretation/preference`, {
@@ -3945,6 +3952,7 @@ export default function MeetingRoom() {
   const handleChangeOriginalAudioVolume = async (volume) => {
     setOriginalAudioVolume(volume);
     try {
+      const token = getAuthToken();
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
       await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/interpretation/preference`, {
@@ -3963,6 +3971,7 @@ export default function MeetingRoom() {
   const handleChangeInterpretationVolume = async (volume) => {
     setInterpretationVolume(volume);
     try {
+      const token = getAuthToken();
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
       await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/interpretation/preference`, {
@@ -3982,6 +3991,7 @@ export default function MeetingRoom() {
     const nextVal = !signLanguageEnabled;
     setSignLanguageEnabled(nextVal);
     try {
+      const token = getAuthToken();
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
       await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/interpretation/preference`, {
@@ -4000,6 +4010,7 @@ export default function MeetingRoom() {
 
   const handleStartInterpretationSession = async () => {
     try {
+      const token = getAuthToken();
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
       const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/interpretation/session/start`, {
@@ -4023,6 +4034,7 @@ export default function MeetingRoom() {
 
   const handleStopInterpretationSession = async () => {
     try {
+      const token = getAuthToken();
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
       const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/interpretation/session/stop`, {
@@ -4044,6 +4056,7 @@ export default function MeetingRoom() {
 
   const handleAddInterpretationLanguage = async (languageData) => {
     try {
+      const token = getAuthToken();
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
       const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/interpretation/languages`, {

@@ -42,7 +42,7 @@ export default function RecordingsPage() {
 
   const fetchRecordings = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || localStorage.getItem('intellmeet_token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const url = `${API_BASE_URL}/recordings?search=${encodeURIComponent(searchQuery)}`;
       const res = await fetch(url, { headers });
@@ -70,7 +70,7 @@ export default function RecordingsPage() {
   const handleDelete = async (recordingId) => {
     if (!window.confirm('Are you sure you want to delete this recording?')) return;
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || localStorage.getItem('intellmeet_token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const res = await fetch(`${API_BASE_URL}/recordings/${recordingId}`, {
         method: 'DELETE',
@@ -90,7 +90,7 @@ export default function RecordingsPage() {
   const handleRename = async (recordingId) => {
     if (!newTitle.trim()) return;
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || localStorage.getItem('intellmeet_token');
       const headers = { 
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {})
@@ -113,7 +113,7 @@ export default function RecordingsPage() {
 
   const handleRetryAI = async (recordingId) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || localStorage.getItem('intellmeet_token');
       toast.loading('Queueing AI transcription and summary...', { id: 'retry-ai' });
       const res = await fetch(`${API_BASE_URL}/recordings/${recordingId}/retry-ai`, {
         method: 'POST',
@@ -706,7 +706,7 @@ export default function RecordingsPage() {
         recording={shareRecording || {}}
         onUpdateShareSettings={async (recordingId, updates) => {
           try {
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('token') || localStorage.getItem('intellmeet_token');
             const headers = {
               'Content-Type': 'application/json',
               ...(token ? { Authorization: `Bearer ${token}` } : {})

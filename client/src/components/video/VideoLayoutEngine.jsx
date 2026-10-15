@@ -83,6 +83,57 @@ function RemoteParticipantTile({ participant, hasCamOn }) {
   );
 }
 
+function ScreenShareStreamPlayer({ screenTrack, sharerParticipant, isLocalSharer, sharerName, sourceName }) {
+  const videoRef = useRef(null);
+  const [streamActive, setStreamActive] = useState(false);
+
+  useEffect(() => {
+    let stream = null;
+    if (isLocalSharer && screenTrack) {
+      stream = new MediaStream([screenTrack]);
+    } else if (sharerParticipant?.stream) {
+      stream = sharerParticipant.stream;
+    }
+
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play()
+        .then(() => setStreamActive(true))
+        .catch(err => {
+          console.warn('Screen share autoplay note:', err);
+          setStreamActive(true);
+        });
+    } else {
+      setStreamActive(false);
+    }
+  }, [screenTrack, sharerParticipant?.stream, isLocalSharer]);
+
+  return (
+    <div className="w-full h-full relative flex items-center justify-center bg-black overflow-hidden">
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted={isLocalSharer}
+        className="w-full h-full object-contain"
+      />
+      {!streamActive && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-4 bg-gradient-to-b from-[#181818] to-[#101010]">
+          <div className="w-20 h-20 rounded-3xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto shadow-2xl">
+            <Maximize2 className="w-10 h-10 animate-pulse" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-white">{sharerName} is sharing their {sourceName}</h3>
+            <p className="text-xs text-gray-400 max-w-md mx-auto mt-1">
+              Screen broadcast is live. Synchronizing display stream across participants...
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function VideoLayoutEngine({
   layoutMode = 'gallery', // 'speaker' | 'gallery' | 'dynamic-gallery' | 'multi' | 'immersive' | 'floating' | 'side-by-side-speaker' | 'side-by-side-gallery'
   participants = [], // array of { id, name, isLocal, isMuted, isSpeaking, avatar, isHost, isCoHost, hasVideo }
@@ -867,6 +918,11 @@ export default function VideoLayoutEngine({
     const shareType = screenShareDetails?.type || 'SCREEN';
     const sourceName = screenShareDetails?.sourceName || 'Entire Screen';
     const sharerName = screenShareDetails?.sharerName || 'Presenter';
+    const isLocalSharer = screenShareDetails?.sharerId === (user?.id || user?._id || 'local') || sharerName === 'You' || sharerName === user?.name;
+    const sharerParticipant = participants.find(p => 
+      (screenShareDetails?.sharerId && (p.id === screenShareDetails.sharerId || p.userId === screenShareDetails.sharerId)) ||
+      (sharerName && p.name === sharerName)
+    ) || participants.find(p => !p.isLocal && p.stream);
 
     return (
       <div className="w-full h-full flex flex-col p-4 gap-3">
@@ -996,18 +1052,14 @@ export default function VideoLayoutEngine({
                 </div>
               </div>
             ) : (
-              /* Default Screen / App Broadcast Frame */
-              <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center space-y-4 bg-gradient-to-b from-[#181818] to-[#101010]">
-                <div className="w-20 h-20 rounded-3xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto shadow-2xl">
-                  <Maximize2 className="w-10 h-10" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-white">{sharerName} is sharing their {sourceName}</h3>
-                  <p className="text-xs text-gray-400 max-w-md mx-auto mt-1">
-                    Screen broadcast is live with crystal clear audio and presentation sync across all devices.
-                  </p>
-                </div>
-              </div>
+              /* Real Screen / App Live Video Stream */
+              <ScreenShareStreamPlayer
+                screenTrack={screenTrack}
+                sharerParticipant={sharerParticipant}
+                isLocalSharer={isLocalSharer}
+                sharerName={sharerName}
+                sourceName={sourceName}
+              />
             )}
 
             {/* Presenter Overlay: Picture-in-Picture Webcam (Section 13.15) */}
