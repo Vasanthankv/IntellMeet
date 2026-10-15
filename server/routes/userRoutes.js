@@ -57,10 +57,10 @@ router.post('/', protect, async (req, res) => {
   }
 });
 
-// @route   PUT /api/users/:id
+// @route   PUT /api/users/:id & PATCH /api/users/:id
 // @desc    Update user role, license, or personal information (Admin Center)
 // @access  Private
-router.put('/:id', protect, async (req, res) => {
+const handleUpdateUser = async (req, res) => {
   try {
     const { role, license, department, jobTitle, name, pronouns } = req.body;
     const user = await User.findById(req.params.id);
@@ -85,7 +85,10 @@ router.put('/:id', protect, async (req, res) => {
     console.error('Error updating user:', error);
     res.status(500).json({ success: false, message: error.message });
   }
-});
+};
+
+router.put('/:id', protect, handleUpdateUser);
+router.patch('/:id', protect, handleUpdateUser);
 
 // @route   DELETE /api/users/:id
 // @desc    Remove user (Admin Center)
@@ -183,6 +186,39 @@ router.put('/me/profile', protect, async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
+});
+
+// @route   GET /groups (organization groups)
+router.get('/groups', protect, async (req, res) => {
+  try {
+    const users = await User.find({}).select('department name');
+    const groupMap = {};
+    users.forEach(u => {
+      const dept = u.department || 'General';
+      if (!groupMap[dept]) {
+        groupMap[dept] = { name: dept, memberCount: 0, members: [] };
+      }
+      groupMap[dept].memberCount += 1;
+      groupMap[dept].members.push(u.name);
+    });
+    const groups = Object.values(groupMap);
+    res.json({ success: true, count: groups.length, groups });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   GET /roles (organization roles)
+router.get('/roles', protect, async (req, res) => {
+  res.json({
+    success: true,
+    roles: [
+      { id: 'owner', name: 'Account Owner', description: 'Full access to all administrative settings and billing.' },
+      { id: 'admin', name: 'Administrator', description: 'Can manage users, settings, and reports.' },
+      { id: 'member', name: 'Member', description: 'Standard enterprise access to meetings and collaboration.' },
+      { id: 'guest', name: 'Guest', description: 'Limited meeting participation access.' }
+    ]
+  });
 });
 
 export default router;

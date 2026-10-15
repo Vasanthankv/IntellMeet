@@ -166,6 +166,19 @@ export default function VideoLayoutEngine({
   const [isDraggingFloating, setIsDraggingFloating] = useState(false);
   const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
 
+  // Ensure local video element always stays synced with localStream and plays on camera ON
+  useEffect(() => {
+    const el = userVideoRef?.current;
+    if (el && localStream) {
+      if (el.srcObject !== localStream) {
+        el.srcObject = localStream;
+      }
+      if (isVideoOn) {
+        el.play().catch(e => console.warn('Local video play error on sync:', e));
+      }
+    }
+  }, [localStream, isVideoOn, userVideoRef]);
+
   // 1. Filter out non-video participants if toggle is active (Section 9.13)
   const filteredParticipants = useMemo(() => {
     if (!hideNonVideoParticipants) return participants;
@@ -271,30 +284,37 @@ export default function VideoLayoutEngine({
               </span>
               <span className="text-[10px] bg-black/60 px-2 py-0.5 rounded-full mt-2 font-semibold">Avatar Active</span>
             </div>
-          ) : isVideoOn ? (
-            <video
-              ref={(el) => {
-                if (userVideoRef) {
-                  if (typeof userVideoRef === 'function') userVideoRef(el);
-                  else userVideoRef.current = el;
-                }
-                if (el && localStream && el.srcObject !== localStream) {
-                  el.srcObject = localStream;
-                  el.play().catch(e => console.warn('Local video play error:', e));
-                }
-              }}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover relative z-10 scale-x-[-1]"
-              style={{
-                filter: `${currentBackground === 'blur' ? 'blur(10px) ' : ''}${filterStyle}`
-              }}
-            />
           ) : (
-            <div className="w-20 h-20 bg-purple-700 rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-lg">
-              {p.name.slice(0, 2).toUpperCase()}
-            </div>
+            <>
+              <video
+                ref={(el) => {
+                  if (userVideoRef) {
+                    if (typeof userVideoRef === 'function') userVideoRef(el);
+                    else userVideoRef.current = el;
+                  }
+                  if (el) {
+                    if (localStream && el.srcObject !== localStream) {
+                      el.srcObject = localStream;
+                    }
+                    if (isVideoOn) {
+                      el.play().catch(e => console.warn('Local video play error:', e));
+                    }
+                  }
+                }}
+                autoPlay
+                playsInline
+                muted
+                className={`w-full h-full object-cover relative z-10 scale-x-[-1] ${isVideoOn ? 'block' : 'hidden'}`}
+                style={{
+                  filter: `${currentBackground === 'blur' ? 'blur(10px) ' : ''}${filterStyle}`
+                }}
+              />
+              {!isVideoOn && (
+                <div className="w-20 h-20 bg-purple-700 rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-lg">
+                  {p.name.slice(0, 2).toUpperCase()}
+                </div>
+              )}
+            </>
           )
         ) : (
           /* Remote Participant Live Video / Audio Tile */

@@ -2300,6 +2300,10 @@ export default function MeetingRoom() {
               try { activeStream.removeTrack(videoTrack); } catch (e) {}
             }
             activeStream.addTrack(newVideoTrack);
+            const refreshedStream = new MediaStream(activeStream.getTracks());
+            setStream(refreshedStream);
+            localStreamRef.current = refreshedStream;
+            activeStream = refreshedStream;
           }
 
           // Hot-swap or add track on all connected peers
@@ -2483,17 +2487,56 @@ export default function MeetingRoom() {
       return;
     }
 
-    if (stream) {
-      const audioTrack = stream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setIsAudioOn(audioTrack.enabled);
-        const cleanMId = meetingId ? meetingId.replace(/[\s-]/g, '') : '';
-        socketRef.current?.emit('toggle-media-state', cleanMId || meetingId, { isAudioOn: audioTrack.enabled });
-        toast(audioTrack.enabled ? 'Microphone unmuted' : 'Microphone muted', {
-          icon: audioTrack.enabled ? '🎤' : '🔇'
-        });
+    const activeStream = stream || localStreamRef.current;
+    if (activeStream) {
+      let audioTrack = activeStream.getAudioTracks()[0];
+      if (!audioTrack || audioTrack.readyState === 'ended') {
+        const constraints = {
+          audio: selectedMic === 'default' ? true : { deviceId: { exact: selectedMic } }
+        };
+        navigator.mediaDevices.getUserMedia(constraints)
+          .then(freshAudioStream => {
+            const newAudioTrack = freshAudioStream.getAudioTracks()[0];
+            if (audioTrack) {
+              try { activeStream.removeTrack(audioTrack); } catch (e) {}
+            }
+            activeStream.addTrack(newAudioTrack);
+            const refreshedStream = new MediaStream(activeStream.getTracks());
+            setStream(refreshedStream);
+            localStreamRef.current = refreshedStream;
+
+            peersRef.current.forEach(({ peer }) => {
+              if (peer) {
+                try {
+                  if (audioTrack) {
+                    peer.replaceTrack(audioTrack, newAudioTrack, refreshedStream);
+                  } else {
+                    peer.addTrack(newAudioTrack, refreshedStream);
+                  }
+                } catch (e) {
+                  console.warn('Peer track update on mic start:', e);
+                }
+              }
+            });
+
+            setIsAudioOn(true);
+            const cleanMId = meetingId ? meetingId.replace(/[\s-]/g, '') : '';
+            socketRef.current?.emit('toggle-media-state', cleanMId || meetingId, { isAudioOn: true });
+            toast('Microphone unmuted', { icon: '🎤' });
+          })
+          .catch(e => {
+            toast.error('Could not access microphone: ' + (e.message || 'Permission denied'));
+          });
+        return;
       }
+
+      audioTrack.enabled = !audioTrack.enabled;
+      setIsAudioOn(audioTrack.enabled);
+      const cleanMId = meetingId ? meetingId.replace(/[\s-]/g, '') : '';
+      socketRef.current?.emit('toggle-media-state', cleanMId || meetingId, { isAudioOn: audioTrack.enabled });
+      toast(audioTrack.enabled ? 'Microphone unmuted' : 'Microphone muted', {
+        icon: audioTrack.enabled ? '🎤' : '🔇'
+      });
     }
   };
 

@@ -76,11 +76,15 @@ import personalizationRoutes from './routes/personalizationRoutes.js';
 import adaptationRoutes from './routes/adaptationRoutes.js';
 import integrationRoutes from './routes/integrationRoutes.js';
 import lifecycleRoutes from './routes/lifecycleRoutes.js';
+import billingRoutes from './routes/billingRoutes.js';
 import ScreenShareSession from './models/ScreenShareSession.js';
 
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/organization', userRoutes);
+app.use('/api/organization/users', userRoutes);
+app.use('/api/billing', billingRoutes);
 app.use('/api/meetings', meetingRoutes);
 app.use('/api/meetings', chatRoutes);
 app.use('/api/meetings', participantRoutes);

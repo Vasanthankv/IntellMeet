@@ -68,6 +68,13 @@ router.get('/stats', protect, async (req, res) => {
   }
 });
 
+// @route   GET /api/dashboard/summary
+// @desc    Alias for /api/dashboard/stats
+router.get('/summary', protect, (req, res, next) => {
+  req.url = '/stats';
+  router.handle(req, res, next);
+});
+
 // @route   POST /api/dashboard/meetings
 // @desc    Create/Schedule a meeting & update user stats in MongoDB
 // @access  Private

@@ -108,13 +108,22 @@ export default function AdminCenterPage() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || localStorage.getItem('intellmeet_token');
+      if (!token) {
+        setUsers([]);
+        setLoading(false);
+        return;
+      }
       const res = await fetch(`${API_BASE_URL}/users`, {
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
+      if (res.status === 401) {
+        console.warn('Admin users fetch: Session expired or unauthorized');
+        return;
+      }
       const data = await res.json();
       if (data.success) {
         setUsers(data.users || []);
