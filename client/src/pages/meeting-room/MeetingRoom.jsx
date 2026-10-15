@@ -3370,9 +3370,13 @@ export default function MeetingRoom() {
             : (participantTranslationEnabled && participantTargetLanguage ? participantTargetLanguage : null);
           if (targetLang) {
             try {
+              const token = localStorage.getItem('token') || localStorage.getItem('intellmeet_token');
               const transRes = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/translation/translate`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                  'Content-Type': 'application/json',
+                  ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
                 body: JSON.stringify({
                   text: rawText,
                   sourceLanguage: speakingLanguage ? speakingLanguage.split('-')[0] : 'en',
@@ -4968,6 +4972,16 @@ export default function MeetingRoom() {
     if (stream) stream.getTracks().forEach(track => track.stop());
     if (socketRef.current) socketRef.current.emit('end-meeting-for-all', { roomId: meetingId });
     try {
+      const token = localStorage.getItem('token') || localStorage.getItem('intellmeet_token');
+      // Finalize database meeting status & active cloud recording
+      await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/end`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      }).catch(() => null);
+
       await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/lifecycle/stage`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
