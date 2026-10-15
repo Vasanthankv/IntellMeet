@@ -53,7 +53,7 @@ export default function MeetingDetails() {
           setMeeting(data.meeting);
         } else {
           // Fallback search in all meetings
-          const listRes = await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings', {
+          const listRes = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings`, {
             headers: authHeader
           });
           const listData = await listRes.json();
@@ -81,7 +81,7 @@ export default function MeetingDetails() {
     const fetchContacts = async () => {
       try {
         const token = localStorage.getItem('intellmeet_token') || localStorage.getItem('token');
-        const res = await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/users', {
+        const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/users`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();

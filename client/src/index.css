@@ -46,12 +46,13 @@
   }
 }
 @keyframes bounce-up-fade {
-  0% { transform: translateY(0) scale(0.5); opacity: 0; }
-  20% { transform: translateY(-50px) scale(1.2); opacity: 1; }
-  100% { transform: translateY(-300px) scale(1); opacity: 0; }
+  0% { transform: translateY(0) scale(0.6); opacity: 0; }
+  15% { transform: translateY(-40px) scale(1.3); opacity: 1; }
+  70% { transform: translateY(-260px) scale(1.1); opacity: 1; }
+  100% { transform: translateY(-440px) scale(0.8); opacity: 0; }
 }
 .animate-bounce-up-fade {
-  animation: bounce-up-fade 3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  animation: bounce-up-fade 3.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
 
 /* Custom sleek scrollbar styles */

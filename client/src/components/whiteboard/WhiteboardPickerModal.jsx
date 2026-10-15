@@ -54,7 +54,7 @@ export default function WhiteboardPickerModal({
 
   const handleCreateNew = async () => {
     try {
-      const res = await axios.post('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/whiteboards', {
+      const res = await axios.post(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/whiteboards`, {
         title: title.trim() || 'Untitled Whiteboard',
         ownerId: currentUser.id,
         ownerName: currentUser.name,

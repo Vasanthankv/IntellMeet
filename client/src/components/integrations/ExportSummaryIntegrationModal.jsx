@@ -52,7 +52,7 @@ export default function ExportSummaryIntegrationModal({
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/integrations/dispatch', {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/integrations/dispatch`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

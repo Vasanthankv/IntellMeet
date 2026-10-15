@@ -36,6 +36,9 @@ export const protect = async (req, res, next) => {
     req.body?.meetingId || 
     req.query?.meetingId || 
     req.baseUrl?.includes('meeting') ||
+    req.baseUrl?.includes('recording') ||
+    req.baseUrl?.includes('whiteboard') ||
+    req.baseUrl?.includes('poll') ||
     req.baseUrl?.includes('summar') ||
     req.baseUrl?.includes('question') ||
     req.baseUrl?.includes('transcript') ||

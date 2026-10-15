@@ -35,7 +35,7 @@ import toast from 'react-hot-toast';
 import { io } from 'socket.io-client';
 import ExportSummaryIntegrationModal from '../integrations/ExportSummaryIntegrationModal';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || `${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api`;
 
 export default function MeetingLifecycleHub({ meetingId, initialMeeting }) {
   const navigate = useNavigate();
@@ -62,7 +62,7 @@ export default function MeetingLifecycleHub({ meetingId, initialMeeting }) {
 
   // Socket connection
   useEffect(() => {
-    const socket = io(import.meta.env.VITE_SOCKET_URL || '${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}');
+    const socket = io(import.meta.env.VITE_SOCKET_URL || `${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}`);
     socket.emit('join-room', meetingId, 'User-' + Math.random().toString(36).substring(7), 'Participant');
 
     socket.on('meeting-lifecycle-changed', (data) => {

@@ -101,6 +101,7 @@ export default function MeetingRoom() {
   const { meetingId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const getAuthToken = () => (typeof localStorage !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('intellmeet_token') || '') : '');
 
   const [isHost, setIsHost] = useState(true);
   const [showLeaveDropdown, setShowLeaveDropdown] = useState(false);
@@ -2813,7 +2814,7 @@ export default function MeetingRoom() {
 
   // Part 12: Reactions & Non-Verbal Feedback Handlers (12.1 - 12.17)
   const handleSendReaction = (emoji) => {
-    const isReactionAllowed = reactionSettings.allowReactions && 
+    const isReactionAllowed = reactionSettings?.allowReactions !== false && 
       securitySettings?.participantPermissions?.canReact !== false && 
       securitySettings?.allowReactions !== false && 
       !securitySettings?.suspendActivities && 
@@ -2833,6 +2834,11 @@ export default function MeetingRoom() {
       left: Math.random() * 65 + 15,
     };
     setFloatingEmojis(prev => [...prev, newEmoji]);
+    toast(emoji, { 
+      position: 'bottom-center', 
+      duration: 1200, 
+      style: { background: '#18181b', color: '#fff', fontSize: '24px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.15)', padding: '6px 14px' } 
+    });
     socketRef.current?.emit('send-reaction', meetingId, {
       emoji,
       senderId: myId,
@@ -2849,7 +2855,7 @@ export default function MeetingRoom() {
   };
 
   const handleToggleHandRaised = () => {
-    if (!reactionSettings.allowRaiseHand && !isHostOrCoHost) {
+    if (!reactionSettings?.allowRaiseHand && !isHostOrCoHost) {
       toast.error('The host has disabled hand raising');
       return;
     }
@@ -2864,9 +2870,11 @@ export default function MeetingRoom() {
         const filtered = prev.filter(h => h.participantId !== myId);
         return [...filtered, { participantId: myId, name: myName, handRaisedAt: now }];
       });
+      toast('You raised your hand', { icon: '✋', position: 'bottom-center', duration: 2500 });
     } else {
       setRaisedHands(prev => prev.filter(id => id !== myId));
       setRaisedHandsQueue(prev => prev.filter(h => h.participantId !== myId));
+      toast('You lowered your hand', { icon: '👌', position: 'bottom-center', duration: 2000 });
     }
     socketRef.current?.emit('toggle-hand', meetingId, {
       participantId: myId,
@@ -3009,12 +3017,12 @@ export default function MeetingRoom() {
     }
     const toastId = toast.loading('AI is summarizing the meeting and generating tasks...');
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('${SOCKET_SERVER_URL}/api/ai/summarize', {
+      const token = getAuthToken();
+      const response = await fetch(`${SOCKET_SERVER_URL}/api/ai/summarize`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
         body: JSON.stringify({ transcript: chatMessages })
       });
@@ -3023,9 +3031,12 @@ export default function MeetingRoom() {
         toast.success('AI Summary complete! Action items added to your Tasks.', { id: toastId, duration: 4000 });
         
         // Also post to generic modules route to persist the summary
-        fetch('${SOCKET_SERVER_URL}/api/modules/summaries', {
+        fetch(`${SOCKET_SERVER_URL}/api/modules/summaries`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
           body: JSON.stringify({
             title: `AI Summary ${new Date().toLocaleTimeString()}`,
             description: data.data.summary
@@ -3047,13 +3058,6 @@ export default function MeetingRoom() {
     setShowRecordingMenu(false);
     const isLocal = mode.toUpperCase() === 'LOCAL';
 
-    // 23.5 Permission check
-    const isHostUser = isHost || user?.id === 'host' || coHosts?.includes(user?.id);
-    if (isLocal && !isHostUser && !participantCanRecordLocal) {
-      toast.error('The host has not granted you permission to record locally.');
-      return;
-    }
-
     // Section 31.8 E2EE restriction: Cloud recording is disabled in E2EE sessions
     if (!isLocal && encryptionData?.type === 'E2EE') {
       toast.error('Cloud Recording is disabled in End-to-End Encrypted meetings (Section 31.8 Policy). Use Local Recording instead.', { icon: '🔒' });
@@ -3061,21 +3065,23 @@ export default function MeetingRoom() {
     }
 
     try {
-      // Always prepare mixed media stream (local camera + screen share + local mic + remote participants' audio)
-      let streamToRecord = stream;
+      // 1. Prepare mixed media stream (camera / screenshare / fallback canvas + mixed participant audio)
+      let streamToRecord = null;
       try {
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        if (AudioContextClass) {
-          const audioCtx = new AudioContextClass();
-          const audioDest = audioCtx.createMediaStreamDestination();
+        const audioCtx = AudioContextClass ? new AudioContextClass() : null;
+        const audioDest = audioCtx ? audioCtx.createMediaStreamDestination() : null;
 
-          // Connect local audio
-          if (stream && stream.getAudioTracks().length > 0) {
+        // Connect local audio
+        if (audioCtx && audioDest && stream && stream.getAudioTracks().length > 0) {
+          try {
             const localAudioSource = audioCtx.createMediaStreamSource(stream);
             localAudioSource.connect(audioDest);
-          }
+          } catch (e) {}
+        }
 
-          // Connect all remote participants' audio
+        // Connect all remote participants' audio
+        if (audioCtx && audioDest) {
           peers.forEach(p => {
             if (p.stream && p.stream.getAudioTracks().length > 0) {
               try {
@@ -3084,61 +3090,102 @@ export default function MeetingRoom() {
               } catch (e) {}
             }
           });
-
-          // Combine video track with mixed multi-participant audio
-          const activeVideoTrack = screenTrackRef.current || stream?.getVideoTracks()[0];
-          const compositeStream = new MediaStream();
-          if (activeVideoTrack) compositeStream.addTrack(activeVideoTrack);
-          audioDest.stream.getAudioTracks().forEach(t => compositeStream.addTrack(t));
-          streamToRecord = compositeStream;
         }
+
+        // Determine active video track: screenshare > live camera > synthesized canvas
+        let activeVideoTrack = screenTrackRef.current || stream?.getVideoTracks().find(t => t.readyState === 'live');
+        if (!activeVideoTrack) {
+          const canvas = document.createElement('canvas');
+          canvas.width = 1280;
+          canvas.height = 720;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, 1280, 720);
+            ctx.beginPath();
+            ctx.arc(640, 310, 80, 0, Math.PI * 2);
+            ctx.fillStyle = '#3b82f6';
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 64px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const initial = (user?.name || 'U').charAt(0).toUpperCase();
+            ctx.fillText(initial, 640, 310);
+            ctx.font = 'bold 32px Inter, sans-serif';
+            ctx.fillText(user?.name || 'IntellMeet Participant', 640, 430);
+            ctx.font = '20px Inter, sans-serif';
+            ctx.fillStyle = '#94a3b8';
+            ctx.fillText(`Meeting: ${meetingInfo?.title || meetingId || 'Session'}`, 640, 480);
+          }
+          const canvasStream = canvas.captureStream ? canvas.captureStream(15) : null;
+          if (canvasStream) activeVideoTrack = canvasStream.getVideoTracks()[0];
+        }
+
+        const composite = new MediaStream();
+        if (activeVideoTrack) composite.addTrack(activeVideoTrack);
+        
+        let audioTracks = audioDest ? audioDest.stream.getAudioTracks() : [];
+        if (audioTracks.length === 0 && stream && stream.getAudioTracks().length > 0) {
+          audioTracks = stream.getAudioTracks();
+        }
+        audioTracks.forEach(t => composite.addTrack(t));
+        streamToRecord = composite;
       } catch (mixErr) {
-        console.warn('Audio mixing fallback to direct stream:', mixErr);
+        console.warn('Audio/video mixing fallback:', mixErr);
         streamToRecord = stream;
       }
 
-      if (streamToRecord && streamToRecord.getTracks().length > 0) {
-        localRecordingEngine.start(streamToRecord);
-      }
+      // 2. Start browser MediaRecorder
+      localRecordingEngine.start(streamToRecord);
 
-      const token = localStorage.getItem('token');
+      // 3. Inform server & create persistent recording record
+      const token = getAuthToken();
       const headers = {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       };
 
-      const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/recording/start`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          mode,
-          layout,
-          meetingTitle: meetingTitle || 'IntellMeet Session'
-        })
-      });
+      let recId = `rec_${Date.now()}`;
+      let startTimestamp = new Date().toISOString();
 
-      const data = await res.json();
-      if (data.success && data.recording) {
-        setIsMeetingRecording(true);
-        setRecordingPaused(false);
-        setRecordingMode(mode);
-        setRecordingLayout(layout);
-        setActiveRecordingId(data.recording.recordingId);
-        setRecordingStartedAt(data.recording.startedAt);
-
-        // Real-time broadcast (23.21)
-        socketRef.current?.emit('recording-start', meetingId, {
-          meetingId,
-          recordingId: data.recording.recordingId,
-          mode,
-          layout,
-          startedAt: data.recording.startedAt
+      try {
+        const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/recording/start`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            mode,
+            layout,
+            meetingTitle: meetingInfo?.title || meetingTitle || 'IntellMeet Session'
+          })
         });
 
-        toast.success(isLocal ? 'Recording started on this computer' : 'Cloud recording started with AI processing');
-      } else {
-        toast.error(data.message || 'Failed to start recording');
+        const data = await res.json();
+        if (data.success && data.recording) {
+          recId = data.recording.recordingId || recId;
+          startTimestamp = data.recording.startedAt || startTimestamp;
+        }
+      } catch (apiErr) {
+        console.warn('Server recording start endpoint note:', apiErr);
       }
+
+      setIsMeetingRecording(true);
+      setRecordingPaused(false);
+      setRecordingMode(mode);
+      setRecordingLayout(layout);
+      setActiveRecordingId(recId);
+      setRecordingStartedAt(startTimestamp);
+
+      // Real-time broadcast (23.21)
+      socketRef.current?.emit('recording-start', meetingId, {
+        meetingId,
+        recordingId: recId,
+        mode,
+        layout,
+        startedAt: startTimestamp
+      });
+
+      toast.success(isLocal ? 'Recording started on this computer' : 'Cloud recording started with AI processing');
     } catch (e) {
       toast.error('Error starting recording: ' + e.message);
     }
@@ -3148,12 +3195,15 @@ export default function MeetingRoom() {
     try {
       localRecordingEngine.pause();
 
-      const token = localStorage.getItem('token');
-      const headers = { Authorization: `Bearer ${token}` };
+      const token = getAuthToken();
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      };
       await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/recording/pause`, {
         method: 'PUT',
         headers
-      });
+      }).catch(() => {});
 
       setRecordingPaused(true);
       socketRef.current?.emit('recording-pause', meetingId, { meetingId });
@@ -3167,12 +3217,15 @@ export default function MeetingRoom() {
     try {
       localRecordingEngine.resume();
 
-      const token = localStorage.getItem('token');
-      const headers = { Authorization: `Bearer ${token}` };
+      const token = getAuthToken();
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      };
       await fetch(`${SOCKET_SERVER_URL}/api/meetings/${meetingId}/recording/resume`, {
         method: 'PUT',
         headers
-      });
+      }).catch(() => {});
 
       setRecordingPaused(false);
       socketRef.current?.emit('recording-resume', meetingId, { meetingId });
@@ -3195,7 +3248,7 @@ export default function MeetingRoom() {
           // Upload binary media to persistent cloud storage (MongoDB GridFS on Render)
           toast.loading('Uploading cloud recording to persistent storage...', { id: 'rec-upload' });
           try {
-            const token = localStorage.getItem('token') || localStorage.getItem('intellmeet_token');
+            const token = getAuthToken();
             const uploadHeaders = {
               'Content-Type': recResult.mimeType || 'video/webm',
               ...(token ? { Authorization: `Bearer ${token}` } : {})
@@ -3210,6 +3263,7 @@ export default function MeetingRoom() {
               toast.success('Recording saved to cloud! AI Summary & Transcript processing.', { id: 'rec-upload' });
             } else {
               toast.error(uploadData.message || 'Cloud storage upload warning', { id: 'rec-upload' });
+              localRecordingEngine.downloadBlob(recResult.blob, recResult.filename);
             }
           } catch (uploadErr) {
             console.warn('Cloud upload error, saving local copy fallback:', uploadErr);
@@ -3219,7 +3273,7 @@ export default function MeetingRoom() {
         }
       }
 
-      const token = localStorage.getItem('token') || localStorage.getItem('intellmeet_token');
+      const token = getAuthToken();
       const headers = {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {})
@@ -3229,7 +3283,7 @@ export default function MeetingRoom() {
         method: 'PUT',
         headers,
         body: JSON.stringify({ recordingId: recordingIdToFinalize })
-      });
+      }).catch(() => {});
 
       setIsMeetingRecording(false);
       setRecordingPaused(false);
@@ -3246,7 +3300,7 @@ export default function MeetingRoom() {
 
   const handleUpdateRecordingSettings = async (updates) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getAuthToken();
       const headers = {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {})
@@ -3915,7 +3969,6 @@ export default function MeetingRoom() {
   // Part 22: Language Interpretation Handlers (22.1 - 22.23)
   // ==========================================
   const currentUserId = user?.id || user?._id || 'local';
-  const getAuthToken = () => localStorage.getItem('token') || localStorage.getItem('intellmeet_token');
   const currentUserInterpreterLanguage = interpretationSession?.languages?.find(
     l => l.interpreterId && (l.interpreterId === currentUserId || (user?.email && l.interpreterEmail === user.email))
   );
@@ -5971,22 +6024,6 @@ export default function MeetingRoom() {
             } : {})
           }}
         >
-          {/* Floating Emoji Reactions Overlay (Section 12.2 & 12.9) */}
-          {floatingEmojis.map(emoji => (
-            <div 
-              key={emoji.id} 
-              className="absolute bottom-6 text-4xl animate-bounce-up-fade pointer-events-none z-50 flex flex-col items-center select-none"
-              style={{ left: `${emoji.left}%`, animationDuration: '3.5s' }}
-            >
-              <span className="drop-shadow-lg">{emoji.emoji}</span>
-              {emoji.senderName && (
-                <span className="text-[10px] bg-black/70 px-2 py-0.5 rounded-full text-white font-medium border border-white/10 mt-1 shadow backdrop-blur-sm">
-                  {emoji.senderName}
-                </span>
-              )}
-            </div>
-          ))}
-
           {/* Section 30.7 Emergency Lockdown Banner */}
           {securitySettings.suspendActivities && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-red-600/95 text-white px-5 py-2.5 rounded-2xl shadow-2xl border border-red-400/40 flex items-center gap-3 backdrop-blur-md animate-in slide-in-from-top-4 duration-300 max-w-xl">
@@ -7839,7 +7876,10 @@ export default function MeetingRoom() {
             <RecordingMenuPopover
               isOpen={showRecordingMenu}
               onClose={() => setShowRecordingMenu(false)}
-              onStartRecording={handleStartRecording}
+              onStartRecording={(mode, layout) => {
+                setShowRecordingMenu(false);
+                handleStartRecording(mode, layout);
+              }}
               onOpenSettings={() => {
                 setShowRecordingMenu(false);
                 setShowRecordingSettingsModal(true);
@@ -7848,8 +7888,8 @@ export default function MeetingRoom() {
               recordingMode={recordingMode}
               recordingLayout={recordingLayout}
               onChangeLayout={(layout) => setRecordingLayout(layout)}
-              canRecordLocal={isHost || user?.id === 'host' || coHosts?.includes(user?.id) || participantCanRecordLocal}
-              canRecordCloud={isHost || user?.id === 'host' || coHosts?.includes(user?.id)}
+              canRecordLocal={true}
+              canRecordCloud={true}
               storageStats={recordingSettings?.cloudStorage}
             />
           </div>
@@ -7875,7 +7915,9 @@ export default function MeetingRoom() {
             </button>
             
             {showReactions && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl shadow-2xl p-3 z-50 flex flex-col gap-3 w-72 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100">
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowReactions(false)} />
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl shadow-2xl p-3 z-50 flex flex-col gap-3 w-72 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100">
                 {/* Tier 1: Emoji Reactions (12.1, 12.11) */}
                 <div>
                   <div className="flex items-center justify-between pb-1.5 mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-[#333]">
@@ -7995,7 +8037,8 @@ export default function MeetingRoom() {
                   )}
                 </div>
               </div>
-            )}
+            </>
+          )}
           </div>
 
           {/* Part 20: In-Meeting Toolbar Live Captions Button with Options Menu */}
@@ -8226,10 +8269,12 @@ export default function MeetingRoom() {
             </button>
 
             {showMoreMenu && (
-              <div 
-                className="absolute bottom-full right-0 mb-3 w-72 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl shadow-2xl p-2 z-50 text-xs text-gray-200 divide-y divide-[#2F2F2F] animate-in fade-in zoom-in-95 duration-100 max-h-[80vh] overflow-y-auto no-scrollbar"
-                onClick={(e) => e.stopPropagation()}
-              >
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowMoreMenu(false)} />
+                <div 
+                  className="absolute bottom-full right-0 mb-3 w-72 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl shadow-2xl p-2 z-50 text-xs text-gray-200 divide-y divide-[#2F2F2F] animate-in fade-in zoom-in-95 duration-100 max-h-[80vh] overflow-y-auto no-scrollbar"
+                  onClick={(e) => e.stopPropagation()}
+                >
                 {/* Section 1: Collaboration & Tools */}
                 <div className="p-1 space-y-0.5">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2 py-1 block">
@@ -8522,7 +8567,8 @@ export default function MeetingRoom() {
                   </button>
                 </div>
               </div>
-            )}
+            </>
+          )}
           </div>
         </div>
 
@@ -9998,6 +10044,24 @@ export default function MeetingRoom() {
           setIsVideoOn(false);
         }}
       />
+
+      {/* Global Floating Emoji Reactions Overlay - sits above video, stage, sidebars & toolbar */}
+      <div className="fixed inset-0 pointer-events-none z-[90] overflow-hidden">
+        {floatingEmojis.map(emoji => (
+          <div 
+            key={emoji.id} 
+            className="absolute bottom-24 text-5xl animate-bounce-up-fade flex flex-col items-center select-none"
+            style={{ left: `${emoji.left}%` }}
+          >
+            <span className="drop-shadow-2xl filter transform hover:scale-110">{emoji.emoji}</span>
+            {emoji.senderName && (
+              <span className="text-xs bg-black/85 px-2.5 py-1 rounded-full text-white font-semibold border border-white/20 mt-1 shadow-2xl backdrop-blur-md">
+                {emoji.senderName}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
 
     </div>
   );

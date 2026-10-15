@@ -5,7 +5,7 @@ import {
   Users, AlertCircle, Eye, EyeOff, GripVertical, ChevronRight
 } from 'lucide-react';
 
-const API = '${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api';
+const API = `${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api`;
 
 const QUESTION_TYPES = [
   { value: 'SINGLE_CHOICE',   label: 'Single Choice',   desc: 'One answer only' },
