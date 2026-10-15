@@ -122,8 +122,15 @@ export default function RecordingsPage() {
     return activeTab === 'cloud' ? isCloud : !isCloud;
   });
 
-  const handleDelete = async (recordingId) => {
-    if (!window.confirm('Are you sure you want to delete this recording?')) return;
+  // Delete confirmation modal state
+  const [recordingToDelete, setRecordingToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirmDelete = async () => {
+    if (!recordingToDelete) return;
+    const recordingId = recordingToDelete.recordingId;
+    setIsDeleting(true);
+    const toastId = toast.loading('Deleting recording...');
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('intellmeet_token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
@@ -133,14 +140,21 @@ export default function RecordingsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success('Recording deleted');
+        toast.success('Recording deleted successfully', { id: toastId });
         setRecordings(prev => prev.filter(r => r.recordingId !== recordingId));
         if (selectedRecording?.recordingId === recordingId) setSelectedRecording(null);
+        setRecordingToDelete(null);
+      } else {
+        toast.error(data.message || 'Failed to delete recording', { id: toastId });
       }
     } catch (e) {
-      toast.error('Failed to delete recording');
+      console.error(e);
+      toast.error('Network error while deleting recording', { id: toastId });
+    } finally {
+      setIsDeleting(false);
     }
   };
+
 
   const handleRename = async (recordingId) => {
     if (!newTitle.trim()) return;
@@ -491,11 +505,15 @@ export default function RecordingsPage() {
                     </button>
 
                     <button
-                      onClick={() => handleDelete(rec.recordingId)}
-                      className="p-2 rounded-xl text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                      title="Delete Recording"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setRecordingToDelete(rec);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer hover:shadow"
+                      title="Delete this recording permanently"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                      <span>Delete</span>
                     </button>
                   </div>
                 </div>
@@ -541,11 +559,12 @@ export default function RecordingsPage() {
                   <Share2 className="w-3.5 h-3.5" /> Share
                 </button>
                 <button
-                  onClick={() => handleDelete(selectedRecording.recordingId)}
-                  className="px-3 py-1.5 rounded-xl bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300 border border-red-500/30 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                  title="Delete Recording"
+                  onClick={() => setRecordingToDelete(selectedRecording)}
+                  className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-red-600/30 transition-all cursor-pointer"
+                  title="Delete Recording permanently"
                 >
-                  <Trash2 className="w-3.5 h-3.5" /> Delete
+                  <Trash2 className="w-4 h-4 text-white" />
+                  <span>Delete Recording</span>
                 </button>
                 <button
                   onClick={() => setSelectedRecording(null)}
@@ -853,6 +872,49 @@ export default function RecordingsPage() {
           setShareRecording(rec);
         }}
       />
+
+      {/* Delete Confirmation Modal (Clear & Unmissable) */}
+      {recordingToDelete && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150">
+          <div className="bg-[#1A1A1A] border border-red-500/40 rounded-3xl w-full max-w-md p-6 text-gray-200 shadow-2xl relative">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-500 shrink-0">
+                <Trash2 className="w-7 h-7" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-bold text-white mb-1">Delete Recording Permanently?</h3>
+                <p className="text-sm text-gray-300 mb-3">
+                  Are you sure you want to delete <span className="font-semibold text-white">"{recordingToDelete.meetingTitle}"</span>?
+                </p>
+                <div className="text-xs text-red-300 bg-red-950/60 border border-red-800/60 rounded-xl p-3 mb-4 leading-relaxed">
+                  ⚠️ <strong>Warning:</strong> This will permanently delete the video file, cloud storage, AI summary, and transcript. This action cannot be undone.
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 mt-2">
+              <button
+                type="button"
+                onClick={() => setRecordingToDelete(null)}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-gray-200 font-semibold text-sm transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-bold text-sm flex items-center gap-2 shadow-lg shadow-red-600/30 transition-all cursor-pointer disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4 text-white" />
+                <span>{isDeleting ? 'Deleting...' : 'Yes, Delete Permanently'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
