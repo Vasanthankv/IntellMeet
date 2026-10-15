@@ -385,6 +385,11 @@ router.put('/:meetingId/lock', protect, async (req, res) => {
     );
     if (!meeting) return res.status(404).json({ success: false, message: 'Meeting not found' });
     res.json({ success: true, isLocked: meeting.isLocked });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // @route   POST /api/meetings/:meetingId/end
 // @desc    End meeting workflow (Finalize recordings, save end duration, queue AI pipeline)
 router.post('/:meetingId/end', protect, async (req, res) => {
