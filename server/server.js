@@ -259,6 +259,17 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Zoom-Style Active Speaker & Voice Activity Detection
+  socket.on('user-speaking', (roomId, payload) => {
+    if (!roomId) return;
+    socket.to(roomId).emit('participant-speaking-status', {
+      socketId: socket.id,
+      userId: socket.userId || payload?.userId || socket.id,
+      isSpeaking: Boolean(payload?.isSpeaking),
+      audioLevel: payload?.audioLevel || 0
+    });
+  });
+
   // Real-time Waiting Room & Admission Signaling
   socket.on('request-admission', (roomId, attendeeData) => {
     socket.join(`${roomId}-waiting`);

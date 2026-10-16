@@ -13,8 +13,13 @@ import toast from 'react-hot-toast';
 
 function RemoteParticipantTile({ participant, hasCamOn }) {
   const [remoteStream, setRemoteStream] = useState(participant.stream || null);
+  const [remoteAudioSpeaking, setRemoteAudioSpeaking] = useState(false);
   const audioRef = useRef(null);
   const videoRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const sourceRef = useRef(null);
+  const rafRef = useRef(null);
+  const releaseTimerRef = useRef(null);
 
   useEffect(() => {
     if (participant.stream) {
@@ -53,6 +58,83 @@ function RemoteParticipantTile({ participant, hasCamOn }) {
     }
   }, [remoteStream]);
 
+  // Web Audio voice activity detection on remote audio stream
+  useEffect(() => {
+    if (!remoteStream || participant.isMuted) {
+      setRemoteAudioSpeaking(false);
+      return;
+    }
+
+    const audioTrack = remoteStream.getAudioTracks && remoteStream.getAudioTracks()[0];
+    if (!audioTrack || !audioTrack.enabled || audioTrack.readyState === 'ended') {
+      setRemoteAudioSpeaking(false);
+      return;
+    }
+
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+
+      const ctx = new AudioCtx();
+      audioCtxRef.current = ctx;
+      const source = ctx.createMediaStreamSource(remoteStream);
+      sourceRef.current = source;
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.3;
+      source.connect(analyser);
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      let currentlySpeaking = false;
+
+      const checkRemoteAudio = () => {
+        if (!analyser || participant.isMuted) return;
+        analyser.getByteTimeDomainData(dataArray);
+
+        let sumSquares = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          const norm = (dataArray[i] - 128) / 128;
+          sumSquares += norm * norm;
+        }
+        const rms = Math.sqrt(sumSquares / dataArray.length);
+
+        if (rms >= 0.025) {
+          if (releaseTimerRef.current) {
+            clearTimeout(releaseTimerRef.current);
+            releaseTimerRef.current = null;
+          }
+          if (!currentlySpeaking) {
+            currentlySpeaking = true;
+            setRemoteAudioSpeaking(true);
+          }
+        } else if (currentlySpeaking && !releaseTimerRef.current) {
+          releaseTimerRef.current = setTimeout(() => {
+            currentlySpeaking = false;
+            setRemoteAudioSpeaking(false);
+            releaseTimerRef.current = null;
+          }, 450);
+        }
+
+        rafRef.current = requestAnimationFrame(checkRemoteAudio);
+      };
+
+      rafRef.current = requestAnimationFrame(checkRemoteAudio);
+    } catch (err) {
+      console.warn('Remote audio analyser note:', err);
+    }
+
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (releaseTimerRef.current) clearTimeout(releaseTimerRef.current);
+      if (sourceRef.current) {
+        try { sourceRef.current.disconnect(); } catch (e) {}
+      }
+      if (audioCtxRef.current) {
+        try { audioCtxRef.current.close(); } catch (e) {}
+      }
+    };
+  }, [remoteStream, participant.isMuted]);
+
   // Bind and play video stream
   useEffect(() => {
     if (videoRef.current && remoteStream) {
@@ -65,6 +147,7 @@ function RemoteParticipantTile({ participant, hasCamOn }) {
 
   const initials = (participant.name || 'Participant').slice(0, 2).toUpperCase();
   const hasLiveVideoTrack = remoteStream && remoteStream.getVideoTracks && remoteStream.getVideoTracks().length > 0 && remoteStream.getVideoTracks().some(t => t.readyState !== 'ended');
+  const isSpeaking = Boolean((participant.isSpeaking || remoteAudioSpeaking) && !participant.isMuted);
 
   return (
     <div className="w-full h-full relative flex items-center justify-center bg-black">
@@ -86,8 +169,8 @@ function RemoteParticipantTile({ participant, hasCamOn }) {
         />
       ) : (
         <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-b from-[#2B2B2B] to-[#1C1C1C]">
-          <div className={`w-20 h-20 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg ${
-            participant.isSpeaking ? 'bg-emerald-600 animate-pulse' : 'bg-purple-700'
+          <div className={`w-20 h-20 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg transition-all duration-200 ${
+            isSpeaking ? 'bg-purple-700 ring-4 ring-emerald-500 shadow-[0_0_25px_rgba(16,185,129,0.6)] scale-105' : 'bg-purple-700'
           }`}>
             {initials}
           </div>
@@ -315,6 +398,7 @@ export default function VideoLayoutEngine({
     const isSpotlighted = spotlightParticipantIds.includes(p.id);
     const isLocal = p.isLocal;
     const hasCamOn = isLocal ? isVideoOn : p.hasVideo !== false;
+    const isSpeaking = Boolean(p.isSpeaking && !p.isMuted);
 
     return (
       <div
@@ -324,7 +408,9 @@ export default function VideoLayoutEngine({
         onDragOver={handleDragOver}
         onDrop={(e) => handleDrop(e, orderedParticipants.findIndex(x => x.id === p.id))}
         className={`relative bg-[#202020] rounded-2xl overflow-hidden border transition-all duration-200 group flex items-center justify-center select-none shadow-xl ${
-          p.isSpeaking ? 'border-emerald-500 ring-2 ring-emerald-500/50' : 'border-[#333]'
+          isSpeaking 
+            ? 'border-emerald-500 ring-2 ring-emerald-500/80 shadow-[0_0_24px_rgba(16,185,129,0.35)]' 
+            : 'border-[#333]'
         } ${isSpotlighted ? 'ring-2 ring-amber-500 border-amber-500' : ''} ${
           isPinned && !isSpotlighted ? 'ring-2 ring-blue-500 border-blue-500' : ''
         } ${isThumbnail ? 'h-full aspect-video' : 'w-full h-full'} ${
@@ -376,7 +462,9 @@ export default function VideoLayoutEngine({
                 }}
               />
               {!isVideoOn && (
-                <div className="w-20 h-20 bg-purple-700 rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-lg">
+                <div className={`w-20 h-20 bg-purple-700 rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-lg transition-all duration-200 ${
+                  isSpeaking ? 'ring-4 ring-emerald-500 shadow-[0_0_25px_rgba(16,185,129,0.6)] scale-105' : ''
+                }`}>
                   {p.name.slice(0, 2).toUpperCase()}
                 </div>
               )}
@@ -485,13 +573,24 @@ export default function VideoLayoutEngine({
           )}
         </div>
 
-        {/* Bottom Label Tag */}
-        <div className="absolute bottom-2.5 left-2.5 bg-black/60 px-2.5 py-1 rounded-md text-white text-xs font-medium backdrop-blur-sm flex items-center gap-2 z-20">
+        {/* Bottom Label Tag with Audio-Reactive Voice Equalizer */}
+        <div className={`absolute bottom-2.5 left-2.5 bg-black/70 px-2.5 py-1 rounded-md text-white text-xs font-medium backdrop-blur-sm flex items-center gap-2 z-20 border transition-all duration-200 ${
+          isSpeaking ? 'border-emerald-500/60 shadow-[0_0_10px_rgba(16,185,129,0.4)]' : 'border-transparent'
+        }`}>
           <span>{p.name} {isLocal && '(Me)'}</span>
           {p.isMuted ? (
             <MicOff className="w-3.5 h-3.5 text-red-500" />
           ) : (
-            <Mic className={`w-3.5 h-3.5 ${p.isSpeaking ? 'text-emerald-400 animate-pulse' : 'text-gray-400'}`} />
+            <div className="flex items-center gap-1.5">
+              <Mic className={`w-3.5 h-3.5 transition-colors ${isSpeaking ? 'text-emerald-400' : 'text-gray-400'}`} />
+              {isSpeaking && (
+                <div className="flex items-end gap-0.5 h-3 px-0.5" title="Speaking">
+                  <span className="w-0.5 bg-emerald-400 rounded-full animate-[pulse_0.4s_ease-in-out_infinite] h-2" />
+                  <span className="w-0.5 bg-emerald-400 rounded-full animate-[pulse_0.25s_ease-in-out_infinite] h-3.5" />
+                  <span className="w-0.5 bg-emerald-400 rounded-full animate-[pulse_0.5s_ease-in-out_infinite] h-1.5" />
+                </div>
+              )}
+            </div>
           )}
         </div>
 

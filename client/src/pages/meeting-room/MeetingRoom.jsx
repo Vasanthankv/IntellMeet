@@ -190,6 +190,11 @@ export default function MeetingRoom() {
   const isMuted = !isAudioOn;
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   
+  // Zoom-Style Active Speaker & Voice Activity Detection States
+  const [localIsSpeaking, setLocalIsSpeaking] = useState(false);
+  const [localAudioLevel, setLocalAudioLevel] = useState(0);
+  const [speakingParticipants, setSpeakingParticipants] = useState({});
+  
   // UI Panels
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [showSecurityPopover, setShowSecurityPopover] = useState(false);
@@ -764,6 +769,12 @@ export default function MeetingRoom() {
   const peersRef = useRef([]);
   const localStreamRef = useRef(null);
   const screenTrackRef = useRef(null);
+  const localAudioContextRef = useRef(null);
+  const localSourceRef = useRef(null);
+  const localAnalyserRef = useRef(null);
+  const localRafRef = useRef(null);
+  const speakingTimeoutRef = useRef(null);
+  const lastBroadcastTimeRef = useRef(0);
 
   const [meetingTitle, setMeetingTitle] = useState(user?.name ? `${user.name}'s IntellMeet` : 'IntellMeet Meeting');
 
@@ -1003,9 +1014,17 @@ export default function MeetingRoom() {
       });
 
       // Real-time camera and microphone status from remote peer
-      socketRef.current.on('participant-media-status', ({ socketId, isAudioOn, isVideoOn }) => {
+      socketRef.current.on('participant-media-status', ({ socketId, userId, isAudioOn, isVideoOn }) => {
+        if (isAudioOn === false) {
+          setSpeakingParticipants(prev => {
+            const next = { ...prev };
+            delete next[socketId];
+            if (userId) delete next[userId];
+            return next;
+          });
+        }
         setSampleParticipants(prev => prev.map(p => {
-          if (p.id === socketId || p.userId === socketId) {
+          if (p.id === socketId || p.userId === socketId || (userId && (p.id === userId || p.userId === userId))) {
             return {
               ...p,
               isMuted: isAudioOn !== undefined ? !isAudioOn : p.isMuted,
@@ -1015,6 +1034,26 @@ export default function MeetingRoom() {
           }
           return p;
         }));
+      });
+
+      // Zoom-Style Active Speaker Detection (Voice Activity from remote participant)
+      socketRef.current.on('participant-speaking-status', ({ socketId, userId, isSpeaking, audioLevel }) => {
+        setSpeakingParticipants(prev => {
+          const effectiveId = socketId || userId;
+          if (!effectiveId) return prev;
+          if (!isSpeaking) {
+            const next = { ...prev };
+            delete next[effectiveId];
+            if (userId) delete next[userId];
+            if (socketId) delete next[socketId];
+            return next;
+          }
+          return {
+            ...prev,
+            [effectiveId]: { isSpeaking: true, audioLevel: audioLevel || 0 },
+            ...(userId ? { [userId]: { isSpeaking: true, audioLevel: audioLevel || 0 } } : {})
+          };
+        });
       });
 
       // Waiting room attendee notification
@@ -1031,6 +1070,11 @@ export default function MeetingRoom() {
       });
 
       socketRef.current.on('user-disconnected', socketId => {
+        setSpeakingParticipants(prev => {
+          const next = { ...prev };
+          delete next[socketId];
+          return next;
+        });
         const peerObj = peersRef.current.find(p => p.peerID === socketId);
         if (peerObj) {
           try { peerObj.peer.destroy(); } catch (err) {}
@@ -2654,12 +2698,180 @@ export default function MeetingRoom() {
       audioTrack.enabled = !audioTrack.enabled;
       setIsAudioOn(audioTrack.enabled);
       const cleanMId = meetingId ? meetingId.replace(/[\s-]/g, '') : '';
+      if (!audioTrack.enabled) {
+        setLocalIsSpeaking(false);
+        setLocalAudioLevel(0);
+        socketRef.current?.emit('user-speaking', cleanMId || meetingId, {
+          userId: user?.id || user?._id || 'local',
+          isSpeaking: false,
+          audioLevel: 0
+        });
+      }
       socketRef.current?.emit('toggle-media-state', cleanMId || meetingId, { isAudioOn: audioTrack.enabled });
       toast(audioTrack.enabled ? 'Microphone unmuted' : 'Microphone muted', {
         icon: audioTrack.enabled ? '🎤' : '🔇'
       });
     }
   };
+
+  // =========================================================================
+  // Zoom-Style Active Speaker & Audio-Reactive Voice Activity Detector (Web Audio API)
+  // =========================================================================
+  useEffect(() => {
+    const cleanMId = meetingId ? meetingId.replace(/[\s-]/g, '') : '';
+    const myUserId = user?.id || user?._id || 'local';
+
+    // When audio is disabled or stream is missing, immediately clear local speaking state
+    if (!isAudioOn || !stream) {
+      if (localIsSpeaking) {
+        setLocalIsSpeaking(false);
+        setLocalAudioLevel(0);
+        socketRef.current?.emit('user-speaking', cleanMId || meetingId, {
+          userId: myUserId,
+          isSpeaking: false,
+          audioLevel: 0
+        });
+      }
+      if (localRafRef.current) {
+        cancelAnimationFrame(localRafRef.current);
+        localRafRef.current = null;
+      }
+      if (localSourceRef.current) {
+        try { localSourceRef.current.disconnect(); } catch (e) {}
+        localSourceRef.current = null;
+      }
+      return;
+    }
+
+    const audioTrack = stream.getAudioTracks && stream.getAudioTracks()[0];
+    if (!audioTrack || !audioTrack.enabled || audioTrack.readyState === 'ended') {
+      if (localIsSpeaking) {
+        setLocalIsSpeaking(false);
+        setLocalAudioLevel(0);
+        socketRef.current?.emit('user-speaking', cleanMId || meetingId, {
+          userId: myUserId,
+          isSpeaking: false,
+          audioLevel: 0
+        });
+      }
+      return;
+    }
+
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+
+      if (!localAudioContextRef.current || localAudioContextRef.current.state === 'closed') {
+        localAudioContextRef.current = new AudioCtx();
+      }
+      const audioCtx = localAudioContextRef.current;
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+
+      if (localSourceRef.current) {
+        try { localSourceRef.current.disconnect(); } catch (e) {}
+        localSourceRef.current = null;
+      }
+
+      const source = audioCtx.createMediaStreamSource(stream);
+      localSourceRef.current = source;
+
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.3;
+      source.connect(analyser);
+      // NOTE: NEVER connect analyser to audioCtx.destination to prevent loopback feedback!
+      localAnalyserRef.current = analyser;
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      const SPEAKING_THRESHOLD = 0.025; // Calibrated threshold to distinguish human voice from ambient noise
+      const RELEASE_DELAY_MS = 450; // Zoom-standard release hangover delay to prevent flickering between syllables
+
+      let isCurrentlySpeaking = false;
+
+      const detectAudioLevel = () => {
+        if (!analyser || !isAudioOn) return;
+
+        analyser.getByteTimeDomainData(dataArray);
+
+        // Compute Root Mean Square (RMS) of sample values
+        let sumSquares = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          const norm = (dataArray[i] - 128) / 128;
+          sumSquares += norm * norm;
+        }
+        const rms = Math.sqrt(sumSquares / dataArray.length);
+        const normalizedLevel = Math.min(1, rms * 4);
+
+        if (rms >= SPEAKING_THRESHOLD) {
+          if (speakingTimeoutRef.current) {
+            clearTimeout(speakingTimeoutRef.current);
+            speakingTimeoutRef.current = null;
+          }
+
+          if (!isCurrentlySpeaking) {
+            isCurrentlySpeaking = true;
+            setLocalIsSpeaking(true);
+            setLocalAudioLevel(normalizedLevel);
+            socketRef.current?.emit('user-speaking', cleanMId || meetingId, {
+              userId: myUserId,
+              isSpeaking: true,
+              audioLevel: normalizedLevel
+            });
+          } else {
+            // Throttle continuous audio level updates
+            const now = Date.now();
+            if (now - lastBroadcastTimeRef.current > 180) {
+              lastBroadcastTimeRef.current = now;
+              setLocalAudioLevel(normalizedLevel);
+              socketRef.current?.emit('user-speaking', cleanMId || meetingId, {
+                userId: myUserId,
+                isSpeaking: true,
+                audioLevel: normalizedLevel
+              });
+            }
+          }
+        } else {
+          // Below threshold: hold release delay before resetting active speaker state
+          if (isCurrentlySpeaking && !speakingTimeoutRef.current) {
+            speakingTimeoutRef.current = setTimeout(() => {
+              isCurrentlySpeaking = false;
+              setLocalIsSpeaking(false);
+              setLocalAudioLevel(0);
+              socketRef.current?.emit('user-speaking', cleanMId || meetingId, {
+                userId: myUserId,
+                isSpeaking: false,
+                audioLevel: 0
+              });
+              speakingTimeoutRef.current = null;
+            }, RELEASE_DELAY_MS);
+          }
+        }
+
+        localRafRef.current = requestAnimationFrame(detectAudioLevel);
+      };
+
+      localRafRef.current = requestAnimationFrame(detectAudioLevel);
+    } catch (err) {
+      console.warn('Local AudioContext speaking analyser error:', err);
+    }
+
+    return () => {
+      if (localRafRef.current) {
+        cancelAnimationFrame(localRafRef.current);
+        localRafRef.current = null;
+      }
+      if (speakingTimeoutRef.current) {
+        clearTimeout(speakingTimeoutRef.current);
+        speakingTimeoutRef.current = null;
+      }
+      if (localSourceRef.current) {
+        try { localSourceRef.current.disconnect(); } catch (e) {}
+        localSourceRef.current = null;
+      }
+    };
+  }, [stream, isAudioOn, meetingId, user]);
 
   // Section 7.1 & 7.7: Join Computer Audio
   const handleJoinComputerAudio = async () => {
@@ -5729,17 +5941,37 @@ export default function MeetingRoom() {
 
   const allParticipants = useMemo(() => {
     const list = [
-      { id: 'local', name: user?.name || 'You', isLocal: true, isMuted: !isAudioOn, isVideoOff: !isVideoOn, hasVideo: isVideoOn, stream: stream || localStreamRef.current }
+      { 
+        id: 'local', 
+        name: user?.name || 'You', 
+        isLocal: true, 
+        isMuted: !isAudioOn, 
+        isVideoOff: !isVideoOn, 
+        hasVideo: isVideoOn, 
+        stream: stream || localStreamRef.current,
+        isSpeaking: localIsSpeaking && isAudioOn,
+        audioLevel: localAudioLevel
+      }
     ];
 
     const remoteMap = new Map();
 
     // 1. Populate from sampleParticipants
     sampleParticipants.forEach(sp => {
+      const spId = sp.id || sp.userId;
+      const isSpeaking = Boolean(
+        speakingParticipants[spId]?.isSpeaking ||
+        (sp.userId && speakingParticipants[sp.userId]?.isSpeaking) ||
+        (sp.socketId && speakingParticipants[sp.socketId]?.isSpeaking)
+      );
+      const audioLevel = speakingParticipants[spId]?.audioLevel || 0;
+
       remoteMap.set(sp.id, {
         ...sp,
         isLocal: false,
-        hasVideo: sp.hasVideo !== undefined ? sp.hasVideo : !sp.isVideoOff
+        hasVideo: sp.hasVideo !== undefined ? sp.hasVideo : !sp.isVideoOff,
+        isSpeaking: isSpeaking && !sp.isMuted,
+        audioLevel: sp.isMuted ? 0 : audioLevel
       });
     });
 
@@ -5749,6 +5981,16 @@ export default function MeetingRoom() {
       const existing = matchKey ? remoteMap.get(matchKey) : null;
       const finalId = p.peerID;
 
+      const isSpeaking = Boolean(
+        speakingParticipants[finalId]?.isSpeaking || 
+        (existing?.userId && speakingParticipants[existing.userId]?.isSpeaking) ||
+        (existing?.id && speakingParticipants[existing.id]?.isSpeaking)
+      );
+      const audioLevel = speakingParticipants[finalId]?.audioLevel || 
+        (existing?.userId ? speakingParticipants[existing.userId]?.audioLevel : 0) || 0;
+
+      const isMuted = existing?.isMuted || false;
+
       remoteMap.set(finalId, {
         ...(existing || {}),
         id: finalId,
@@ -5756,9 +5998,11 @@ export default function MeetingRoom() {
         isLocal: false,
         peer: p.peer,
         stream: p.stream || existing?.stream,
-        isMuted: existing?.isMuted || false,
+        isMuted,
         isVideoOff: existing?.isVideoOff || false,
-        hasVideo: existing?.hasVideo !== undefined ? existing?.hasVideo : true
+        hasVideo: existing?.hasVideo !== undefined ? existing?.hasVideo : true,
+        isSpeaking: isSpeaking && !isMuted,
+        audioLevel: isMuted ? 0 : audioLevel
       });
 
       if (matchKey && matchKey !== finalId) {
@@ -5767,7 +6011,7 @@ export default function MeetingRoom() {
     });
 
     return [...list, ...Array.from(remoteMap.values())];
-  }, [sampleParticipants, peers, isAudioOn, isVideoOn, stream, user?.name]);
+  }, [sampleParticipants, peers, isAudioOn, isVideoOn, stream, user?.name, localIsSpeaking, localAudioLevel, speakingParticipants]);
   const participants = allParticipants;
 
   const filteredParticipants = allParticipants.filter(p => 
