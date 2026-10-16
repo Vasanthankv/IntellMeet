@@ -5,33 +5,24 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const getApiBaseUrl = () => {
-  if (typeof window !== 'undefined') {
-    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      // If accessed via the standalone frontend Render URL, point to the dedicated backend service
-      if (window.location.origin.includes('frontend')) {
-        return 'https://intellmeet-backend-h3md.onrender.com/api';
-      }
-      // If accessed via unified full-stack URL or custom domain, use same origin
-      return `${window.location.origin}/api`;
-    }
+  if (import.meta.env.VITE_API_URL) {
+    const base = import.meta.env.VITE_API_URL.replace(/\/$/, '');
+    return base.endsWith('/api') ? base : `${base}/api`;
   }
-  return import.meta.env.VITE_API_URL 
-    ? (import.meta.env.VITE_API_URL.endsWith('/api') ? import.meta.env.VITE_API_URL : `${import.meta.env.VITE_API_URL}/api`)
-    : 'http://localhost:5000/api';
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return 'https://intellmeet-backend-h3md.onrender.com/api';
+  }
+  return 'http://localhost:5000/api';
 };
 
 export const getServerBaseUrl = () => {
-  if (typeof window !== 'undefined') {
-    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      if (window.location.origin.includes('frontend')) {
-        return 'https://intellmeet-backend-h3md.onrender.com';
-      }
-      return window.location.origin;
-    }
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL.replace(/\/api$/, '').replace(/\/$/, '');
   }
-  return import.meta.env.VITE_API_URL 
-    ? import.meta.env.VITE_API_URL.replace(/\/api$/, '')
-    : 'http://localhost:5000';
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return 'https://intellmeet-backend-h3md.onrender.com';
+  }
+  return 'http://localhost:5000';
 };
 
 export const API_BASE_URL = getApiBaseUrl();
