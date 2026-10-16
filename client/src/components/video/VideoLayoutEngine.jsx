@@ -161,7 +161,16 @@ function RemoteParticipantTile({ participant, hasCamOn }) {
       {/* Video display when camera is active and stream has live video track */}
       {hasCamOn && hasLiveVideoTrack && remoteStream ? (
         <video
-          ref={videoRef}
+          ref={el => {
+            if (el) {
+              el.muted = true;
+              el.defaultMuted = true;
+              el.playsInline = true;
+              el.setAttribute('playsinline', '');
+              el.setAttribute('webkit-playsinline', '');
+            }
+            videoRef.current = el;
+          }}
           autoPlay
           playsInline
           muted
@@ -445,6 +454,11 @@ export default function VideoLayoutEngine({
                     else userVideoRef.current = el;
                   }
                   if (el) {
+                    el.muted = true;
+                    el.defaultMuted = true;
+                    el.playsInline = true;
+                    el.setAttribute('playsinline', '');
+                    el.setAttribute('webkit-playsinline', '');
                     if (localStream && el.srcObject !== localStream) {
                       el.srcObject = localStream;
                     }
@@ -1347,14 +1361,14 @@ export default function VideoLayoutEngine({
     const secondaryParticipants = orderedParticipants.filter(p => !focalItems.some(f => f.id === p.id));
 
     return (
-      <div className="w-full h-full flex flex-col p-4 gap-4">
+      <div className="w-full h-full flex flex-col p-2 sm:p-4 gap-2 sm:gap-4 overflow-hidden">
         {/* Top Strip of Non-Focal Attendees */}
         {secondaryParticipants.length > 0 && (
-          <div className="flex gap-3 overflow-x-auto pb-1 shrink-0 h-28">
+          <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-1 shrink-0 h-20 sm:h-28 no-scrollbar">
             {secondaryParticipants.map(p => (
               <div 
                 key={p.id} 
-                className="w-44 h-full shrink-0 cursor-pointer"
+                className="w-28 sm:w-44 h-full shrink-0 cursor-pointer"
                 onClick={() => onTogglePinParticipant(p.id)}
               >
                 {renderParticipantTile(p, false, true)}
@@ -1366,7 +1380,7 @@ export default function VideoLayoutEngine({
         {/* Hero Speaker / Spotlight / Pinned Stage */}
         <div className="flex-1 w-full relative flex items-center justify-center min-h-0">
           <div className={`w-full h-full max-w-5xl ${
-            focalItems.length > 1 ? 'grid grid-cols-2 gap-4' : 'aspect-video'
+            focalItems.length > 1 ? 'grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4' : 'w-full h-full'
           }`}>
             {focalItems.map(p => (
               <div key={p.id} className="w-full h-full">
@@ -1384,8 +1398,8 @@ export default function VideoLayoutEngine({
   // --------------------------------------------------------------------------
   if (layoutMode === 'dynamic-gallery') {
     return (
-      <div className="w-full h-full p-4 flex flex-col items-center justify-center overflow-hidden">
-        <div className="w-full max-w-6xl grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 p-2 items-center justify-center">
+      <div className="w-full h-full p-2 sm:p-4 flex flex-col items-center justify-center overflow-hidden">
+        <div className="w-full max-w-6xl grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2 sm:gap-3 p-1 sm:p-2 items-center justify-center">
           {orderedParticipants.map(p => (
             <div key={p.id} className="w-full aspect-[3/4]">
               {renderParticipantTile(p, false, false, true)}
@@ -1403,30 +1417,30 @@ export default function VideoLayoutEngine({
   const pagedParticipants = orderedParticipants.slice(galleryPage * PAGE_SIZE, (galleryPage + 1) * PAGE_SIZE);
 
   const count = pagedParticipants.length;
-  let gridClass = 'grid-cols-1 max-w-3xl aspect-video';
-  if (count === 2) gridClass = 'grid-cols-2 max-w-5xl aspect-video';
-  else if (count <= 4) gridClass = 'grid-cols-2 max-w-5xl aspect-[4/3]';
-  else if (count <= 6) gridClass = 'grid-cols-3 max-w-6xl aspect-[16/9]';
-  else gridClass = 'grid-cols-3 max-w-6xl aspect-[16/9]';
+  let gridClass = 'grid-cols-1 w-full max-w-3xl h-full sm:aspect-video';
+  if (count === 2) gridClass = 'grid-cols-1 sm:grid-cols-2 w-full max-w-5xl h-full sm:aspect-video';
+  else if (count <= 4) gridClass = 'grid-cols-1 sm:grid-cols-2 w-full max-w-5xl h-full sm:aspect-[4/3]';
+  else if (count <= 6) gridClass = 'grid-cols-2 sm:grid-cols-3 w-full max-w-6xl h-full sm:aspect-[16/9]';
+  else gridClass = 'grid-cols-2 sm:grid-cols-3 w-full max-w-6xl h-full sm:aspect-[16/9]';
 
   return (
-    <div className="w-full h-full p-4 flex flex-col items-center justify-center overflow-hidden relative">
+    <div className="w-full h-full p-2 sm:p-4 flex flex-col items-center justify-center overflow-hidden relative">
       
       {/* Host Custom Order Toolbar Banner (Section 9.4) */}
       {hasCustomReorder && (
-        <div className="absolute top-4 bg-[#242424]/90 border border-blue-500/40 rounded-xl px-4 py-2 flex items-center gap-3 text-xs z-30 shadow-xl backdrop-blur-md">
+        <div className="absolute top-2 sm:top-4 bg-[#242424]/90 border border-blue-500/40 rounded-xl px-3 py-1.5 sm:px-4 sm:py-2 flex items-center gap-2 sm:gap-3 text-xs z-30 shadow-xl backdrop-blur-md">
           <span className="text-gray-300">Custom Gallery Order active</span>
           {isHostOrCoHost && onHostBroadcastVideoOrder && (
             <button
               onClick={() => onHostBroadcastVideoOrder(customOrder)}
-              className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition-all shadow-md"
+              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition-all shadow-md text-xs"
             >
-              Follow Host's Video Order
+              Follow Host
             </button>
           )}
           <button
             onClick={handleResetCustomOrder}
-            className="px-2 py-1 text-gray-400 hover:text-white flex items-center gap-1"
+            className="px-2 py-1 text-gray-400 hover:text-white flex items-center gap-1 text-xs"
           >
             <RotateCcw className="w-3 h-3" /> Reset
           </button>
@@ -1434,9 +1448,9 @@ export default function VideoLayoutEngine({
       )}
 
       {/* Gallery Grid */}
-      <div className={`w-full flex-1 grid gap-4 p-2 ${gridClass} items-center justify-center min-h-0`}>
+      <div className={`w-full flex-1 grid gap-2 sm:gap-4 p-1 sm:p-2 ${gridClass} items-center justify-center min-h-0`}>
         {pagedParticipants.map(p => (
-          <div key={p.id} className="w-full h-full max-h-[70vh]">
+          <div key={p.id} className="w-full h-full max-h-[85vh] sm:max-h-[70vh] flex items-center justify-center">
             {renderParticipantTile(p, false, false)}
           </div>
         ))}
