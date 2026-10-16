@@ -16,8 +16,8 @@ RUN npm ci --omit=dev || npm install --omit=dev
 # Copy application source code
 COPY . .
 
-# Create uploads and public directories
-RUN mkdir -p uploads public
+# Create uploads directory
+RUN mkdir -p uploads
 
 # Expose backend port
 EXPOSE 5000
