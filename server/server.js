@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import http from 'http';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { Server } from 'socket.io';
 import { connectDB } from './config/db.js';
@@ -1172,6 +1173,30 @@ io.on('connection', (socket) => {
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Unified Full-Stack Deployment: Static Frontend & SPA Fallback Route
+// Enables hosting the entire IntelliMeet website + API under one single URL.
+// ─────────────────────────────────────────────────────────────────────────────
+const clientDistPath = path.resolve(__dirname, 'public');
+const fallbackDistPath = path.resolve(__dirname, '../client/dist');
+
+const staticDir = fs.existsSync(clientDistPath) 
+  ? clientDistPath 
+  : (fs.existsSync(fallbackDistPath) ? fallbackDistPath : null);
+
+if (staticDir) {
+  console.log(`[Unified Server] Serving frontend static assets from: ${staticDir}`);
+  app.use(express.static(staticDir));
+
+  // SPA Catch-All: any route not handled by /api, /uploads, or /socket.io serves index.html
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/socket.io')) {
+      return next();
+    }
+    res.sendFile(path.join(staticDir, 'index.html'));
+  });
+}
 
 // Start DB and Express Server
 const startServer = async () => {

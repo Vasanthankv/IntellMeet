@@ -3,13 +3,13 @@
 
 services:
   # ─────────────────────────────────────────────────────────────────────────────
-  # 1. IntellMeet Backend API & Real-time WebRTC/Socket.IO Server
+  # 1. IntellMeet Unified Full-Stack Web Application (Frontend + Backend + WebSockets)
   # ─────────────────────────────────────────────────────────────────────────────
   - type: web
     name: intellmeet-backend
     runtime: docker
-    dockerfilePath: ./server/Dockerfile
-    dockerContext: ./server
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     plan: free
     region: oregon
     healthCheckPath: /api/health

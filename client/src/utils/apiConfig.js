@@ -5,8 +5,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const getApiBaseUrl = () => {
-  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    return 'https://intellmeet-backend-h3md.onrender.com/api';
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      // If accessed via the standalone frontend Render URL, point to the dedicated backend service
+      if (window.location.origin.includes('frontend')) {
+        return 'https://intellmeet-backend-h3md.onrender.com/api';
+      }
+      // If accessed via unified full-stack URL or custom domain, use same origin
+      return `${window.location.origin}/api`;
+    }
   }
   return import.meta.env.VITE_API_URL 
     ? (import.meta.env.VITE_API_URL.endsWith('/api') ? import.meta.env.VITE_API_URL : `${import.meta.env.VITE_API_URL}/api`)
@@ -14,8 +21,13 @@ export const getApiBaseUrl = () => {
 };
 
 export const getServerBaseUrl = () => {
-  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    return 'https://intellmeet-backend-h3md.onrender.com';
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      if (window.location.origin.includes('frontend')) {
+        return 'https://intellmeet-backend-h3md.onrender.com';
+      }
+      return window.location.origin;
+    }
   }
   return import.meta.env.VITE_API_URL 
     ? import.meta.env.VITE_API_URL.replace(/\/api$/, '')
