@@ -3,6 +3,7 @@ import express from 'express';
 import { generateGeminiContent, isGeminiConfigured } from '../services/geminiService.js';
 import { MeetingAIQuestionSession, MeetingQuestionItem } from '../models/MeetingQuestion.js';
 import { MeetingTranscript } from '../models/MeetingTranscript.js';
+import { safeFindTranscript } from '../services/transcriptStore.js';
 import ChatMessage from '../models/ChatMessage.js';
 import { protect } from '../middleware/authMiddleware.js';
 
@@ -209,10 +210,7 @@ router.post('/ask', protect, async (req, res) => {
 
     // Source A: Part 24 Transcript
     if (session.allowedSources?.transcript !== false) {
-      let transcriptDoc = null;
-      if (mongoose.connection.readyState === 1) {
-        try { transcriptDoc = await MeetingTranscript.findOne({ meetingId }).sort({ createdAt: -1 }); } catch (e) {}
-      }
+      const transcriptDoc = await safeFindTranscript(meetingId);
       if (transcriptDoc?.segments) {
         let segs = transcriptDoc.segments;
         // Scope filtering (26.13)

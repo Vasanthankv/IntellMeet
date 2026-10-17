@@ -3,6 +3,7 @@ import express from 'express';
 import { generateGeminiContent, isGeminiConfigured } from '../services/geminiService.js';
 import { MeetingSummary } from '../models/MeetingSummary.js';
 import { MeetingTranscript } from '../models/MeetingTranscript.js';
+import { safeFindTranscript } from '../services/transcriptStore.js';
 import Task from '../models/Task.js';
 import ChatMessage from '../models/ChatMessage.js';
 import { protect } from '../middleware/authMiddleware.js';
@@ -188,16 +189,8 @@ router.post('/generate', protect, async (req, res) => {
 
     if (template) summary.template = template;
 
-    // Fetch conversation transcript segments from Part 24 MeetingTranscript
-    let transcriptDoc = null;
-    if (mongoose.connection.readyState === 1) {
-      try {
-        transcriptDoc = await Promise.race([
-          MeetingTranscript.findOne({ meetingId }).sort({ createdAt: -1 }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
-        ]);
-      } catch (e) {}
-    }
+    // Fetch conversation transcript segments safely
+    const transcriptDoc = await safeFindTranscript(meetingId);
     let segments = transcriptDoc?.segments || [];
 
     if (segments.length === 0) {

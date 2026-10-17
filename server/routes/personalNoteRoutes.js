@@ -3,6 +3,7 @@ import express from 'express';
 import { generateGeminiContent, isGeminiConfigured } from '../services/geminiService.js';
 import { PersonalNote } from '../models/PersonalNote.js';
 import { MeetingTranscript } from '../models/MeetingTranscript.js';
+import { safeFindTranscript } from '../services/transcriptStore.js';
 import Meeting from '../models/Meeting.js';
 import User from '../models/User.js';
 import { protect } from '../middleware/authMiddleware.js';
@@ -291,18 +292,8 @@ router.post('/:noteId/ai-enhance', protect, async (req, res) => {
 
     const combinedManualNotes = [manualNotesText, ...sectionTexts].filter(Boolean).join('\n\n') || 'None provided yet.';
 
-    // 2. Fetch Transcript Segments (27.3) with safe timeout
-    let transcriptDoc = null;
-    if (mongoose.connection.readyState === 1) {
-      try {
-        transcriptDoc = await Promise.race([
-          MeetingTranscript.findOne({ meetingId: note.meetingId }).sort({ createdAt: -1 }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
-        ]);
-      } catch (e) {
-        console.warn('Transcript lookup timeout, proceeding with manual notes...');
-      }
-    }
+    // 2. Fetch Transcript Segments (27.3) safely
+    const transcriptDoc = await safeFindTranscript(note.meetingId);
     const transcriptSegments = transcriptDoc?.segments || [];
     const formattedTranscript = transcriptSegments.map(s => 
       `[${formatTimestamp(s.startTime || 0)}] ${s.speakerName}: ${s.text}`

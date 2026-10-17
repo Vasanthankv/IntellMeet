@@ -1,6 +1,7 @@
 import express from 'express';
 import { generateGeminiContent, isGeminiConfigured } from '../services/geminiService.js';
 import { MeetingTranscript } from '../models/MeetingTranscript.js';
+import { safeFindTranscript, safeSaveTranscript, getOrCreateTranscript } from '../services/transcriptStore.js';
 import Task from '../models/Task.js';
 import { protect } from '../middleware/authMiddleware.js';
 
@@ -43,16 +44,12 @@ router.get('/', protect, async (req, res) => {
     const meetingId = getMeetingId(req);
     if (!meetingId) return res.status(400).json({ success: false, message: 'meetingId required' });
 
-    let transcript = await MeetingTranscript.findOne({ meetingId }).sort({ createdAt: -1 });
-    if (!transcript) {
-      transcript = await MeetingTranscript.create({
-        meetingId,
-        status: 'NOT_STARTED',
-        enabled: true,
-        segments: [],
-        aiSummary: {}
-      });
-    }
+    let transcript = await getOrCreateTranscript(meetingId, {
+      status: 'NOT_STARTED',
+      enabled: true,
+      segments: [],
+      aiSummary: {}
+    });
 
     res.json({ success: true, transcript });
   } catch (err) {
@@ -166,15 +163,11 @@ router.post('/segments', protect, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Segment text is required' });
     }
 
-    let transcript = await MeetingTranscript.findOne({ meetingId }).sort({ createdAt: -1 });
-    if (!transcript) {
-      transcript = await MeetingTranscript.create({
-        meetingId,
-        status: 'LIVE',
-        startedAt: new Date(),
-        segments: []
-      });
-    }
+    let transcript = await getOrCreateTranscript(meetingId, {
+      status: 'LIVE',
+      startedAt: new Date(),
+      segments: []
+    });
 
     const startOffset = startTime !== undefined 
       ? Number(startTime) 
@@ -200,7 +193,7 @@ router.post('/segments', protect, async (req, res) => {
     };
 
     transcript.segments.push(newSegment);
-    await transcript.save();
+    await safeSaveTranscript(transcript);
 
     res.status(201).json({ 
       success: true, 
