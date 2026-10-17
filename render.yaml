@@ -24,6 +24,19 @@ services:
         generateValue: true
       - key: GEMINI_API_KEY
         sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: FRONTEND_URL
+        value: https://intellmeet-frontend-5khf.onrender.com
+
 
   # ─────────────────────────────────────────────────────────────────────────────
   # 2. IntellMeet Frontend Single Page App (Static Site - Free, Fast CDN, 0 Sleep)

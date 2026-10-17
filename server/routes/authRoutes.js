@@ -36,6 +36,25 @@ const saveFallbackUser = (user) => {
   fs.writeFileSync(fallbackDbPath, JSON.stringify(users, null, 2));
 };
 
+import {
+  sendWelcomeEmail,
+  sendLoginNotificationEmail,
+  queueLoginNotification,
+  queueWelcomeNotification,
+  verifyEmailService,
+  isEmailConfigured,
+} from '../services/emailService.js';
+
+// Helper to extract sanitized client connection details (IP & User-Agent)
+const getClientDetails = (req) => {
+  const forwarded = req.headers['x-forwarded-for'];
+  const ip = forwarded
+    ? forwarded.split(',')[0].trim()
+    : (req.socket?.remoteAddress || req.ip || 'Unknown IP');
+  const userAgent = req.headers['user-agent'] || 'Unknown Browser/Device';
+  return { ip, userAgent };
+};
+
 // Helper to generate JWT token
 const generateToken = (id, email) => {
   return jwt.sign({ id, email }, process.env.JWT_SECRET || 'intellmeet_jwt_secret_key_2026_secure', {
@@ -122,6 +141,18 @@ router.post('/register', async (req, res) => {
 
     const token = generateToken(newUser._id || newUser.id, newUser.email);
 
+    // Extract client connection details safely
+    const { ip, userAgent } = getClientDetails(req);
+
+    // Queue personalized registration confirmation email (dispatched reliably in background without blocking response)
+    queueWelcomeNotification(newUser, { ip, userAgent }, async (result) => {
+      if (result.success && isDbConnected && newUser._id) {
+        try {
+          await User.findByIdAndUpdate(newUser._id, { welcomeEmailSentAt: new Date() });
+        } catch (e) {}
+      }
+    });
+
     const userResponse = {
       id: newUser._id || newUser.id,
       _id: newUser._id || newUser.id,
@@ -185,6 +216,33 @@ router.post('/login', async (req, res) => {
 
     const token = generateToken(user._id || user.id, user.email);
 
+    // Extract client connection details safely
+    const { ip, userAgent } = getClientDetails(req);
+
+    // Queue personalized security login notification email (dispatched reliably in background without delaying login response)
+    queueLoginNotification(
+      user,
+      {
+        method: 'Email & Password',
+        provider: 'Email & Password',
+        ip,
+        userAgent,
+      },
+      async (result) => {
+        if (isDbConnected && user._id) {
+          try {
+            await User.findByIdAndUpdate(user._id, {
+              lastLoginAt: new Date(),
+              lastLoginProvider: 'local',
+              lastLoginIp: ip,
+              lastLoginUserAgent: userAgent,
+              ...(result.success ? { lastLoginNotificationSentAt: new Date() } : {}),
+            });
+          } catch (e) {}
+        }
+      }
+    );
+
     const userResponse = {
       id: user._id || user.id,
       _id: user._id || user.id,
@@ -227,11 +285,13 @@ router.post('/social', async (req, res) => {
 
     const isDbConnected = mongoose.connection.readyState === 1;
     let user = null;
+    let isNewUser = false;
 
     if (isDbConnected) {
       user = await User.findOne({ email: email.toLowerCase() });
 
       if (!user) {
+        isNewUser = true;
         // Auto-register: generate a valid hashed dummy password for social-only users
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash('social_oauth_' + Date.now(), salt);
@@ -259,6 +319,7 @@ router.post('/social', async (req, res) => {
       user = users.find(u => u.email === email.toLowerCase());
 
       if (!user) {
+        isNewUser = true;
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash('social_oauth_' + Date.now(), salt);
         const p1 = Math.floor(100 + Math.random() * 900);
@@ -286,6 +347,46 @@ router.post('/social', async (req, res) => {
     }
 
     const token = generateToken(user._id || user.id, user.email);
+
+    // Extract client connection details safely
+    const { ip, userAgent } = getClientDetails(req);
+    const providerName = provider || 'Google';
+
+    // If new user registered via social login, send welcome confirmation in background
+    if (isNewUser) {
+      queueWelcomeNotification(user, { ip, userAgent, provider: providerName }, async (result) => {
+        if (result.success && isDbConnected && user._id) {
+          try {
+            await User.findByIdAndUpdate(user._id, { welcomeEmailSentAt: new Date() });
+          } catch (e) {}
+        }
+      });
+    }
+
+    // Queue personalized security login notification email for the social sign-in session
+    // (Deduplication cache automatically suppresses rapid duplicate callbacks within 60s)
+    queueLoginNotification(
+      user,
+      {
+        method: `${providerName} Social Login`,
+        provider: providerName,
+        ip,
+        userAgent,
+      },
+      async (result) => {
+        if (isDbConnected && user._id) {
+          try {
+            await User.findByIdAndUpdate(user._id, {
+              lastLoginAt: new Date(),
+              lastLoginProvider: providerName.toLowerCase(),
+              lastLoginIp: ip,
+              lastLoginUserAgent: userAgent,
+              ...(result.success ? { lastLoginNotificationSentAt: new Date() } : {}),
+            });
+          } catch (e) {}
+        }
+      }
+    );
 
     return res.json({
       success: true,
@@ -388,6 +489,29 @@ router.put('/profile', protect, async (req, res) => {
     return res.status(404).json({ message: 'User not found' });
   } catch (error) {
     return res.status(500).json({ message: error.message });
+  }
+});
+
+// @route   GET /api/auth/email-status
+// @desc    Safe diagnostic status check for Email Notification Service
+// @access  Public
+router.get('/email-status', async (req, res) => {
+  try {
+    const status = await verifyEmailService();
+    return res.json({
+      success: true,
+      service: 'IntelliMeet Email Notification Service',
+      configured: status.configured,
+      status: status.status,
+      message: status.message,
+      smtpHostConfigured: Boolean(process.env.SMTP_HOST || process.env.EMAIL_SERVICE),
+      smtpUserConfigured: Boolean(process.env.SMTP_USER),
+      smtpFrom: process.env.SMTP_FROM || process.env.EMAIL_FROM || (process.env.SMTP_USER ? `IntelliMeet <${process.env.SMTP_USER}>` : 'Default Sender'),
+      queuePending: status.queuePending || 0,
+      recentLogs: status.recentLogs || [],
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
   }
 });
 

@@ -1175,13 +1175,17 @@ io.on('connection', (socket) => {
 });
 
 // Start DB and Express Server
-const startServer = async () => {
-  await connectDB();
+const startServer = () => {
   server.listen(PORT, () => {
     console.log(`================================================`);
     console.log(`🚀 IntellMeet Server running on port ${PORT}`);
     console.log(`🔗 API Base URL: http://localhost:${PORT}/api`);
     console.log(`================================================`);
+  });
+
+  // Connect to DB asynchronously without blocking server port binding
+  connectDB().catch((err) => {
+    console.error('Initial DB connection error:', err.message);
   });
 };
 

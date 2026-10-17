@@ -300,8 +300,24 @@ export default function Login() {
     defaultValues: { email: '', password: '' }
   });
 
+  // Preload dashboard and meeting room chunks in browser idle time
+  // so post-login navigation and meeting access feel instantaneous
+  React.useEffect(() => {
+    const preloadRoutes = () => {
+      import('../Dashboard');
+      import('../meeting-room/MeetingRoom');
+      import('../meetings/MeetingsIndex');
+    };
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      window.requestIdleCallback(preloadRoutes);
+    } else {
+      setTimeout(preloadRoutes, 300);
+    }
+  }, []);
+
   // ── Email/Password login ──
   const onSubmit = async (data) => {
+    if (isLoading) return; // Prevent duplicate concurrent submissions
     try {
       setIsLoading(true);
       const res = await authService.login(data.email, data.password);
@@ -323,6 +339,7 @@ export default function Login() {
 
   // ── Process account selection from chooser ──
   const processSocialLogin = async (account) => {
+    if (socialLoading) return; // Prevent duplicate concurrent social login requests
     setSocialLoading(true);
     try {
       const providerData = {

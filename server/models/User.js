@@ -146,6 +146,12 @@ const userSchema = new mongoose.Schema(
       default: [0, 0, 0, 0, 0, 0, 0], // Mon to Sun
     },
     recentActivity: [activitySchema],
+    lastLoginAt: { type: Date },
+    lastLoginProvider: { type: String, default: 'local' },
+    lastLoginIp: { type: String, default: '' },
+    lastLoginUserAgent: { type: String, default: '' },
+    lastLoginNotificationSentAt: { type: Date },
+    welcomeEmailSentAt: { type: Date },
   },
   {
     timestamps: true,

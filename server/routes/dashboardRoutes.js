@@ -20,8 +20,10 @@ router.get('/stats', protect, async (req, res) => {
     let meetings = [];
 
     if (isDbConnected) {
-      user = await User.findById(userId).select('-password');
-      meetings = await Meeting.find({ host: userId }).sort({ createdAt: -1 });
+      [user, meetings] = await Promise.all([
+        User.findById(userId).select('-password').lean(),
+        Meeting.find({ host: userId }).select('title date time participants status meetingId createdAt').sort({ createdAt: -1 }).lean(),
+      ]);
     }
 
     // Default stats if empty
