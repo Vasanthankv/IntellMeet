@@ -10,7 +10,7 @@ export const getApiBaseUrl = () => {
     return base.endsWith('/api') ? base : `${base}/api`;
   }
   if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    return 'https://intellmeet-backend-h3md.onrender.com/api';
+    return 'https://intellmeet-backend-rc32.onrender.com/api';
   }
   return 'http://localhost:5000/api';
 };
@@ -20,7 +20,7 @@ export const getServerBaseUrl = () => {
     return import.meta.env.VITE_API_URL.replace(/\/api$/, '').replace(/\/$/, '');
   }
   if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    return 'https://intellmeet-backend-h3md.onrender.com';
+    return 'https://intellmeet-backend-rc32.onrender.com';
   }
   return 'http://localhost:5000';
 };

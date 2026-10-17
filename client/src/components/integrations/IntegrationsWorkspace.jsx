@@ -7,7 +7,7 @@ import {
 import toast from 'react-hot-toast';
 import AddToCalendarDropdown from './AddToCalendarDropdown';
 
-const API_BASE = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' ? 'https://intellmeet-backend-h3md.onrender.com' : 'http://localhost:5000';
+const API_BASE = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' ? 'https://intellmeet-backend-rc32.onrender.com' : 'http://localhost:5000';
 
 export default function IntegrationsWorkspace({ isAdminView = false }) {
   const [activeCategory, setActiveCategory] = useState('ALL');
@@ -216,7 +216,7 @@ export default function IntegrationsWorkspace({ isAdminView = false }) {
   const handleDeleteWebhook = async (subscriptionId) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/integrations/webhooks/${subscriptionId}`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/integrations/webhooks/${subscriptionId}`, {
         method: 'DELETE',
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });

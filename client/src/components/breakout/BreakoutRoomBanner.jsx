@@ -38,7 +38,7 @@ export default function BreakoutRoomBanner({
   const handleAskForHelp = async () => {
     try {
       setHasRequestedHelp(true);
-      const res = await axios.post(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/breakout/help`, {
+      const res = await axios.post(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/breakout/help`, {
         roomId: room.roomId,
         userId: currentUser.id,
         userName: currentUser.name,
@@ -65,7 +65,7 @@ export default function BreakoutRoomBanner({
   // Return to Main Meeting (18.16)
   const handleLeaveRoom = async () => {
     try {
-      await axios.post(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/breakout/leave`, {
+      await axios.post(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/breakout/leave`, {
         roomId: room.roomId,
         userId: currentUser.id
       });

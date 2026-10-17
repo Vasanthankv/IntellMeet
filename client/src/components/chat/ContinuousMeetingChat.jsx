@@ -62,7 +62,7 @@ export default function ContinuousMeetingChat({ meeting, meetingId, user, onOpen
     const socketUrl =
       import.meta.env.VITE_API_URL ||
       (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-        ? (typeof localStorage !== 'undefined' && localStorage.getItem('intellmeet_api_url')) || 'https://intellmeet-backend-h3md.onrender.com'
+        ? (typeof localStorage !== 'undefined' && localStorage.getItem('intellmeet_api_url')) || 'https://intellmeet-backend-rc32.onrender.com'
         : 'http://localhost:5000');
     socketRef.current = io(socketUrl);
     socketRef.current.emit('join-room', currentMeetingId, user?.id || 'guest', user?.name || 'User');
@@ -118,7 +118,7 @@ export default function ContinuousMeetingChat({ meeting, meetingId, user, onOpen
         search: searchQuery,
       });
 
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/messages?${queryParams}`);
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/messages?${queryParams}`);
       const data = await res.json();
       if (data.success) {
         setMessages(data.messages || []);
@@ -138,7 +138,7 @@ export default function ContinuousMeetingChat({ meeting, meetingId, user, onOpen
     if (!currentMeetingId) return;
     try {
       setLoadingFiles(true);
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/chat-files`);
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/chat-files`);
       const data = await res.json();
       if (data.success) {
         setSharedFiles(data.files || []);
@@ -200,7 +200,7 @@ export default function ContinuousMeetingChat({ meeting, meetingId, user, onOpen
     };
 
     try {
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/messages`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -263,7 +263,7 @@ export default function ContinuousMeetingChat({ meeting, meetingId, user, onOpen
   const handleSaveEdit = async (messageId) => {
     if (!editText.trim()) return;
     try {
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/messages/${messageId}`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/messages/${messageId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: editText.trim() })
@@ -285,7 +285,7 @@ export default function ContinuousMeetingChat({ meeting, meetingId, user, onOpen
   const handleDeleteMessage = async (messageId) => {
     if (!window.confirm('Delete this message for everyone in the continuous meeting chat?')) return;
     try {
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/messages/${messageId}`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/messages/${messageId}`, {
         method: 'DELETE'
       });
       const data = await res.json();
@@ -307,7 +307,7 @@ export default function ContinuousMeetingChat({ meeting, meetingId, user, onOpen
   // Pin / Unpin
   const handleTogglePin = async (messageId) => {
     try {
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/messages/${messageId}/pin`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/messages/${messageId}/pin`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pinnedBy: user?.name || 'Host' })
@@ -327,7 +327,7 @@ export default function ContinuousMeetingChat({ meeting, meetingId, user, onOpen
   const handleAddReaction = async (messageId, emoji) => {
     setShowEmojiPickerFor(null);
     try {
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/messages/${messageId}/react`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/messages/${messageId}/react`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ emoji, userName: user?.name || 'User' })
@@ -345,7 +345,7 @@ export default function ContinuousMeetingChat({ meeting, meetingId, user, onOpen
   // Save Continuous Chat Settings (Host / Admin)
   const handleSaveSettings = async () => {
     try {
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/continuous-settings`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/continuous-settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ continuousChatSettings: chatSettings })

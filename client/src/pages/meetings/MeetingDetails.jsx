@@ -45,7 +45,7 @@ export default function MeetingDetails() {
         const cleanMeetingId = meetingId ? meetingId.replace(/[\s-]/g, '') : '';
         const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
 
-        const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${encodeURIComponent(cleanMeetingId || meetingId || '')}`, {
+        const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${encodeURIComponent(cleanMeetingId || meetingId || '')}`, {
           headers: authHeader
         });
         const data = await res.json();
@@ -53,7 +53,7 @@ export default function MeetingDetails() {
           setMeeting(data.meeting);
         } else {
           // Fallback search in all meetings
-          const listRes = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings`, {
+          const listRes = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings`, {
             headers: authHeader
           });
           const listData = await listRes.json();
@@ -81,7 +81,7 @@ export default function MeetingDetails() {
     const fetchContacts = async () => {
       try {
         const token = localStorage.getItem('intellmeet_token') || localStorage.getItem('token');
-        const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/users`, {
+        const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/users`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();
@@ -189,7 +189,7 @@ export default function MeetingDetails() {
     if (!window.confirm('Are you sure you want to delete this scheduled meeting?')) return;
     try {
       const token = localStorage.getItem('token');
-      await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meeting.meetingId || meeting._id}`, {
+      await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${meeting.meetingId || meeting._id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -206,7 +206,7 @@ export default function MeetingDetails() {
     setLoadingRegs(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meeting.meetingId || meeting._id}/registrations`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${meeting.meetingId || meeting._id}/registrations`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -238,7 +238,7 @@ export default function MeetingDetails() {
   const handleUpdateRegStatus = async (regId, status) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meeting.meetingId || meeting._id}/registrations/${regId}`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${meeting.meetingId || meeting._id}/registrations/${regId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -262,7 +262,7 @@ export default function MeetingDetails() {
     if (!window.confirm('Are you sure you want to remove this registration?')) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meeting.meetingId || meeting._id}/registrations/${regId}`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${meeting.meetingId || meeting._id}/registrations/${regId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });

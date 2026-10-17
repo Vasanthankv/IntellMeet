@@ -10,7 +10,7 @@ if (typeof window !== 'undefined') {
   const targetBase =
     (import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL.replace(/\/api$/, '')) ||
     (typeof localStorage !== 'undefined' && localStorage.getItem('intellmeet_api_url')) ||
-    (isLocal ? 'http://localhost:5000' : 'https://intellmeet-backend-h3md.onrender.com');
+    (isLocal ? 'http://localhost:5000' : 'https://intellmeet-backend-rc32.onrender.com');
 
   window.INTELLMEET_SERVER_BASE = targetBase;
   window.INTELLMEET_API_BASE = `${targetBase}/api`;

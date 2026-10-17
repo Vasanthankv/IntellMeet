@@ -141,9 +141,15 @@ export const getResolvedEmailConfig = () => {
   const port = parseInt(process.env.SMTP_PORT || process.env.EMAIL_PORT || process.env.MAIL_PORT || '587', 10);
   const secure = process.env.SMTP_SECURE === 'true' || port === 465;
 
-  // Auto-detect Gmail if host omitted but user is @gmail.com
-  if (!host && !service && user && user.toLowerCase().endsWith('@gmail.com')) {
-    host = 'smtp.gmail.com';
+  // Auto-detect Gmail if host omitted or user is @gmail.com
+  const isGmail = (user && user.toLowerCase().endsWith('@gmail.com')) || host.includes('gmail') || service === 'gmail';
+  if (isGmail && user && pass && (!process.env.SMTP_PORT || process.env.SMTP_PORT === '465')) {
+    return {
+      provider: 'Gmail',
+      service: 'gmail',
+      auth: { user, pass },
+      from: process.env.SMTP_FROM || process.env.EMAIL_FROM || `"IntelliMeet" <${user}>`,
+    };
   }
 
   if (service && user && pass) {

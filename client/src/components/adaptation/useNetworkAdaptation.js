@@ -116,7 +116,7 @@ export function useNetworkAdaptation({ meetingId, user, socket, onVideoQualityAd
       };
 
       try {
-        await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/adaptation/device-session`, {
+        await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/adaptation/device-session`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -173,7 +173,7 @@ export function useNetworkAdaptation({ meetingId, user, socket, onVideoQualityAd
 
       try {
         // High-frequency ping probe
-        await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/adaptation/analytics?ping=1`, {
+        await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/adaptation/analytics?ping=1`, {
           cache: 'no-store'
         });
         const elapsed = performance.now() - startTime;
@@ -215,7 +215,7 @@ export function useNetworkAdaptation({ meetingId, user, socket, onVideoQualityAd
 
       // Report telemetry to backend REST & Socket (Section 38.7)
       try {
-        fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/adaptation/network-quality`, {
+        fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/adaptation/network-quality`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -341,7 +341,7 @@ export function useNetworkAdaptation({ meetingId, user, socket, onVideoQualityAd
 
     // Persist media profile to backend
     try {
-      await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/adaptation/media-profile`, {
+      await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${meetingId}/adaptation/media-profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

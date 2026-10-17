@@ -41,7 +41,7 @@ export default function WhiteboardPickerModal({
   const fetchBoards = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/whiteboards?userId=${currentUser.id}&tab=${boardFilter}`);
+      const res = await axios.get(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/whiteboards?userId=${currentUser.id}&tab=${boardFilter}`);
       if (res.data.success) {
         setExistingBoards(res.data.whiteboards || []);
       }
@@ -54,7 +54,7 @@ export default function WhiteboardPickerModal({
 
   const handleCreateNew = async () => {
     try {
-      const res = await axios.post(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/whiteboards`, {
+      const res = await axios.post(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/whiteboards`, {
         title: title.trim() || 'Untitled Whiteboard',
         ownerId: currentUser.id,
         ownerName: currentUser.name,

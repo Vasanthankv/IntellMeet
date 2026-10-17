@@ -1,4 +1,4 @@
-const BASE_URL = 'https://intellmeet-backend-h3md.onrender.com/api';
+const BASE_URL = 'https://intellmeet-backend-rc32.onrender.com/api';
 
 async function runTests() {
   console.log('🧪 Starting Part 40 Complete Meeting Lifecycle Test Suite against Live Backend...');

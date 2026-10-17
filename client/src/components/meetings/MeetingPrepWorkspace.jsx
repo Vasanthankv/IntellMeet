@@ -58,7 +58,7 @@ export default function MeetingPrepWorkspace({ meeting, meetingId, user, isLiveM
     const socketUrl =
       import.meta.env.VITE_API_URL ||
       (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-        ? (typeof localStorage !== 'undefined' && localStorage.getItem('intellmeet_api_url')) || 'https://intellmeet-backend-h3md.onrender.com'
+        ? (typeof localStorage !== 'undefined' && localStorage.getItem('intellmeet_api_url')) || 'https://intellmeet-backend-rc32.onrender.com'
         : 'http://localhost:5000');
     socketRef.current = io(socketUrl);
     socketRef.current.emit('join-room', currentMeetingId, user?.id || 'guest', user?.name || 'User');
@@ -91,7 +91,7 @@ export default function MeetingPrepWorkspace({ meeting, meetingId, user, isLiveM
   const fetchAgenda = async () => {
     if (!currentMeetingId) return;
     try {
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/agenda`);
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/agenda`);
       const data = await res.json();
       if (data.success && data.agenda) {
         setAgenda(data.agenda);
@@ -105,7 +105,7 @@ export default function MeetingPrepWorkspace({ meeting, meetingId, user, isLiveM
   const fetchPreReads = async () => {
     if (!currentMeetingId) return;
     try {
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/prereads`);
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/prereads`);
       const data = await res.json();
       if (data.success) {
         setPreReads(data.preReads || []);
@@ -120,7 +120,7 @@ export default function MeetingPrepWorkspace({ meeting, meetingId, user, isLiveM
     if (!currentMeetingId) return;
     try {
       const query = noteFilterCategory !== 'ALL' ? `?category=${noteFilterCategory}` : '';
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/meeting-notes${query}`);
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/meeting-notes${query}`);
       const data = await res.json();
       if (data.success) {
         setMeetingNotes(data.notes || []);
@@ -154,7 +154,7 @@ export default function MeetingPrepWorkspace({ meeting, meetingId, user, isLiveM
     }
 
     try {
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/agenda/items`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/agenda/items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newAgendaItem)
@@ -182,7 +182,7 @@ export default function MeetingPrepWorkspace({ meeting, meetingId, user, isLiveM
   // Update Status of Agenda Item (Section 36.5)
   const handleUpdateItemStatus = async (itemId, newStatus) => {
     try {
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/agenda/items/${itemId}/status`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/agenda/items/${itemId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
@@ -202,7 +202,7 @@ export default function MeetingPrepWorkspace({ meeting, meetingId, user, isLiveM
   const handleDeleteAgendaItem = async (itemId) => {
     if (!window.confirm('Remove this agenda item from the meeting plan?')) return;
     try {
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/agenda/items/${itemId}`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/agenda/items/${itemId}`, {
         method: 'DELETE'
       });
       const data = await res.json();
@@ -254,7 +254,7 @@ export default function MeetingPrepWorkspace({ meeting, meetingId, user, isLiveM
     }
 
     try {
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/prereads`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/prereads`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -285,7 +285,7 @@ export default function MeetingPrepWorkspace({ meeting, meetingId, user, isLiveM
   // Toggle Pre-Read Reviewed Status
   const handleToggleReviewed = async (preReadId, currentStatus) => {
     try {
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/prereads/${preReadId}/view`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/prereads/${preReadId}/view`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -311,7 +311,7 @@ export default function MeetingPrepWorkspace({ meeting, meetingId, user, isLiveM
     if (!noteContent.trim()) return;
 
     try {
-      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-h3md.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/meeting-notes`, {
+      const res = await fetch(`${(typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "https://intellmeet-backend-rc32.onrender.com" : "http://localhost:5000")}/api/meetings/${currentMeetingId}/meeting-notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
