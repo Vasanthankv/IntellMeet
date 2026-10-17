@@ -110,27 +110,21 @@ export const notificationQueue = new NotificationQueue();
  * 4. Automatic default to smtp.gmail.com if user is a @gmail.com address
  */
 export const getResolvedEmailConfig = () => {
-  // 1. Resend API Key auto-configuration
+  // 1. Resend HTTPS REST API (Uses port 443 HTTPS - 100% immune to Render free-tier SMTP blocks)
   if (process.env.RESEND_API_KEY) {
     return {
-      provider: 'Resend',
-      host: 'smtp.resend.com',
-      port: 465,
-      secure: true,
-      auth: { user: 'resend', pass: process.env.RESEND_API_KEY },
-      from: process.env.SMTP_FROM || process.env.EMAIL_FROM || '"IntelliMeet" <onboarding@resend.dev>',
+      provider: 'Resend (HTTPS API)',
+      isHttpApi: true,
+      from: process.env.SMTP_FROM || process.env.EMAIL_FROM || 'IntelliMeet <onboarding@resend.dev>',
     };
   }
 
-  // 2. SendGrid API Key auto-configuration
-  if (process.env.SENDGRID_API_KEY) {
+  // 2. Brevo HTTPS REST API (Uses port 443 HTTPS)
+  if (process.env.BREVO_API_KEY) {
     return {
-      provider: 'SendGrid',
-      host: 'smtp.sendgrid.net',
-      port: 587,
-      secure: false,
-      auth: { user: 'apikey', pass: process.env.SENDGRID_API_KEY },
-      from: process.env.SMTP_FROM || process.env.EMAIL_FROM || '"IntelliMeet" <notifications@intellmeet.com>',
+      provider: 'Brevo (HTTPS API)',
+      isHttpApi: true,
+      from: process.env.SMTP_FROM || process.env.EMAIL_FROM || 'IntelliMeet <notifications@intellmeet.com>',
     };
   }
 
@@ -252,8 +246,56 @@ const logEmailDiagnostic = (action, details) => {
   console.log(`[EmailService] ${action}:`, JSON.stringify(safeDetails));
 };
 
+const sendViaResendHttp = async (mailOptions) => {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.SMTP_FROM || process.env.EMAIL_FROM || 'IntelliMeet <onboarding@resend.dev>';
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from,
+      to: [mailOptions.to],
+      subject: mailOptions.subject,
+      html: mailOptions.html,
+      text: mailOptions.text,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message || data.name || `HTTP ${res.status}`);
+  }
+  return { success: true, delivered: true, messageId: data.id };
+};
+
+const sendViaBrevoHttp = async (mailOptions) => {
+  const apiKey = process.env.BREVO_API_KEY;
+  const senderEmail = process.env.BREVO_SENDER || process.env.SMTP_USER || 'notifications@intellmeet.com';
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'api-key': apiKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      sender: { name: 'IntelliMeet', email: senderEmail },
+      to: [{ email: mailOptions.to }],
+      subject: mailOptions.subject,
+      htmlContent: mailOptions.html,
+      textContent: mailOptions.text,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message || `HTTP ${res.status}`);
+  }
+  return { success: true, delivered: true, messageId: data.messageId };
+};
+
 /**
- * Verify transporter connection status (useful for health checks & startup diagnostics).
+ * Verify transporter or HTTP API connection status (useful for health checks & startup diagnostics).
  */
 export const verifyEmailService = async () => {
   const config = getResolvedEmailConfig();
@@ -263,10 +305,48 @@ export const verifyEmailService = async () => {
       configured: false,
       status: 'unconfigured',
       provider: 'None',
-      message: 'SMTP credentials (SMTP_HOST / SMTP_USER / SMTP_PASS or RESEND_API_KEY / SENDGRID_API_KEY) are not configured in environment variables.',
+      message: 'Email credentials (RESEND_API_KEY, BREVO_API_KEY, or SMTP_USER/SMTP_PASS) are not configured in environment variables.',
       queuePending: notificationQueue.getPendingCount(),
       recentLogs: notificationQueue.getHistory().slice(0, 10),
     };
+  }
+
+  // Verify Resend HTTP API (Port 443 HTTPS)
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const res = await fetch('https://api.resend.com/api-keys', {
+        headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}` },
+      });
+      if (res.ok) {
+        return {
+          configured: true,
+          status: 'ready',
+          provider: 'Resend (HTTPS Port 443)',
+          message: 'Email service verified successfully via Resend HTTPS REST API (Port 443 - zero firewall blocks).',
+          queuePending: notificationQueue.getPendingCount(),
+          recentLogs: notificationQueue.getHistory().slice(0, 10),
+        };
+      }
+    } catch (e) {}
+  }
+
+  // Verify Brevo HTTP API (Port 443 HTTPS)
+  if (process.env.BREVO_API_KEY) {
+    try {
+      const res = await fetch('https://api.brevo.com/v3/account', {
+        headers: { 'api-key': process.env.BREVO_API_KEY },
+      });
+      if (res.ok) {
+        return {
+          configured: true,
+          status: 'ready',
+          provider: 'Brevo (HTTPS Port 443)',
+          message: 'Email service verified successfully via Brevo HTTPS REST API (Port 443).',
+          queuePending: notificationQueue.getPendingCount(),
+          recentLogs: notificationQueue.getHistory().slice(0, 10),
+        };
+      }
+    } catch (e) {}
   }
 
   const transporter = getTransporter();
@@ -295,7 +375,7 @@ export const verifyEmailService = async () => {
     return {
       configured: true,
       status: 'connection_failed',
-      message: `SMTP verification failed: ${error.message}`,
+      message: `SMTP verification failed: ${error.message}. Note: Render Free Tier blocks outbound SMTP ports 25, 465, and 587. Use RESEND_API_KEY over HTTPS (port 443) for 100% free, unblocked delivery.`,
       queuePending: notificationQueue.getPendingCount(),
       recentLogs: notificationQueue.getHistory().slice(0, 10),
     };
@@ -332,14 +412,48 @@ export const sendMailSafe = async (mailOptions, dedupKey = null) => {
     }
   }
 
+  // 1. Send via Resend HTTPS REST API (Port 443 - zero firewall blocks on Render)
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const result = await sendViaResendHttp(mailOptions);
+      if (dedupKey) recentNotifications.set(dedupKey, Date.now());
+      logEmailDiagnostic('Email delivered successfully via Resend HTTPS', {
+        to: recipient,
+        subject: mailOptions.subject,
+        messageId: result.messageId,
+      });
+      return result;
+    } catch (error) {
+      logEmailDiagnostic('Resend HTTPS delivery error', { to: recipient, error: error.message });
+      return { success: false, delivered: false, error: error.message };
+    }
+  }
+
+  // 2. Send via Brevo HTTPS REST API (Port 443)
+  if (process.env.BREVO_API_KEY) {
+    try {
+      const result = await sendViaBrevoHttp(mailOptions);
+      if (dedupKey) recentNotifications.set(dedupKey, Date.now());
+      logEmailDiagnostic('Email delivered successfully via Brevo HTTPS', {
+        to: recipient,
+        subject: mailOptions.subject,
+        messageId: result.messageId,
+      });
+      return result;
+    } catch (error) {
+      logEmailDiagnostic('Brevo HTTPS delivery error', { to: recipient, error: error.message });
+      return { success: false, delivered: false, error: error.message };
+    }
+  }
+
   const transporter = getTransporter();
 
   // If SMTP is not yet configured, log safely and return accurate status
   if (!transporter) {
-    logEmailDiagnostic('Simulated notification (SMTP not configured in environment)', {
+    logEmailDiagnostic('Simulated notification (Email provider not configured in environment)', {
       to: recipient,
       subject: mailOptions.subject,
-      note: 'Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS on Render to dispatch real inboxes.',
+      note: 'Set RESEND_API_KEY or SMTP credentials on Render to dispatch real inboxes.',
     });
 
     if (dedupKey) {
@@ -350,7 +464,7 @@ export const sendMailSafe = async (mailOptions, dedupKey = null) => {
       success: true,
       delivered: false,
       reason: 'unconfigured_smtp',
-      message: 'SMTP credentials not configured in environment variables. Email was generated but external dispatch skipped.',
+      message: 'Email credentials not configured in environment variables. Email was generated but external dispatch skipped.',
     };
   }
 
@@ -369,7 +483,7 @@ export const sendMailSafe = async (mailOptions, dedupKey = null) => {
       recentNotifications.set(dedupKey, Date.now());
     }
 
-    logEmailDiagnostic('Email delivered successfully', {
+    logEmailDiagnostic('Email delivered successfully via SMTP', {
       to: recipient,
       subject: mailOptions.subject,
       messageId: info.messageId,
