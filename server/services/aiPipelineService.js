@@ -1,10 +1,9 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { generateGeminiContent, isGeminiConfigured } from './geminiService.js';
 import { Recording } from '../models/Recording.js';
 import { MeetingTranscript } from '../models/MeetingTranscript.js';
 import { MeetingSummary } from '../models/MeetingSummary.js';
 import Task from '../models/Task.js';
 
-const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
 export const AIPipelineService = {
   /**
@@ -72,9 +71,8 @@ export const AIPipelineService = {
 
       let aiResult = null;
 
-      if (genAI) {
+      if (isGeminiConfigured()) {
         try {
-          const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
           const prompt = `
 You are an executive corporate meeting intelligence assistant for IntellMeet.
 Meeting Title: ${meetingTitle}
@@ -104,9 +102,8 @@ Return ONLY valid JSON with this exact schema (no markdown, no backticks, raw JS
 }
 `;
 
-          const response = await model.generateContent(prompt);
-          const rawText = response.response?.text() || '';
-          const cleanedJson = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+          const { text } = await generateGeminiContent(prompt);
+          const cleanedJson = text.replace(/```json/gi, '').replace(/```/g, '').trim();
           aiResult = JSON.parse(cleanedJson);
           console.log('[AIPipeline] Gemini summary generated successfully from real transcript.');
         } catch (geminiErr) {

@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { generateGeminiContent, isGeminiConfigured } from './geminiService.js';
 
 // Common meeting phrases mapped across major languages for instant offline/test fallback
 const TRANSLATION_DICTIONARY = {
@@ -93,16 +93,12 @@ export async function translateText(text, sourceLang = 'en', targetLang = 'ta') 
     }
   }
 
-  // 2. Try Gemini AI if API key is configured
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (apiKey) {
+  // 2. Try Gemini AI if API key is configured (Cascading Model Fallback)
+  if (isGeminiConfigured()) {
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
       const prompt = `Translate the following text from ${LANGUAGE_NAMES[src] || src} to ${LANGUAGE_NAMES[tgt] || tgt}. Return ONLY the direct translated text with no quotes, explanations, or formatting.\n\nText: "${text}"`;
-      const res = await model.generateContent(prompt);
-      const translated = (await res.response).text().trim();
-      if (translated) return translated;
+      const { text: translated } = await generateGeminiContent(prompt);
+      if (translated && translated.trim()) return translated.trim();
     } catch (err) {
       console.warn('Gemini translation error:', err.message);
     }

@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import express from 'express';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { generateGeminiContent, isGeminiConfigured } from '../services/geminiService.js';
 import { MeetingSummary } from '../models/MeetingSummary.js';
 import { MeetingTranscript } from '../models/MeetingTranscript.js';
 import Task from '../models/Task.js';
@@ -10,7 +10,6 @@ import { protect } from '../middleware/authMiddleware.js';
 const router = express.Router({ mergeParams: true });
 const getMeetingId = (req) => req.params.meetingId || req.body.meetingId || req.query.meetingId;
 
-const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
 const memorySummaries = new Map();
 
@@ -233,9 +232,8 @@ router.post('/generate', protect, async (req, res) => {
 
     let aiResult = null;
 
-    if (genAI) {
+    if (isGeminiConfigured()) {
       try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
         const prompt = `
 You are an executive AI assistant specialized in corporate meeting intelligence for the platform IntellMeet.
 Meeting Title: ${summary.meetingTitle || 'Project Review'}
@@ -280,9 +278,8 @@ Return ONLY valid raw JSON with this exact schema (no markdown, no backticks):
   }
 }
 `;
-        const result = await model.generateContent(prompt);
-        const responseText = await result.response.text();
-        const cleaned = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const { text } = await generateGeminiContent(prompt);
+        const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
         aiResult = JSON.parse(cleaned);
       } catch (geminiErr) {
         console.warn('Gemini AI summary generation fallback triggered:', geminiErr.message);

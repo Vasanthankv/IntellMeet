@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { generateGeminiContent } from '../services/geminiService.js';
 import Task from '../models/Task.js';
 
 export const generateSummary = async (req, res) => {
@@ -13,9 +13,6 @@ export const generateSummary = async (req, res) => {
     if (!apiKey) {
       return res.status(500).json({ success: false, message: 'Gemini API key is not configured on the server.' });
     }
-
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     // Format the transcript into a readable string
     const formattedTranscript = transcript.map(t => `${t.sender}: ${t.text}`).join('\n');
@@ -34,14 +31,13 @@ export const generateSummary = async (req, res) => {
       ${formattedTranscript}
     `;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    let text = response.text();
+    const { text } = await generateGeminiContent(prompt);
     
     // Clean up potential markdown formatting
-    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
     
-    const parsedData = JSON.parse(text);
+    const parsedData = JSON.parse(cleanedText);
+
 
     // Automatically generate Tasks from action items!
     if (parsedData.actionItems && parsedData.actionItems.length > 0 && req.user) {

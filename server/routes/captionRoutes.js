@@ -2,7 +2,7 @@ import express from 'express';
 import { CaptionSettings, CaptionSession } from '../models/CaptionSession.js';
 import MeetingTranscript from '../models/MeetingTranscript.js';
 import Task from '../models/Task.js';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { generateGeminiContent, isGeminiConfigured } from '../services/geminiService.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router({ mergeParams: true });
@@ -351,12 +351,9 @@ router.post('/transcription/ai-summary', protect, async (req, res) => {
       .join('\n');
 
     let aiResult = null;
-    const apiKey = process.env.GEMINI_API_KEY;
 
-    if (apiKey) {
+    if (isGeminiConfigured()) {
       try {
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
         const prompt = `
           Analyze the following meeting transcript and produce an executive summary.
           Return ONLY valid JSON matching this schema:
@@ -369,9 +366,9 @@ router.post('/transcription/ai-summary', protect, async (req, res) => {
           Transcript:
           ${formattedTranscript}
         `;
-        const result = await model.generateContent(prompt);
-        const text = (await result.response).text().replace(/```json/g, '').replace(/```/g, '').trim();
-        aiResult = JSON.parse(text);
+        const { text } = await generateGeminiContent(prompt);
+        const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        aiResult = JSON.parse(cleaned);
       } catch (geminiErr) {
         console.warn('Gemini API call failed, generating deterministic structured summary:', geminiErr.message);
       }

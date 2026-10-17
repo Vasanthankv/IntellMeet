@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { generateGeminiContent, isGeminiConfigured } from './geminiService.js';
 import { AIRecordingPipeline } from '../models/AIRecordingPipeline.js';
 import { Recording } from '../models/Recording.js';
 import { MeetingTranscript } from '../models/MeetingTranscript.js';
@@ -6,7 +6,6 @@ import { MeetingSummary } from '../models/MeetingSummary.js';
 import { SmartRecording } from '../models/SmartRecording.js';
 import ChatMessage from '../models/ChatMessage.js';
 
-const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
 const formatTimestamp = (totalSecs) => {
   const mins = Math.floor((totalSecs || 0) / 60);
@@ -139,10 +138,9 @@ export async function runAIRecordingPipeline(meetingId, recordingId, io = null) 
 
     let extractedKeyPoints = [];
 
-    // Query Gemini if available for key points
-    if (genAI) {
+    // Query Gemini AI (with Model Cascade) if available for key points
+    if (isGeminiConfigured()) {
       try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
         const trText = segments.map(s => `[${formatTimestamp(s.startTime || 0)}] ${s.speakerName}: ${s.text}`).join('\n');
         const prompt = `
 Extract 3-5 concise, important key points from this meeting transcript.
@@ -163,9 +161,8 @@ Return ONLY valid JSON (no markdown):
   }
 ]
 `;
-        const result = await model.generateContent(prompt);
-        const respText = await result.response.text();
-        const cleaned = respText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const { text } = await generateGeminiContent(prompt);
+        const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
         extractedKeyPoints = JSON.parse(cleaned);
       } catch (err) {
         console.warn('Gemini Key Points fallback:', err.message);

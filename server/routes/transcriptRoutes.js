@@ -1,5 +1,5 @@
 import express from 'express';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { generateGeminiContent, isGeminiConfigured } from '../services/geminiService.js';
 import { MeetingTranscript } from '../models/MeetingTranscript.js';
 import Task from '../models/Task.js';
 import { protect } from '../middleware/authMiddleware.js';
@@ -8,8 +8,6 @@ const router = express.Router({ mergeParams: true });
 
 const getMeetingId = (req) => req.params.meetingId || req.body.meetingId || req.query.meetingId;
 
-// Initialize Gemini AI client if key provided
-const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
 // Helper to format seconds as HH:MM:SS or MM:SS
 const formatTimestamp = (totalSecs) => {
@@ -332,9 +330,8 @@ router.post('/ai-analyze', protect, async (req, res) => {
 
     let aiResult = null;
 
-    if (genAI) {
+    if (isGeminiConfigured()) {
       try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
         const prompt = `
           Analyze the following meeting transcript. Provide a structured summary in JSON with:
           - "summary": A comprehensive executive summary paragraph
@@ -347,8 +344,7 @@ router.post('/ai-analyze', protect, async (req, res) => {
           Transcript:
           ${dialogueText}
         `;
-        const result = await model.generateContent(prompt);
-        const text = result.response.text();
+        const { text } = await generateGeminiContent(prompt);
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) aiResult = JSON.parse(jsonMatch[0]);
       } catch (geminiErr) {

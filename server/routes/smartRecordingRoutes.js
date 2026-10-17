@@ -1,5 +1,5 @@
 import express from 'express';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { generateGeminiContent, isGeminiConfigured } from '../services/geminiService.js';
 import { SmartRecording } from '../models/SmartRecording.js';
 import { RecordingPlaylist } from '../models/RecordingPlaylist.js';
 import { Recording } from '../models/Recording.js';
@@ -8,7 +8,7 @@ import Meeting from '../models/Meeting.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router({ mergeParams: true });
-const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
+
 
 // Format seconds to MM:SS
 const formatTimestamp = (totalSecs) => {
@@ -137,10 +137,9 @@ router.post('/:recordingId/smart/generate', protect, async (req, res) => {
     let topics = [];
     let analytics = null;
 
-    // 2. Query Gemini 1.5 Flash if available
-    if (genAI) {
+    // 2. Query Gemini AI (with Cascading Model Fallback) if available
+    if (isGeminiConfigured()) {
       try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
         const prompt = `
 You are the dedicated Smart Recording AI engine for IntellMeet (modeled on Zoom AI Smart Recording).
 Analyze the following meeting cloud recording transcript and produce structured outputs.
@@ -216,9 +215,8 @@ Generate a complete Smart Recording breakdown in ONLY valid JSON (no markdown fo
   }
 }
 `;
-        const result = await model.generateContent(prompt);
-        const respText = await result.response.text();
-        const cleaned = respText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const { text } = await generateGeminiContent(prompt);
+        const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
         const parsed = JSON.parse(cleaned);
 
         highlights = (parsed.highlights || []).map(h => ({ ...h, source: 'AI_AUTO' }));

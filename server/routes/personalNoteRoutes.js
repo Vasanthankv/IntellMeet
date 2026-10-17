@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import express from 'express';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { generateGeminiContent, isGeminiConfigured } from '../services/geminiService.js';
 import { PersonalNote } from '../models/PersonalNote.js';
 import { MeetingTranscript } from '../models/MeetingTranscript.js';
 import Meeting from '../models/Meeting.js';
@@ -10,7 +10,6 @@ import { protect } from '../middleware/authMiddleware.js';
 const router = express.Router({ mergeParams: true });
 const getMeetingId = (req) => req.params.meetingId || req.body.meetingId || req.query.meetingId;
 
-const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
 const memoryNotes = new Map();
 
@@ -278,10 +277,9 @@ router.post('/:noteId/ai-enhance', protect, async (req, res) => {
     let questions = [];
     let citations = [];
 
-    // 3. Generate with Gemini 1.5 Flash if available
-    if (genAI) {
+    // 3. Generate with Gemini AI (Cascading Model Fallback)
+    if (isGeminiConfigured()) {
       try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
         const prompt = `
 You are the dedicated Personal AI Note Assistant for IntellMeet (My Notes feature).
 Your task is to enrich, structure, and refine the user's personal notes using the meeting transcript.
@@ -315,8 +313,7 @@ Instructions:
   ]
 }
 `;
-        const result = await model.generateContent(prompt);
-        const text = await result.response.text();
+        const { text } = await generateGeminiContent(prompt);
         const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
         const parsed = JSON.parse(cleaned);
 
@@ -442,9 +439,8 @@ router.post('/:noteId/ai-refine', protect, async (req, res) => {
     let refinedContent = currentContent;
     let assistantMessage = '';
 
-    if (genAI) {
+    if (isGeminiConfigured()) {
       try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
         const prompt = `
 The user is refining their personal meeting note.
 Current Enhanced Note Content:
@@ -455,8 +451,8 @@ User Refinement Instruction:
 
 Respond with ONLY the updated markdown content for the note incorporating the requested adjustments.
 `;
-        const result = await model.generateContent(prompt);
-        refinedContent = (await result.response.text()).trim();
+        const { text } = await generateGeminiContent(prompt);
+        refinedContent = text.trim();
         assistantMessage = `I've updated your note according to: "${refinementPrompt}"`;
       } catch (err) {
         console.warn('Gemini Note Refine fallback:', err.message);

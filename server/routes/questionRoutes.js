@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import express from 'express';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { generateGeminiContent, isGeminiConfigured } from '../services/geminiService.js';
 import { MeetingAIQuestionSession, MeetingQuestionItem } from '../models/MeetingQuestion.js';
 import { MeetingTranscript } from '../models/MeetingTranscript.js';
 import ChatMessage from '../models/ChatMessage.js';
@@ -9,7 +9,6 @@ import { protect } from '../middleware/authMiddleware.js';
 const router = express.Router({ mergeParams: true });
 const getMeetingId = (req) => req.params.meetingId || req.body.meetingId || req.query.meetingId;
 
-const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
 const memoryQuestionSessions = new Map();
 const memoryQuestionItems = new Map();
@@ -275,10 +274,9 @@ router.post('/ask', protect, async (req, res) => {
     let citedSources = [];
     let confidence = 0.95;
 
-    // 5. Query LLM (Gemini 1.5 Flash) with Grounded RAG Prompt (26.24)
-    if (genAI) {
+    // 5. Query LLM (Gemini AI with Model Cascade) with Grounded RAG Prompt (26.24)
+    if (isGeminiConfigured()) {
       try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
         const prompt = `
 You are the dedicated in-meeting AI assistant for IntellMeet.
 A meeting participant has asked a question during an active meeting.
@@ -308,9 +306,8 @@ Return ONLY valid JSON with this exact schema (no markdown, no backticks):
   ]
 }
 `;
-        const result = await model.generateContent(prompt);
-        const responseText = await result.response.text();
-        const cleaned = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const { text } = await generateGeminiContent(prompt);
+        const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
         const parsed = JSON.parse(cleaned);
         answerText = parsed.answer;
         confidence = parsed.confidence || 0.95;
