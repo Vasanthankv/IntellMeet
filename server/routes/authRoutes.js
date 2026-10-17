@@ -505,9 +505,10 @@ router.get('/email-status', async (req, res) => {
       configured: status.configured,
       status: status.status,
       message: status.message,
+      resendConfigured: Boolean(process.env.RESEND_API_KEY),
       smtpHostConfigured: Boolean(process.env.SMTP_HOST || process.env.EMAIL_SERVICE),
       smtpUserConfigured: Boolean(process.env.SMTP_USER),
-      smtpFrom: process.env.SMTP_FROM || process.env.EMAIL_FROM || (process.env.SMTP_USER ? `IntelliMeet <${process.env.SMTP_USER}>` : 'Default Sender'),
+      smtpFrom: process.env.SMTP_FROM || process.env.EMAIL_FROM || (process.env.RESEND_API_KEY ? 'IntelliMeet <onboarding@resend.dev>' : (process.env.SMTP_USER ? `IntelliMeet <${process.env.SMTP_USER}>` : 'Default Sender')),
       queuePending: status.queuePending || 0,
       recentLogs: status.recentLogs || [],
     });

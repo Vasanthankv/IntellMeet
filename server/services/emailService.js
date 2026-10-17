@@ -404,21 +404,17 @@ export const verifyEmailService = async () => {
 
   // Verify Resend HTTP API (Port 443 HTTPS)
   if (process.env.RESEND_API_KEY) {
-    try {
-      const res = await fetch('https://api.resend.com/api-keys', {
-        headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}` },
-      });
-      if (res.ok) {
-        return {
-          configured: true,
-          status: 'ready',
-          provider: 'Resend (HTTPS Port 443)',
-          message: 'Email service verified successfully via Resend HTTPS REST API (Port 443 - zero firewall blocks).',
-          queuePending: notificationQueue.getPendingCount(),
-          recentLogs: notificationQueue.getHistory().slice(0, 10),
-        };
-      }
-    } catch (e) {}
+    const key = process.env.RESEND_API_KEY.trim();
+    if (key.startsWith('re_')) {
+      return {
+        configured: true,
+        status: 'ready',
+        provider: 'Resend (HTTPS Port 443)',
+        message: 'Email service ready via Resend HTTPS REST API (Port 443 - zero firewall blocks).',
+        queuePending: notificationQueue.getPendingCount(),
+        recentLogs: notificationQueue.getHistory().slice(0, 10),
+      };
+    }
   }
 
   // Verify Brevo HTTP API (Port 443 HTTPS)
