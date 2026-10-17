@@ -10,6 +10,7 @@ process.on('unhandledRejection', (reason, promise) => {
 
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import dotenv from 'dotenv';
 import http from 'http';
 import path from 'path';
@@ -51,6 +52,15 @@ app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
+// Compress HTTP responses for high throughput & low bandwidth latency
+app.use(compression({
+  threshold: 1024,
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) return false;
+    return compression.filter(req, res);
+  }
 }));
 
 app.use(express.json({ limit: '100mb' }));

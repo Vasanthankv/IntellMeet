@@ -141,13 +141,18 @@ export default function MeetingRoom() {
         const token = getAuthToken();
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-        // Fetch meeting info
-        const res = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${encodeURIComponent(cleanMeetingId || meetingId || '')}`);
-        const data = await res.json();
-        if (data.success && data.meeting) {
-          setMeetingInfo(data.meeting);
+        // Parallelize meeting info and user role queries for 2x faster room joining
+        const meetingEndpoint = `${SOCKET_SERVER_URL}/api/meetings/${encodeURIComponent(cleanMeetingId || meetingId || '')}`;
+        const [infoResult, roleResult] = await Promise.allSettled([
+          fetch(meetingEndpoint).then((r) => r.json()),
+          fetch(`${meetingEndpoint}/my-role`, { headers }).then((r) => r.json()),
+        ]);
+
+        if (infoResult.status === 'fulfilled' && infoResult.value?.success && infoResult.value.meeting) {
+          const meeting = infoResult.value.meeting;
+          setMeetingInfo(meeting);
           const currentUserId = user?.id || user?._id;
-          const hostId = data.meeting.host?._id || data.meeting.host || data.meeting.hostId;
+          const hostId = meeting.host?._id || meeting.host || meeting.hostId;
           const isUserHost = Boolean(
             currentUserId && hostId && String(currentUserId) === String(hostId)
           );
@@ -157,22 +162,14 @@ export default function MeetingRoom() {
           }
         }
 
-        // Authoritatively query user role & permissions from server
-        try {
-          const roleRes = await fetch(`${SOCKET_SERVER_URL}/api/meetings/${encodeURIComponent(cleanMeetingId || meetingId || '')}/my-role`, {
-            headers
-          });
-          const roleData = await roleRes.json();
-          if (roleData.success) {
-            setUserRole(roleData.role);
-            setIsHost(roleData.isHost);
-            setIsCoHost(roleData.isCoHost);
-            if (roleData.permissions) {
-              setEffectivePermissions(roleData.permissions);
-            }
+        if (roleResult.status === 'fulfilled' && roleResult.value?.success) {
+          const roleData = roleResult.value;
+          setUserRole(roleData.role);
+          setIsHost(roleData.isHost);
+          setIsCoHost(roleData.isCoHost);
+          if (roleData.permissions) {
+            setEffectivePermissions(roleData.permissions);
           }
-        } catch (e) {
-          console.warn('Meeting role check note:', e);
         }
       } catch (err) {
         console.warn('Meeting info fetch note:', err);

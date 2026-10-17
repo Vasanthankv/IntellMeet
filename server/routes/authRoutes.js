@@ -423,19 +423,14 @@ router.post('/social', async (req, res) => {
 // @access  Private
 router.get('/me', protect, async (req, res) => {
   try {
-    const isDbConnected = User.db && User.db.readyState === 1;
-    let user = null;
-    if (isDbConnected) {
-      user = await User.findById(req.user.id).select('-password');
-    } else {
-      const users = getFallbackUsers();
-      user = users.find(u => u.email === req.user.email);
-    }
-
-    if (!user) {
+    if (!req.user) {
       return res.status(404).json({ message: 'User not found' });
     }
-
+    const user = { ...req.user };
+    delete user.password;
+    if (!user.id && user._id) {
+      user.id = String(user._id);
+    }
     return res.json({ success: true, user });
   } catch (error) {
     return res.status(500).json({ message: error.message });
@@ -448,10 +443,11 @@ router.get('/me', protect, async (req, res) => {
 router.put('/profile', protect, async (req, res) => {
   try {
     const { name, phone, role, department, company, location, timezone } = req.body;
+    const userId = req.user._id || req.user.id;
     const isDbConnected = User.db && User.db.readyState === 1;
 
     if (isDbConnected) {
-      const user = await User.findById(req.user.id);
+      const user = await User.findById(userId);
       if (user) {
         if (name) user.name = name;
         if (phone) user.phone = phone;

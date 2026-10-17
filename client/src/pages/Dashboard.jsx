@@ -27,10 +27,13 @@ export default function Dashboard() {
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [isTaskOpen, setIsTaskOpen] = useState(false);
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
+  const lastFetchRef = React.useRef(0);
+
+  const fetchDashboardData = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
       const res = await dashboardService.getStats(token);
+      lastFetchRef.current = Date.now();
       if (res && res.success) {
         setStats(res.stats || {
           totalMeetings: 0,
@@ -45,15 +48,19 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Error loading dashboard stats:', error);
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchDashboardData();
 
-    // Auto-refresh when user returns to window or schedules a meeting anywhere
-    const onWindowFocus = () => fetchDashboardData();
+    // Auto-refresh when user returns to window (throttled to 15s to prevent request spam)
+    const onWindowFocus = () => {
+      if (Date.now() - lastFetchRef.current > 15000) {
+        fetchDashboardData(true);
+      }
+    };
     const onMeetingCreated = () => fetchDashboardData();
 
     window.addEventListener('focus', onWindowFocus);

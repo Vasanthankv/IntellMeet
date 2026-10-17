@@ -23,6 +23,10 @@ export const protect = async (req, res, next) => {
         if (!req.user) {
           req.user = decoded;
         }
+        if (req.user) {
+          if (!req.user.id && req.user._id) req.user.id = String(req.user._id);
+          if (!req.user._id && req.user.id) req.user._id = req.user.id;
+        }
         return next();
       }
     } catch (error) {

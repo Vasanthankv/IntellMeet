@@ -70,7 +70,11 @@ router.get('/', protect, async (req, res) => {
         }
 
         const query = hostConditions.length > 0 ? { $or: hostConditions } : {};
-        const meetings = await Meeting.find(query).sort({ createdAt: -1 }).lean();
+        const meetings = await Meeting.find(query)
+          .select('title description date time duration timezone status meetingId passcode recurring participants host hostName hostEmail createdAt')
+          .sort({ createdAt: -1 })
+          .limit(50)
+          .lean();
         if (meetings && meetings.length > 0) {
           return res.json({ success: true, meetings });
         }
@@ -167,7 +171,7 @@ router.get('/:meetingId', async (req, res) => {
   try {
     const isDbConnected = Meeting.db && Meeting.db.readyState === 1;
     if (isDbConnected) {
-      const meeting = await Meeting.findOne(buildMeetingQuery(req.params.meetingId));
+      const meeting = await Meeting.findOne(buildMeetingQuery(req.params.meetingId)).lean();
       if (!meeting) return res.status(404).json({ success: false, message: 'Meeting not found' });
       return res.json({ success: true, meeting });
     }
@@ -199,7 +203,8 @@ router.get('/public/:meetingId', async (req, res) => {
     const isDbConnected = Meeting.db && Meeting.db.readyState === 1;
     if (isDbConnected) {
       const meeting = await Meeting.findOne(buildMeetingQuery(req.params.meetingId))
-        .select('title description date time timezone hostName registration passcode');
+        .select('title description date time timezone hostName registration passcode')
+        .lean();
       if (!meeting) return res.status(404).json({ success: false, message: 'Meeting not found' });
       return res.json({ success: true, meeting });
     }

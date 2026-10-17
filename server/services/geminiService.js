@@ -25,6 +25,9 @@ export const isGeminiConfigured = () => {
   return Boolean((process.env.GEMINI_API_KEY || '').trim());
 };
 
+// Cache the last verified working model in-memory so subsequent requests do not pay waterfall latency
+let preferredModel = null;
+
 /**
  * Execute Gemini content generation with multi-model automatic fallback.
  * @param {string|Array} prompt - Prompt string or contents array
@@ -38,8 +41,11 @@ export const generateGeminiContent = async (prompt, options = {}) => {
   }
 
   let lastError = null;
+  const modelsToTry = preferredModel
+    ? [preferredModel, ...GEMINI_MODEL_CASCADE.filter((m) => m !== preferredModel)]
+    : GEMINI_MODEL_CASCADE;
 
-  for (const modelName of GEMINI_MODEL_CASCADE) {
+  for (const modelName of modelsToTry) {
     try {
       const model = genAI.getGenerativeModel({
         model: modelName,
@@ -49,6 +55,9 @@ export const generateGeminiContent = async (prompt, options = {}) => {
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
+
+      // Remember working model to avoid fallback delays on future calls
+      preferredModel = modelName;
 
       return {
         text,

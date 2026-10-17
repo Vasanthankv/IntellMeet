@@ -113,7 +113,11 @@ router.delete('/:id', protect, async (req, res) => {
 // @access  Private
 router.get('/me/settings', protect, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    if (req.user && req.user.settings !== undefined) {
+      return res.json({ success: true, settings: req.user.settings || {} });
+    }
+    const userId = req.user._id || req.user.id;
+    const user = await User.findById(userId).select('settings').lean();
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
@@ -128,7 +132,8 @@ router.get('/me/settings', protect, async (req, res) => {
 // @access  Private
 router.put('/me/settings', protect, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    const userId = req.user._id || req.user.id;
+    const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
