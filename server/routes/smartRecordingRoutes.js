@@ -137,10 +137,18 @@ router.post('/:recordingId/smart/generate', protect, async (req, res) => {
     let topics = [];
     let analytics = null;
 
-    // 2. Query Gemini AI (with Cascading Model Fallback) if available
-    if (isGeminiConfigured()) {
-      try {
-        const prompt = `
+    // 2. Query Gemini AI (with Cascading Model Fallback)
+    if (!isGeminiConfigured()) {
+      smartRec.status = 'FAILED';
+      await smartRec.save();
+      return res.status(503).json({
+        success: false,
+        message: 'Gemini AI service is not configured. Please ensure GEMINI_API_KEY is configured in the environment.'
+      });
+    }
+
+    try {
+      const prompt = `
 You are the dedicated Smart Recording AI engine for IntellMeet (modeled on Zoom AI Smart Recording).
 Analyze the following meeting cloud recording transcript and produce structured outputs.
 
@@ -215,87 +223,27 @@ Generate a complete Smart Recording breakdown in ONLY valid JSON (no markdown fo
   }
 }
 `;
-        const { text } = await generateGeminiContent(prompt);
-        const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(cleaned);
-
-        highlights = (parsed.highlights || []).map(h => ({ ...h, source: 'AI_AUTO' }));
-        chapters = parsed.chapters || [];
-        nextSteps = (parsed.nextSteps || []).map(n => ({ ...n, status: 'OPEN' }));
-        topics = parsed.topics || [];
-        analytics = parsed.analytics || null;
-      } catch (gemErr) {
-        console.warn('Gemini Smart Recording fallback triggered:', gemErr.message);
+      const { text } = await generateGeminiContent(prompt);
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('Gemini Smart Recording response did not return valid JSON.');
       }
+      const parsed = JSON.parse(jsonMatch[0]);
+
+      highlights = (parsed.highlights || []).map(h => ({ ...h, source: 'AI_AUTO' }));
+      chapters = parsed.chapters || [];
+      nextSteps = (parsed.nextSteps || []).map(n => ({ ...n, status: 'OPEN' }));
+      topics = parsed.topics || [];
+      analytics = parsed.analytics || null;
+    } catch (gemErr) {
+      console.error('Gemini Smart Recording error:', gemErr.message);
+      smartRec.status = 'FAILED';
+      await smartRec.save();
+      return res.status(502).json({
+        success: false,
+        message: `Smart Recording AI processing failed: ${gemErr.message}. Please try again.`
+      });
     }
-
-    // 3. Heuristic Engine Fallback (guaranteed high fidelity)
-    if (!chapters || chapters.length === 0) {
-      // Highlights
-      highlights = [
-        {
-          title: 'Project Kickoff & Agenda',
-          description: 'Introduction to sprint milestones and architecture goals.',
-          startTime: 0,
-          endTime: Math.min(30, totalDuration),
-          source: 'AI_AUTO'
-        },
-        {
-          title: 'Cloud Infrastructure Decision',
-          description: 'Team consensus on AWS deployment platform.',
-          startTime: Math.floor(totalDuration * 0.35),
-          endTime: Math.floor(totalDuration * 0.55),
-          source: 'AI_AUTO'
-        },
-        {
-          title: 'Testing & Rollout Plan',
-          description: 'Finalizing database testing schedule and action items.',
-          startTime: Math.floor(totalDuration * 0.65),
-          endTime: totalDuration,
-          source: 'AI_AUTO'
-        }
-      ];
-
-      // Smart Chapters (28.5, 28.6)
-      const ch1End = Math.floor(totalDuration * 0.3);
-      const ch2End = Math.floor(totalDuration * 0.7);
-      chapters = [
-        {
-          title: 'Introduction & Sprint Review',
-          summary: 'The team reviewed ongoing sprint deliverables, team attendance, and upcoming product milestones.',
-          startTime: 0,
-          endTime: ch1End,
-          order: 1
-        },
-        {
-          title: 'Architecture & Cloud Discussion',
-          summary: 'Evaluated cloud provider options (AWS vs. Azure) and finalized architecture setup.',
-          startTime: ch1End,
-          endTime: ch2End,
-          order: 2
-        },
-        {
-          title: 'Decisions & Next Steps',
-          summary: 'Agreed on Friday database testing schedule and designated task owners.',
-          startTime: ch2End,
-          endTime: totalDuration,
-          order: 3
-        }
-      ];
-
-      // Next Steps (28.7)
-      nextSteps = [
-        { task: 'Complete database testing before Friday deployment', assignedTo: 'QA Lead', dueDate: 'Friday', status: 'OPEN' },
-        { task: 'Configure AWS Elastic Beanstalk and set up billing alerts', assignedTo: 'DevOps Lead', dueDate: 'Thursday', status: 'OPEN' },
-        { task: 'Distribute recording replay and transcript to all attendees', assignedTo: 'Host', dueDate: 'Today', status: 'OPEN' }
-      ];
-
-      // Topics (28.9)
-      topics = [
-        { topicName: 'Cloud Infrastructure', keywords: ['AWS', 'Azure', 'Deployment', 'Beanstalk'], startTime: ch1End, endTime: ch2End, relevanceScore: 0.95 },
-        { topicName: 'Database Testing', keywords: ['QA', 'Migration', 'Performance', 'Scripts'], startTime: ch2End, endTime: totalDuration, relevanceScore: 0.92 },
-        { topicName: 'Sprint Milestones', keywords: ['Review', 'Architecture', 'Roadmap'], startTime: 0, endTime: ch1End, relevanceScore: 0.88 }
-      ];
 
       // Conversation Analytics (28.8)
       // Extract unique speakers from segments
@@ -319,33 +267,34 @@ Generate a complete Smart Recording breakdown in ONLY valid JSON (no markdown fo
         };
       });
 
-      analytics = {
-        talkSpeed: {
-          wpmAverage: 135,
-          perSpeaker: Object.keys(speakerCounts).map(s => ({ speakerName: s, wpm: Math.floor(125 + Math.random() * 25) }))
-        },
-        talkListenRatio,
-        longestMonologue: {
-          speakerName: segments[1]?.speakerName || 'Lead Engineer',
-          durationSeconds: Math.min(45, totalDuration),
-          startTime: segments[1]?.startTime || 45,
-          textSnippet: segments[1]?.text || 'I completed the backend microservices and database migration scripts.'
-        },
-        fillerWords: {
-          totalCount: 5,
-          perSpeaker: Object.keys(speakerCounts).map(s => ({
-            speakerName: s,
-            count: 2,
-            words: [{ word: 'um', count: 1 }, { word: 'like', count: 1 }]
-          }))
-        },
-        patience: {
-          score: 91,
-          interruptionCount: 1,
-          responseLagSecondsAverage: 1.2
-        }
-      };
-    }
+      if (!analytics) {
+        analytics = {
+          talkSpeed: {
+            wpmAverage: 135,
+            perSpeaker: Object.keys(speakerCounts).map(s => ({ speakerName: s, wpm: Math.floor(125 + Math.random() * 25) }))
+          },
+          talkListenRatio,
+          longestMonologue: {
+            speakerName: segments[0]?.speakerName || 'Speaker',
+            durationSeconds: Math.min(45, totalDuration),
+            startTime: segments[0]?.startTime || 0,
+            textSnippet: segments[0]?.text || ''
+          },
+          fillerWords: {
+            totalCount: 0,
+            perSpeaker: Object.keys(speakerCounts).map(s => ({
+              speakerName: s,
+              count: 0,
+              words: []
+            }))
+          },
+          patience: {
+            score: 95,
+            interruptionCount: 0,
+            responseLagSecondsAverage: 1.0
+          }
+        };
+      }
 
     // 4. Update and Save Smart Recording Record
     smartRec.highlights = highlights;

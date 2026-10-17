@@ -275,9 +275,15 @@ router.post('/ask', protect, async (req, res) => {
     let confidence = 0.95;
 
     // 5. Query LLM (Gemini AI with Model Cascade) with Grounded RAG Prompt (26.24)
-    if (isGeminiConfigured()) {
-      try {
-        const prompt = `
+    if (!isGeminiConfigured()) {
+      return res.status(503).json({
+        success: false,
+        message: 'Gemini AI service is not configured. Please ensure GEMINI_API_KEY is configured in the environment.'
+      });
+    }
+
+    try {
+      const prompt = `
 You are the dedicated in-meeting AI assistant for IntellMeet.
 A meeting participant has asked a question during an active meeting.
 You must answer strictly based on the provided meeting context (speech-to-text transcript and chat).
@@ -306,125 +312,29 @@ Return ONLY valid JSON with this exact schema (no markdown, no backticks):
   ]
 }
 `;
-        const { text } = await generateGeminiContent(prompt);
-        const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(cleaned);
-        answerText = parsed.answer;
-        confidence = parsed.confidence || 0.95;
-        citedSources = (parsed.sources || []).map(s => ({
-          sourceType: s.sourceType || 'TRANSCRIPT',
-          speakerName: s.speakerName || 'Speaker',
-          timecode: s.timecode || '00:00',
-          startTime: s.startTime || 0,
-          endTime: s.startTime ? s.startTime + 4 : 4,
-          textSnippet: s.textSnippet || '',
-          relevanceScore: 0.95
-        }));
-      } catch (geminiErr) {
-        console.warn('Gemini Meeting Questions fallback triggered:', geminiErr.message);
+      const { text } = await generateGeminiContent(prompt);
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('Gemini response did not return valid JSON.');
       }
-    }
-
-    // 6. Heuristic RAG Fallback if Gemini unavailable or rate-limited
-    if (!answerText) {
-      const qLower = question.toLowerCase();
-      const matched = [];
-
-      contextSegments.forEach(seg => {
-        const sLower = seg.text.toLowerCase();
-        let matchScore = 0;
-        const words = qLower.split(' ').filter(w => w.length > 3);
-        words.forEach(w => {
-          if (sLower.includes(w)) matchScore += 1;
-        });
-
-        if (matchScore > 0 || presetType === 'CATCH_ME_UP') {
-          matched.push({ seg, score: matchScore });
-        }
+      const parsed = JSON.parse(jsonMatch[0]);
+      answerText = parsed.answer;
+      confidence = parsed.confidence || 0.95;
+      citedSources = (parsed.sources || []).map(s => ({
+        sourceType: s.sourceType || 'TRANSCRIPT',
+        speakerName: s.speakerName || 'Speaker',
+        timecode: s.timecode || '00:00',
+        startTime: s.startTime || 0,
+        endTime: s.startTime ? s.startTime + 4 : 4,
+        textSnippet: s.textSnippet || '',
+        relevanceScore: 0.95
+      }));
+    } catch (geminiErr) {
+      console.error('Gemini Meeting Questions error:', geminiErr.message);
+      return res.status(502).json({
+        success: false,
+        message: `In-meeting AI Assistant error: ${geminiErr.message}. Please try again.`
       });
-
-      matched.sort((a, b) => b.score - a.score);
-      const topMatches = matched.slice(0, 3).map(m => m.seg);
-
-      if (presetType === 'CATCH_ME_UP') {
-        answerText = `Here is what was discussed so far:\n• ` +
-          contextSegments.slice(0, 4).map(s => `${s.speakerName}: "${s.text}"`).join('\n• ');
-        citedSources = contextSegments.slice(0, 3).map(s => ({
-          sourceType: s.sourceType,
-          speakerName: s.speakerName,
-          timecode: s.timecode,
-          startTime: s.startTime,
-          endTime: s.endTime,
-          textSnippet: s.text,
-          relevanceScore: 0.9
-        }));
-      } else if (presetType === 'DECISIONS' || qLower.includes('decide') || qLower.includes('decision')) {
-        const decSeg = contextSegments.find(s => s.text.toLowerCase().includes('agree') || s.text.toLowerCase().includes('decid') || s.text.toLowerCase().includes('let\'s')) || contextSegments[0];
-        answerText = `The team agreed: "${decSeg.text}".`;
-        citedSources = [{
-          sourceType: decSeg.sourceType,
-          speakerName: decSeg.speakerName,
-          timecode: decSeg.timecode,
-          startTime: decSeg.startTime,
-          endTime: decSeg.endTime,
-          textSnippet: decSeg.text,
-          relevanceScore: 0.95
-        }];
-      } else if (presetType === 'ACTION_ITEMS' || qLower.includes('action') || qLower.includes('task') || qLower.includes('who is')) {
-        const actSeg = contextSegments.find(s => s.text.toLowerCase().includes('will') || s.text.toLowerCase().includes('action') || s.text.toLowerCase().includes('complete')) || contextSegments[contextSegments.length - 1];
-        answerText = `${actSeg.speakerName} committed to: "${actSeg.text}".`;
-        citedSources = [{
-          sourceType: actSeg.sourceType,
-          speakerName: actSeg.speakerName,
-          timecode: actSeg.timecode,
-          startTime: actSeg.startTime,
-          endTime: actSeg.endTime,
-          textSnippet: actSeg.text,
-          relevanceScore: 0.95
-        }];
-      } else if (presetType === 'DEADLINES' || qLower.includes('deadline') || qLower.includes('when') || qLower.includes('date')) {
-        const deadSeg = contextSegments.find(s => s.text.toLowerCase().includes('friday') || s.text.toLowerCase().includes('monday') || s.text.toLowerCase().includes('today') || s.text.toLowerCase().includes('deadline')) || contextSegments[0];
-        answerText = `According to ${deadSeg.speakerName}, the agreed timeframe is: "${deadSeg.text}".`;
-        citedSources = [{
-          sourceType: deadSeg.sourceType,
-          speakerName: deadSeg.speakerName,
-          timecode: deadSeg.timecode,
-          startTime: deadSeg.startTime,
-          endTime: deadSeg.endTime,
-          textSnippet: deadSeg.text,
-          relevanceScore: 0.95
-        }];
-      } else if (presetType === 'MY_NAME' || qLower.includes('my name') || (user.name && qLower.includes(user.name.toLowerCase()))) {
-        const nameQuery = user.name ? user.name.toLowerCase() : 'you';
-        const mention = contextSegments.find(s => s.text.toLowerCase().includes(nameQuery));
-        if (mention) {
-          answerText = `Your name was mentioned by ${mention.speakerName}: "${mention.text}".`;
-          citedSources = [{
-            sourceType: mention.sourceType,
-            speakerName: mention.speakerName,
-            timecode: mention.timecode,
-            startTime: mention.startTime,
-            endTime: mention.endTime,
-            textSnippet: mention.text,
-            relevanceScore: 0.95
-          }];
-        } else {
-          answerText = `Your name (${user.name || 'Participant'}) has not been mentioned in the meeting discussion recorded so far.`;
-        }
-      } else if (topMatches.length > 0) {
-        answerText = `Based on the discussion, ${topMatches[0].speakerName} stated: "${topMatches[0].text}".`;
-        citedSources = topMatches.map(s => ({
-          sourceType: s.sourceType,
-          speakerName: s.speakerName,
-          timecode: s.timecode,
-          startTime: s.startTime,
-          endTime: s.endTime,
-          textSnippet: s.text,
-          relevanceScore: 0.9
-        }));
-      } else {
-        answerText = `I analyzed the available meeting transcript and chat, but no specific discussion matched your question: "${question}".`;
-      }
     }
 
     // 7. Store Question and Answer Item (26.23)
@@ -442,7 +352,7 @@ Return ONLY valid JSON with this exact schema (no markdown, no backticks):
         text: answerText,
         confidence,
         sources: citedSources,
-        model: isGeminiConfigured() ? 'gemini-3.5-flash' : 'intellmeet-heuristic-rag',
+        model: 'gemini-3.5-flash',
         generatedAt: new Date()
       },
       createdAt: new Date()

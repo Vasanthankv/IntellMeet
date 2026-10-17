@@ -316,9 +316,15 @@ router.post('/:noteId/ai-enhance', protect, async (req, res) => {
     let citations = [];
 
     // 3. Generate with Gemini AI (Cascading Model Fallback)
-    if (isGeminiConfigured()) {
-      try {
-        const prompt = `
+    if (!isGeminiConfigured()) {
+      return res.status(503).json({
+        success: false,
+        message: 'Gemini AI service is not configured. Please ensure GEMINI_API_KEY is configured in the environment.'
+      });
+    }
+
+    try {
+      const prompt = `
 You are the dedicated Personal AI Note Assistant for IntellMeet (My Notes feature).
 Your task is to enrich, structure, and refine the user's personal notes using the meeting transcript.
 
@@ -351,75 +357,25 @@ Instructions:
   ]
 }
 `;
-        const { text } = await generateGeminiContent(prompt);
-        const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(cleaned);
-
-        enhancedContent = parsed.enhancedContent || '';
-        keyPoints = parsed.keyPoints || [];
-        decisions = parsed.decisions || [];
-        actionItems = parsed.actionItems || [];
-        questions = parsed.questions || [];
-        citations = parsed.citations || [];
-      } catch (geminiErr) {
-        console.warn('Gemini Personal Note enhancement fallback triggered:', geminiErr.message);
+      const { text } = await generateGeminiContent(prompt);
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('Gemini Personal Note enhancement did not return valid JSON.');
       }
-    }
+      const parsed = JSON.parse(jsonMatch[0]);
 
-    // 4. Heuristic Fallback Engine if Gemini is absent or fails
-    if (!enhancedContent) {
-      keyPoints = [];
-      decisions = [];
-      actionItems = [];
-      questions = [];
-      citations = [];
-
-      // Extract from manual sections
-      note.sections?.important?.forEach(i => keyPoints.push(i.text));
-      note.sections?.decisions?.forEach(d => decisions.push(d.text));
-      note.sections?.questions?.forEach(q => questions.push(q.text));
-      note.sections?.tasks?.forEach(t => actionItems.push({ task: t.text, owner: 'You', due: t.due || 'Soon' }));
-
-      // Extract from transcript segments
-      transcriptSegments.forEach(seg => {
-        const txt = seg.text;
-        const lower = txt.toLowerCase();
-        if (lower.includes('decid') || lower.includes('agree') || lower.includes('let\'s')) {
-          decisions.push(`${seg.speakerName}: "${txt}"`);
-          citations.push({
-            speaker: seg.speakerName,
-            timecode: formatTimestamp(seg.startTime || 0),
-            startTime: seg.startTime || 0,
-            text: txt
-          });
-        } else if (lower.includes('will') || lower.includes('action') || lower.includes('todo') || lower.includes('complete')) {
-          actionItems.push({
-            task: txt,
-            owner: seg.speakerName,
-            due: lower.includes('friday') ? 'Friday' : (lower.includes('monday') ? 'Monday' : 'Next Sprint')
-          });
-          citations.push({
-            speaker: seg.speakerName,
-            timecode: formatTimestamp(seg.startTime || 0),
-            startTime: seg.startTime || 0,
-            text: txt
-          });
-        } else if (lower.includes('?') || lower.includes('should') || lower.includes('what about')) {
-          questions.push(`${seg.speakerName}: "${txt}"`);
-        } else {
-          keyPoints.push(`${seg.speakerName}: ${txt}`);
-        }
+      enhancedContent = parsed.enhancedContent || '';
+      keyPoints = parsed.keyPoints || [];
+      decisions = parsed.decisions || [];
+      actionItems = parsed.actionItems || [];
+      questions = parsed.questions || [];
+      citations = parsed.citations || [];
+    } catch (geminiErr) {
+      console.error('Gemini Personal Note enhancement error:', geminiErr.message);
+      return res.status(502).json({
+        success: false,
+        message: `Personal Note AI enhancement failed: ${geminiErr.message}. Please try again.`
       });
-
-      if (keyPoints.length === 0) keyPoints.push('Reviewed meeting agenda and ongoing project milestones.');
-      if (decisions.length === 0) decisions.push('Agreed to proceed with proposed roadmap.');
-      if (actionItems.length === 0) actionItems.push({ task: 'Follow up on sprint goals', owner: 'Team', due: 'This week' });
-
-      enhancedContent = `### ${note.title}\n\n` +
-        `**Key Points**\n` + keyPoints.slice(0, 5).map(k => `• ${k}`).join('\n') + `\n\n` +
-        `**Decisions**\n` + decisions.slice(0, 3).map(d => `• ${d}`).join('\n') + `\n\n` +
-        `**Next Steps & Action Items**\n` + actionItems.slice(0, 4).map(a => `• ${a.task} (${a.owner} - ${a.due})`).join('\n') + `\n\n` +
-        `**Questions & Reminders**\n` + (questions.length ? questions.slice(0, 3).map(q => `• ${q}`).join('\n') : '• None flagged.');
     }
 
     // 5. Update note AI enhancement record
@@ -433,7 +389,7 @@ Instructions:
       actionItems,
       questions,
       citations: citations.slice(0, 6),
-      model: isGeminiConfigured() ? 'gemini-3.5-flash' : 'intellmeet-heuristic-notes-engine',
+      model: 'gemini-3.5-flash',
       status: 'COMPLETED',
       generatedAt: new Date(),
       chatRefinements: note.aiEnhancement?.chatRefinements || []
@@ -502,9 +458,15 @@ router.post('/:noteId/ai-refine', protect, async (req, res) => {
     let refinedContent = currentContent;
     let assistantMessage = '';
 
-    if (isGeminiConfigured()) {
-      try {
-        const prompt = `
+    if (!isGeminiConfigured()) {
+      return res.status(503).json({
+        success: false,
+        message: 'Gemini AI service is not configured. Please ensure GEMINI_API_KEY is configured in the environment.'
+      });
+    }
+
+    try {
+      const prompt = `
 The user is refining their personal meeting note.
 Current Enhanced Note Content:
 ${currentContent}
@@ -514,17 +476,15 @@ User Refinement Instruction:
 
 Respond with ONLY the updated markdown content for the note incorporating the requested adjustments.
 `;
-        const { text } = await generateGeminiContent(prompt);
-        refinedContent = text.trim();
-        assistantMessage = `I've updated your note according to: "${refinementPrompt}"`;
-      } catch (err) {
-        console.warn('Gemini Note Refine fallback:', err.message);
-      }
-    }
-
-    if (!assistantMessage) {
-      refinedContent = currentContent + `\n\n> **Refinement (${new Date().toLocaleTimeString()}):** ${refinementPrompt}`;
-      assistantMessage = `Note updated with refinement: "${refinementPrompt}"`;
+      const { text } = await generateGeminiContent(prompt);
+      refinedContent = text.trim();
+      assistantMessage = `I've updated your note according to: "${refinementPrompt}"`;
+    } catch (err) {
+      console.error('Gemini Note Refine error:', err.message);
+      return res.status(502).json({
+        success: false,
+        message: `Personal Note AI refinement failed: ${err.message}. Please try again.`
+      });
     }
 
     if (!note.aiEnhancement) note.aiEnhancement = {};

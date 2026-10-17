@@ -330,72 +330,39 @@ router.post('/ai-analyze', protect, async (req, res) => {
 
     let aiResult = null;
 
-    if (isGeminiConfigured()) {
-      try {
-        const prompt = `
-          Analyze the following meeting transcript. Provide a structured summary in JSON with:
-          - "summary": A comprehensive executive summary paragraph
-          - "decisions": Array of key agreed decisions (3-5 items)
-          - "actionItems": Array of objects { "task": string, "owner": string, "due": string }
-          - "keyTopics": Array of main topics discussed (3-5 strings)
-          - "importantQuestions": Array of crucial questions raised during the meeting
-          - "followUpTasks": Array of follow-up tasks
-
-          Transcript:
-          ${dialogueText}
-        `;
-        const { text } = await generateGeminiContent(prompt);
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) aiResult = JSON.parse(jsonMatch[0]);
-      } catch (geminiErr) {
-        console.warn('Gemini call fallback to heuristic AI extraction:', geminiErr);
-      }
+    if (!isGeminiConfigured()) {
+      return res.status(503).json({
+        success: false,
+        message: 'Gemini AI service is not configured. Please ensure GEMINI_API_KEY is configured in the environment.'
+      });
     }
 
-    if (!aiResult) {
-      // Heuristic extraction pipeline (24.13, 24.20)
-      const actionKeywords = ['will', 'shall', 'need to', 'deploy', 'complete', 'test', 'review', 'prepare', 'send', 'fix', 'finish', 'build'];
-      const decisionKeywords = ['agree', 'decided', 'approved', 'choose', 'confirm', 'consensus', 'selected', 'finalize'];
-      const questionKeywords = ['?', 'how', 'when', 'why', 'who', 'what', 'where'];
+    try {
+      const prompt = `
+        Analyze the following meeting transcript. Provide a structured summary in JSON with:
+        - "summary": A comprehensive executive summary paragraph
+        - "decisions": Array of key agreed decisions (3-5 items)
+        - "actionItems": Array of objects { "task": string, "owner": string, "due": string }
+        - "keyTopics": Array of main topics discussed (3-5 strings)
+        - "importantQuestions": Array of crucial questions raised during the meeting
+        - "followUpTasks": Array of follow-up tasks
 
-      const decisions = [];
-      const actionItems = [];
-      const questions = [];
-
-      transcript.segments.forEach(seg => {
-        const lower = seg.text.toLowerCase();
-        if (decisionKeywords.some(kw => lower.includes(kw))) {
-          decisions.push(seg.text);
-        }
-        if (actionKeywords.some(kw => lower.includes(kw))) {
-          actionItems.push({
-            task: seg.text,
-            owner: seg.speakerName || 'Team Member',
-            due: 'Next Sprint',
-            completed: false
-          });
-        }
-        if (questionKeywords.some(kw => lower.includes(kw))) {
-          questions.push(seg.text);
-        }
+        Transcript:
+        ${dialogueText}
+      `;
+      const { text } = await generateGeminiContent(prompt);
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('Gemini response did not return valid JSON.');
+      }
+      aiResult = JSON.parse(jsonMatch[0]);
+      aiResult.generatedAt = new Date();
+    } catch (geminiErr) {
+      console.error('Gemini transcript AI error:', geminiErr.message);
+      return res.status(502).json({
+        success: false,
+        message: `AI Transcript analysis failed: ${geminiErr.message}. Please try again.`
       });
-
-      aiResult = {
-        summary: `Executive Summary for ${transcript.meetingTitle || 'Meeting'}: Participants (${Array.from(new Set(transcript.segments.map(s => s.speakerName))).join(', ')}) conducted an active review across ${transcript.segments.length} dialogue segments, establishing milestones for architecture, feature delivery, and deployment.`,
-        decisions: decisions.length > 0 ? decisions.slice(0, 5) : [
-          'Approved speech-recognition transcript storage and search model',
-          'Confirmed time-synchronized playback with recording player',
-          'Agreed on structured AI summary extraction pipeline'
-        ],
-        actionItems: actionItems.length > 0 ? actionItems.slice(0, 5) : [
-          { task: 'Export and distribute finalized meeting transcript', owner: 'Host', due: 'Today', completed: false },
-          { task: 'Review action items in next sprint standup', owner: 'Team', due: 'Friday', completed: false }
-        ],
-        keyTopics: ['Architecture Review', 'Speech Recognition', 'Transcript Accuracy', 'AI Analysis', 'Timeline & Delivery'],
-        importantQuestions: questions.length > 0 ? questions.slice(0, 4) : ['How will speech segments be synchronized with recording timestamps?'],
-        followUpTasks: ['Verify subtitle export in WebVTT and SRT formats', 'Schedule follow-up design sync'],
-        generatedAt: new Date()
-      };
     }
 
     transcript.aiSummary = aiResult;

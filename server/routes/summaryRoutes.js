@@ -232,9 +232,17 @@ router.post('/generate', protect, async (req, res) => {
 
     let aiResult = null;
 
-    if (isGeminiConfigured()) {
-      try {
-        const prompt = `
+    if (!isGeminiConfigured()) {
+      summary.status = 'FAILED';
+      await safeSaveSummary(summary);
+      return res.status(503).json({
+        success: false,
+        message: 'Gemini AI service is not configured. Please ensure GEMINI_API_KEY is configured in the environment.'
+      });
+    }
+
+    try {
+      const prompt = `
 You are an executive AI assistant specialized in corporate meeting intelligence for the platform IntellMeet.
 Meeting Title: ${summary.meetingTitle || 'Project Review'}
 Template Type: ${summary.template}
@@ -278,80 +286,20 @@ Return ONLY valid raw JSON with this exact schema (no markdown, no backticks):
   }
 }
 `;
-        const { text } = await generateGeminiContent(prompt);
-        const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        aiResult = JSON.parse(cleaned);
-      } catch (geminiErr) {
-        console.warn('Gemini AI summary generation fallback triggered:', geminiErr.message);
+      const { text } = await generateGeminiContent(prompt);
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('Gemini response did not return valid JSON.');
       }
-    }
-
-    // Heuristic Fallback Pipeline if Gemini not configured or rate-limited
-    if (!aiResult) {
-      const decisionList = [];
-      const actionItemList = [];
-      const questionList = [];
-      const topicsList = ['Project Deployment', 'Frontend & UI', 'Backend Architecture', 'Database QA', 'Timeline'];
-
-      segments.forEach((seg, i) => {
-        const text = seg.text || '';
-        const lower = text.toLowerCase();
-        const timeSecs = seg.startTime || i * 5;
-
-        if (lower.includes('agree') || lower.includes('decide') || lower.includes('finalize') || lower.includes('let\'s') || lower.includes('conclude')) {
-          decisionList.push({
-            description: text,
-            decidedBy: [seg.speakerName || 'Team'],
-            sourceTimestamp: timeSecs
-          });
-        }
-
-        if (lower.includes('will') || lower.includes('action item') || lower.includes('complete') || lower.includes('task') || lower.includes('deadline') || lower.includes('assign')) {
-          actionItemList.push({
-            task: text,
-            assignedTo: seg.speakerName || 'Unassigned',
-            dueDate: 'Next Sprint',
-            priority: lower.includes('urgent') || lower.includes('today') ? 'High' : 'Medium',
-            status: 'Pending',
-            sourceTimestamp: timeSecs
-          });
-        }
-
-        if (text.includes('?')) {
-          questionList.push(text);
-        }
+      aiResult = JSON.parse(jsonMatch[0]);
+    } catch (geminiErr) {
+      console.error('Gemini AI summary generation error:', geminiErr.message);
+      summary.status = 'FAILED';
+      await safeSaveSummary(summary);
+      return res.status(502).json({
+        success: false,
+        message: `AI Summary generation failed: ${geminiErr.message}. Please try again.`
       });
-
-      aiResult = {
-        overview: `The IntellMeet session "${summary.meetingTitle || 'Meeting'}" was conducted with ${speakers.length} participants (${speakers.join(', ')}). The conversation covered key development milestones, architectural deliverables, and target deployment objectives.`,
-        keyDiscussionPoints: segments.slice(0, 5).map(s => `${s.speakerName}: ${s.text}`),
-        decisions: decisionList.length > 0 ? decisionList.slice(0, 5) : [
-          { description: 'Complete database testing before production deployment.', decidedBy: speakers.slice(0, 2), sourceTimestamp: 5 },
-          { description: 'Conduct final deployment and security architecture review.', decidedBy: speakers, sourceTimestamp: 10 }
-        ],
-        actionItems: actionItemList.length > 0 ? actionItemList.slice(0, 5) : [
-          { task: 'Complete database integration testing', assignedTo: speakers[0] || 'Team Lead', dueDate: 'Friday', priority: 'High', status: 'Pending', sourceTimestamp: 8 },
-          { task: 'Prepare production release configuration and documentation', assignedTo: speakers[1] || 'DevOps', dueDate: 'Monday', priority: 'Medium', status: 'Pending', sourceTimestamp: 14 }
-        ],
-        questions: questionList.length > 0 ? questionList.slice(0, 4) : ['Are all staging tests passing with zero errors?'],
-        importantTopics: topicsList,
-        nextSteps: [
-          'Verify test suite pass rate in staging environment',
-          'Coordinate final sign-off with core stakeholders',
-          'Deploy application release'
-        ],
-        standupSpecific: {
-          yesterday: ['Completed API endpoint development and unit tests'],
-          today: ['Implementing AI Meeting Summary and action item dispatch'],
-          blockers: ['None currently identified']
-        },
-        projectSpecific: {
-          projectStatus: 'On Track',
-          completedWork: ['Speech recognition pipeline', 'Transcript storage & multi-format export'],
-          pendingWork: ['Automated post-meeting email distribution'],
-          issues: ['API rate limits under stress testing']
-        }
-      };
     }
 
     // Populate summary model fields

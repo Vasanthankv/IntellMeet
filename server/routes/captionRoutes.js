@@ -352,57 +352,38 @@ router.post('/transcription/ai-summary', protect, async (req, res) => {
 
     let aiResult = null;
 
-    if (isGeminiConfigured()) {
-      try {
-        const prompt = `
-          Analyze the following meeting transcript and produce an executive summary.
-          Return ONLY valid JSON matching this schema:
-          {
-            "summary": "2-3 sentence overview",
-            "keyPoints": ["Point 1", "Point 2"],
-            "actionItems": ["Action 1", "Action 2"],
-            "decisions": ["Decision 1"]
-          }
-          Transcript:
-          ${formattedTranscript}
-        `;
-        const { text } = await generateGeminiContent(prompt);
-        const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        aiResult = JSON.parse(cleaned);
-      } catch (geminiErr) {
-        console.warn('Gemini API call failed, generating deterministic structured summary:', geminiErr.message);
-      }
+    if (!isGeminiConfigured()) {
+      return res.status(503).json({
+        success: false,
+        message: 'Gemini AI service is not configured. Please ensure GEMINI_API_KEY is configured in the environment.'
+      });
     }
 
-    // High quality rule-based fallback if no Gemini key or offline
-    if (!aiResult) {
-      const allSentences = transcript.segments.map(s => s.text);
-      const actionKeywords = ['will', 'shall', 'need to', 'deploy', 'complete', 'test', 'review', 'prepare', 'send', 'fix'];
-      const decisionKeywords = ['agree', 'decided', 'approved', 'choose', 'confirm', 'consensus', 'selected'];
-
-      const actionItems = [];
-      const decisions = [];
-      const keyPoints = [];
-
-      transcript.segments.forEach(seg => {
-        const lower = seg.text.toLowerCase();
-        if (actionKeywords.some(kw => lower.includes(kw))) {
-          actionItems.push(`${seg.speakerName}: ${seg.text}`);
+    try {
+      const prompt = `
+        Analyze the following meeting transcript and produce an executive summary.
+        Return ONLY valid JSON matching this schema:
+        {
+          "summary": "2-3 sentence overview",
+          "keyPoints": ["Point 1", "Point 2"],
+          "actionItems": ["Action 1", "Action 2"],
+          "decisions": ["Decision 1"]
         }
-        if (decisionKeywords.some(kw => lower.includes(kw))) {
-          decisions.push(`${seg.speakerName}: ${seg.text}`);
-        }
-        if (keyPoints.length < 5) {
-          keyPoints.push(seg.text);
-        }
+        Transcript:
+        ${formattedTranscript}
+      `;
+      const { text } = await generateGeminiContent(prompt);
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('Gemini response did not return valid JSON.');
+      }
+      aiResult = JSON.parse(jsonMatch[0]);
+    } catch (geminiErr) {
+      console.error('Gemini caption summary error:', geminiErr.message);
+      return res.status(502).json({
+        success: false,
+        message: `AI Summary generation failed: ${geminiErr.message}. Please try again.`
       });
-
-      aiResult = {
-        summary: `Meeting of ${transcript.segments.length} dialogue segments recorded between participants including ${Array.from(new Set(transcript.segments.map(s => s.speakerName))).join(', ')}.`,
-        keyPoints: keyPoints.length > 0 ? keyPoints.slice(0, 4) : ['Productive discussion and collaboration.'],
-        actionItems: actionItems.length > 0 ? actionItems.slice(0, 5) : ['Follow up on items discussed in meeting.'],
-        decisions: decisions.length > 0 ? decisions.slice(0, 3) : ['Proceed with planned sprint schedule.']
-      };
     }
 
     aiResult.generatedAt = new Date();

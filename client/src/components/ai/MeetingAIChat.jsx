@@ -34,43 +34,39 @@ export default function MeetingAIChat({ summary, meetingId: propMeetingId }) {
         });
         const data = await res.json();
         if (data.success && data.questionItem?.answer) {
+          const ansText = typeof data.questionItem.answer === 'string'
+            ? data.questionItem.answer
+            : (data.questionItem.answer.text || 'Answer generated.');
           setMessages(prev => [...prev, { 
             role: 'assistant', 
-            text: data.questionItem.answer,
-            citations: data.questionItem.citations || []
+            text: ansText,
+            citations: data.questionItem.answer.sources || data.questionItem.citations || []
+          }]);
+          setIsThinking(false);
+          return;
+        } else {
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            text: data.message || 'The AI assistant was unable to process your question. Please ensure Gemini is configured and retry.'
           }]);
           setIsThinking(false);
           return;
         }
       }
     } catch (e) {
-      console.warn('Live AI endpoint unreachable, using local summary context:', e);
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        text: `Error connecting to AI service: ${e.message}. Please check your network connection and try again.`
+      }]);
+      setIsThinking(false);
+      return;
     }
 
-    // Local summary intelligence fallback
-    setTimeout(() => {
-      let aiResponse = "I'm your meeting assistant. You can ask me about decisions, action items, or the summary of this session.";
-      const lowerInput = query.toLowerCase();
-      
-      if (lowerInput.includes('action') || lowerInput.includes('task')) {
-        const items = summary?.actionItems || [];
-        aiResponse = items.length > 0 
-          ? `There are ${items.length} action items recorded: ${items.map(a => a.task || a.description || 'Task').slice(0, 3).join('; ')}.`
-          : 'No specific action items have been recorded for this meeting yet.';
-      } else if (lowerInput.includes('decision') || lowerInput.includes('decide') || lowerInput.includes('outcome')) {
-        const decs = summary?.decisions || [];
-        aiResponse = decs.length > 0
-          ? `Agreed decisions include: ${decs.map(d => d.description || d).slice(0, 3).join('; ')}.`
-          : 'No formal decisions have been logged for this meeting yet.';
-      } else if (lowerInput.includes('summary') || lowerInput.includes('overview') || lowerInput.includes('about')) {
-        aiResponse = summary?.overview 
-          ? `Here is the executive overview: ${summary.overview}`
-          : `This session is titled "${meetingName}". No detailed overview notes have been submitted yet.`;
-      }
-
-      setMessages(prev => [...prev, { role: 'assistant', text: aiResponse }]);
-      setIsThinking(false);
-    }, 400);
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      text: 'Please select an active meeting to query the AI assistant.'
+    }]);
+    setIsThinking(false);
   };
 
   return (

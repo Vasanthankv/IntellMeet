@@ -93,20 +93,20 @@ export async function translateText(text, sourceLang = 'en', targetLang = 'ta') 
     }
   }
 
-  // 2. Try Gemini AI if API key is configured (Cascading Model Fallback)
-  if (isGeminiConfigured()) {
-    try {
-      const prompt = `Translate the following text from ${LANGUAGE_NAMES[src] || src} to ${LANGUAGE_NAMES[tgt] || tgt}. Return ONLY the direct translated text with no quotes, explanations, or formatting.\n\nText: "${text}"`;
-      const { text: translated } = await generateGeminiContent(prompt);
-      if (translated && translated.trim()) return translated.trim();
-    } catch (err) {
-      console.warn('Gemini translation error:', err.message);
-    }
+  // 2. Query Gemini AI (Cascading Model Fallback)
+  if (!isGeminiConfigured()) {
+    throw new Error('Gemini AI service is not configured. Please set GEMINI_API_KEY in the environment.');
   }
 
-  // 3. Fallback: Return formatted representation indicating target language translation
-  const tgtName = LANGUAGE_NAMES[tgt] || tgt.toUpperCase();
-  return `[${tgtName}] ${text}`;
+  try {
+    const prompt = `Translate the following text from ${LANGUAGE_NAMES[src] || src} to ${LANGUAGE_NAMES[tgt] || tgt}. Return ONLY the direct translated text with no quotes, explanations, or formatting.\n\nText: "${text}"`;
+    const { text: translated } = await generateGeminiContent(prompt);
+    if (translated && translated.trim()) return translated.trim();
+    throw new Error('Empty response from translation model');
+  } catch (err) {
+    console.error('Gemini translation error:', err.message);
+    throw new Error(`AI Translation failed: ${err.message}`);
+  }
 }
 
 export default { translateText };
