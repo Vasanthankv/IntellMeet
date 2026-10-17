@@ -103,18 +103,78 @@ class NotificationQueue {
 export const notificationQueue = new NotificationQueue();
 
 /**
+ * Resolve effective SMTP configuration with support for:
+ * 1. Transactional API keys: RESEND_API_KEY, SENDGRID_API_KEY
+ * 2. Dedicated services: EMAIL_SERVICE='gmail'
+ * 3. Environment variable aliases: SMTP_*, EMAIL_*, MAIL_*, GMAIL_*
+ * 4. Automatic default to smtp.gmail.com if user is a @gmail.com address
+ */
+export const getResolvedEmailConfig = () => {
+  // 1. Resend API Key auto-configuration
+  if (process.env.RESEND_API_KEY) {
+    return {
+      provider: 'Resend',
+      host: 'smtp.resend.com',
+      port: 465,
+      secure: true,
+      auth: { user: 'resend', pass: process.env.RESEND_API_KEY },
+      from: process.env.SMTP_FROM || process.env.EMAIL_FROM || '"IntelliMeet" <onboarding@resend.dev>',
+    };
+  }
+
+  // 2. SendGrid API Key auto-configuration
+  if (process.env.SENDGRID_API_KEY) {
+    return {
+      provider: 'SendGrid',
+      host: 'smtp.sendgrid.net',
+      port: 587,
+      secure: false,
+      auth: { user: 'apikey', pass: process.env.SENDGRID_API_KEY },
+      from: process.env.SMTP_FROM || process.env.EMAIL_FROM || '"IntelliMeet" <notifications@intellmeet.com>',
+    };
+  }
+
+  const user = (process.env.SMTP_USER || process.env.EMAIL_USER || process.env.MAIL_USER || process.env.GMAIL_USER || '').trim();
+  const pass = (process.env.SMTP_PASS || process.env.SMTP_PASSWORD || process.env.EMAIL_PASS || process.env.MAIL_PASS || process.env.GMAIL_PASS || '').trim();
+  let host = (process.env.SMTP_HOST || process.env.EMAIL_HOST || process.env.MAIL_HOST || '').trim();
+  const service = (process.env.EMAIL_SERVICE || process.env.MAIL_SERVICE || '').trim().toLowerCase();
+  const port = parseInt(process.env.SMTP_PORT || process.env.EMAIL_PORT || process.env.MAIL_PORT || '587', 10);
+  const secure = process.env.SMTP_SECURE === 'true' || port === 465;
+
+  // Auto-detect Gmail if host omitted but user is @gmail.com
+  if (!host && !service && user && user.toLowerCase().endsWith('@gmail.com')) {
+    host = 'smtp.gmail.com';
+  }
+
+  if (service && user && pass) {
+    return {
+      provider: service,
+      service,
+      auth: { user, pass },
+      from: process.env.SMTP_FROM || process.env.EMAIL_FROM || `"IntelliMeet" <${user}>`,
+    };
+  }
+
+  if (host && user && pass) {
+    return {
+      provider: host.includes('gmail') ? 'Gmail (SMTP)' : host,
+      host,
+      port,
+      secure,
+      auth: { user, pass },
+      from: process.env.SMTP_FROM || process.env.EMAIL_FROM || `"IntelliMeet" <${user}>`,
+    };
+  }
+
+  return null;
+};
+
+/**
  * Check if the email service has the minimum required SMTP configuration.
  * @returns {boolean}
  */
 export const isEmailConfigured = () => {
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const host = process.env.SMTP_HOST;
-  const service = process.env.EMAIL_SERVICE;
-
-  if (service && user && pass) return true;
-  if (host && user && pass) return true;
-  return false;
+  return getResolvedEmailConfig() !== null;
 };
 
 /**
@@ -123,7 +183,8 @@ export const isEmailConfigured = () => {
  */
 let cachedTransporter = null;
 const getTransporter = () => {
-  if (!isEmailConfigured()) {
+  const config = getResolvedEmailConfig();
+  if (!config) {
     return null;
   }
 
@@ -131,31 +192,15 @@ const getTransporter = () => {
     return cachedTransporter;
   }
 
-  const config = {};
-
-  if (process.env.EMAIL_SERVICE) {
-    config.service = process.env.EMAIL_SERVICE;
-    config.auth = {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    };
-  } else {
-    config.host = process.env.SMTP_HOST;
-    config.port = parseInt(process.env.SMTP_PORT || '587', 10);
-    config.secure = process.env.SMTP_SECURE === 'true' || config.port === 465;
-    config.auth = {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    };
-  }
-
-  // Network and timeout safety settings (prevent hangs)
-  config.connectionTimeout = 8000;  // 8s
-  config.greetingTimeout = 8000;    // 8s
-  config.socketTimeout = 12000;     // 12s
+  const transportOpts = {
+    ...config,
+    connectionTimeout: 8000,  // 8s
+    greetingTimeout: 8000,    // 8s
+    socketTimeout: 12000,     // 12s
+  };
 
   try {
-    cachedTransporter = nodemailer.createTransport(config);
+    cachedTransporter = nodemailer.createTransport(transportOpts);
     return cachedTransporter;
   } catch (error) {
     console.error('[EmailService] Failed to initialize Nodemailer transporter:', error.message);
@@ -205,12 +250,14 @@ const logEmailDiagnostic = (action, details) => {
  * Verify transporter connection status (useful for health checks & startup diagnostics).
  */
 export const verifyEmailService = async () => {
-  const configured = isEmailConfigured();
+  const config = getResolvedEmailConfig();
+  const configured = Boolean(config);
   if (!configured) {
     return {
       configured: false,
       status: 'unconfigured',
-      message: 'SMTP credentials (SMTP_HOST / SMTP_USER / SMTP_PASS) are not configured in environment variables.',
+      provider: 'None',
+      message: 'SMTP credentials (SMTP_HOST / SMTP_USER / SMTP_PASS or RESEND_API_KEY / SENDGRID_API_KEY) are not configured in environment variables.',
       queuePending: notificationQueue.getPendingCount(),
       recentLogs: notificationQueue.getHistory().slice(0, 10),
     };
@@ -221,6 +268,7 @@ export const verifyEmailService = async () => {
     return {
       configured: false,
       status: 'error',
+      provider: config.provider,
       message: 'Could not construct Nodemailer transporter with current configuration.',
       queuePending: notificationQueue.getPendingCount(),
       recentLogs: notificationQueue.getHistory().slice(0, 10),
@@ -232,7 +280,8 @@ export const verifyEmailService = async () => {
     return {
       configured: true,
       status: 'ready',
-      message: 'SMTP connection verified successfully.',
+      provider: config.provider,
+      message: `SMTP connection verified successfully (${config.provider}).`,
       queuePending: notificationQueue.getPendingCount(),
       recentLogs: notificationQueue.getHistory().slice(0, 10),
     };
