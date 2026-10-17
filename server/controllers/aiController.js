@@ -33,31 +33,44 @@ export const generateSummary = async (req, res) => {
 
     const { text } = await generateGeminiContent(prompt);
     
-    // Clean up potential markdown formatting
-    const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    // Robustly extract and parse JSON from Gemini response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('Gemini response did not contain a valid JSON object.');
+    }
     
-    const parsedData = JSON.parse(cleanedText);
+    const parsedData = JSON.parse(jsonMatch[0]);
 
-
-    // Automatically generate Tasks from action items!
-    if (parsedData.actionItems && parsedData.actionItems.length > 0 && req.user) {
-      const taskPromises = parsedData.actionItems.map(async (actionText) => {
-        const newTask = new Task({
-          title: actionText,
-          description: 'Auto-generated from IntellMeet AI Summary',
-          status: 'todo',
-          priority: 'Medium',
-          user: req.user._id
-        });
-        return newTask.save();
-      });
-      await Promise.all(taskPromises);
+    // Automatically generate Tasks from action items safely
+    if (parsedData.actionItems && Array.isArray(parsedData.actionItems) && req.user) {
+      try {
+        const rawUserId = req.user._id || req.user.id;
+        const isValidId = rawUserId && typeof rawUserId === 'string' && /^[0-9a-fA-F]{24}$/.test(rawUserId);
+        
+        if (isValidId) {
+          const taskPromises = parsedData.actionItems.map(async (actionItem) => {
+            const title = typeof actionItem === 'string' ? actionItem : (actionItem.task || actionItem.title || JSON.stringify(actionItem));
+            const newTask = new Task({
+              title,
+              description: 'Auto-generated from IntellMeet AI Summary',
+              status: 'todo',
+              priority: 'Medium',
+              user: rawUserId
+            });
+            return newTask.save().catch(e => console.warn('Task save warning:', e.message));
+          });
+          await Promise.all(taskPromises);
+        }
+      } catch (taskErr) {
+        console.warn('Auto task creation notice:', taskErr.message);
+      }
     }
 
     return res.json({ success: true, data: parsedData });
 
   } catch (error) {
-    console.error('Gemini AI Error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to generate AI summary' });
+    console.error('Gemini AI Error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to generate AI summary', error: error.message });
   }
 };
+
