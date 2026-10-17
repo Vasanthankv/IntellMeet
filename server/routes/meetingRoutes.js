@@ -37,15 +37,37 @@ const buildMeetingQuery = (rawId) => {
 };
 
 // @route   GET /api/meetings
+const memoryMeetings = new Map();
+
 // @desc    Get user meetings
 router.get('/', protect, async (req, res) => {
   try {
-    const isDbConnected = Meeting.db && Meeting.db.readyState === 1;
+    const isDbConnected = mongoose.connection.readyState === 1;
+    const userId = req.user?._id || req.user?.id;
+    const userName = req.user?.name;
+
     if (isDbConnected) {
-      const meetings = await Meeting.find({ host: req.user.id }).sort({ createdAt: -1 });
-      return res.json({ success: true, meetings });
+      try {
+        const meetings = await Meeting.find({
+          $or: [
+            ...(userId ? [{ host: userId }] : []),
+            ...(userName ? [{ hostName: userName }] : [])
+          ]
+        }).sort({ createdAt: -1 });
+        if (meetings && meetings.length > 0) {
+          return res.json({ success: true, meetings });
+        }
+      } catch (dbErr) {
+        console.warn('DB Meeting query fallback:', dbErr.message);
+      }
     }
-    return res.json({ success: true, meetings: [] });
+
+    // Fallback to memory meetings
+    const userMemMeetings = Array.from(memoryMeetings.values()).filter(m => 
+      (userId && (m.host === userId || m.host === String(userId))) ||
+      (userName && m.hostName === userName)
+    );
+    return res.json({ success: true, meetings: userMemMeetings });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
@@ -57,32 +79,45 @@ router.post('/', protect, async (req, res) => {
   try {
     const meetingData = req.body;
     const { title, date, time } = meetingData;
+    const userId = req.user?._id || req.user?.id || 'host';
+    const userName = req.user?.name || 'Host';
     
     // Generate meeting ID if not provided automatically
     const meetingId = meetingData.meetingId || `${Math.floor(100 + Math.random() * 900)}-${Math.floor(100 + Math.random() * 900)}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const isDbConnected = Meeting.db && Meeting.db.readyState === 1;
+    const meetingPayload = {
+      ...meetingData,
+      meetingId,
+      host: userId,
+      hostName: userName,
+      status: meetingData.status || 'scheduled',
+      createdAt: new Date()
+    };
+
+    const isDbConnected = mongoose.connection.readyState === 1;
     if (isDbConnected) {
-      const newMeeting = await Meeting.create({
-        ...meetingData,
-        meetingId,
-        host: req.user.id,
-        hostName: req.user.name,
-        status: 'scheduled',
-      });
-      return res.status(201).json({ success: true, meeting: newMeeting });
+      try {
+        const newMeeting = await Meeting.create(meetingPayload);
+        memoryMeetings.set(meetingId, newMeeting.toObject ? newMeeting.toObject() : newMeeting);
+        return res.status(201).json({ success: true, meeting: newMeeting });
+      } catch (dbErr) {
+        console.warn('DB Meeting create fallback:', dbErr.message);
+      }
     }
+
+    const fallbackMeeting = {
+      _id: 'mtg_' + Date.now(),
+      id: 'mtg_' + Date.now(),
+      ...meetingPayload,
+      title: title || 'New Meeting',
+      date: date || new Date().toISOString().split('T')[0],
+      time: time || '10:00 AM',
+    };
+    memoryMeetings.set(meetingId, fallbackMeeting);
 
     return res.status(201).json({
       success: true,
-      meeting: {
-        id: 'mtg_' + Date.now(),
-        meetingId,
-        title: title || 'New Meeting',
-        date: date || new Date().toISOString().split('T')[0],
-        time: time || '10:00 AM',
-        status: 'scheduled',
-      },
+      meeting: fallbackMeeting
     });
   } catch (error) {
     return res.status(500).json({ message: error.message });

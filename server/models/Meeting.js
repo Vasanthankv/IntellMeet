@@ -12,7 +12,7 @@ const meetingSchema = new mongoose.Schema(
       unique: true,
     },
     host: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: mongoose.Schema.Types.Mixed,
       ref: 'User',
     },
     hostName: {

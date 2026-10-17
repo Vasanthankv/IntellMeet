@@ -6,6 +6,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { Server } from 'socket.io';
+import mongoose from 'mongoose';
 import { connectDB } from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
 import meetingRoutes from './routes/meetingRoutes.js';
@@ -147,11 +148,18 @@ app.use('/api/meetings', agendaRoutes);
 
 
 // Health Check
-app.get('/api/health', (req, res) => {
+app.get(['/health', '/api/health'], (req, res) => {
   res.json({
     status: 'ok',
     message: 'IntellMeet Backend API Server is running smoothly',
     timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    db: {
+      readyState: mongoose.connection.readyState,
+      status: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState] || 'unknown',
+      host: mongoose.connection.host || null,
+      name: mongoose.connection.name || null
+    }
   });
 });
 
