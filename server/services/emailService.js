@@ -1,4 +1,88 @@
 import nodemailer from 'nodemailer';
+import dns from 'dns';
+import { promisify } from 'util';
+
+const resolveMxAsync = promisify(dns.resolveMx);
+
+// Disallow reserved, fake, or documentation domains that cause DNS bounce-backs
+const INVALID_DOMAINS = new Set([
+  'example.com',
+  'example.org',
+  'example.net',
+  'test.com',
+  'test.org',
+  'dummy.com',
+  'invalid',
+  'localhost',
+]);
+
+/**
+ * Cleanly resolve the user's authentic profile display name.
+ * Strictly avoids dummy/mock names (Alice, Bob, Alex, Meta, Sally, etc.)
+ * and falls back to a formatted name derived from their real verified email address.
+ */
+export const resolveUserProfileName = (user) => {
+  if (!user) return 'IntelliMeet User';
+
+  const candidate = (user.name || user.fullName || user.profileName || user.displayName || '').trim();
+  const mockNameRegex = /^(alice|bob|alex|meta|sally|john doe|jane doe|test user|member)\b/i;
+
+  if (candidate && !mockNameRegex.test(candidate)) {
+    return candidate;
+  }
+
+  // Derive from real user email address if name is absent or mock
+  if (user.email && typeof user.email === 'string') {
+    const local = user.email.split('@')[0];
+    const words = local.replace(/[._0-9+-]+/g, ' ').trim().split(/\s+/).filter(Boolean);
+    if (words.length > 0) {
+      return words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+    }
+    return local;
+  }
+
+  return 'IntelliMeet User';
+};
+
+/**
+ * Validate recipient address syntax and confirm domain has active MX records before attempting delivery.
+ * Suppresses delivery to fake/unroutable domains to prevent DNS bounce-backs ("Address not found").
+ */
+export const validateRecipientEmail = async (email) => {
+  if (!email || typeof email !== 'string') {
+    return { valid: false, reason: 'empty_or_non_string' };
+  }
+  const clean = email.toLowerCase().trim();
+  const atIndex = clean.lastIndexOf('@');
+  if (atIndex === -1 || atIndex === 0 || atIndex === clean.length - 1) {
+    return { valid: false, reason: 'invalid_recipient' };
+  }
+
+  const domain = clean.slice(atIndex + 1);
+  if (INVALID_DOMAINS.has(domain) || domain.endsWith('.invalid') || domain.endsWith('.example')) {
+    return {
+      valid: false,
+      reason: `reserved_test_domain: ${domain} has no mail routing; delivery suppressed to prevent DNS bounce-backs`,
+    };
+  }
+
+  // Basic DNS MX record check to prevent "Address not found" / "DNS error" bounces
+  try {
+    const mxRecords = await resolveMxAsync(domain);
+    if (!mxRecords || mxRecords.length === 0) {
+      return { valid: false, reason: `domain_has_no_mx_records: ${domain}` };
+    }
+  } catch (dnsErr) {
+    if (dnsErr.code === 'ENOTFOUND' || dnsErr.code === 'ENODATA' || dnsErr.code === 'NXDOMAIN') {
+      return {
+        valid: false,
+        reason: `dns_resolution_failed: domain ${domain} does not exist (${dnsErr.code})`,
+      };
+    }
+  }
+
+  return { valid: true, email: clean };
+};
 
 /**
  * In-memory deduplication cache to suppress duplicate email notifications
@@ -228,11 +312,18 @@ const getFromAddress = () => {
 };
 
 /**
- * Format a human-readable date and time with UTC offset.
+ * Format a human-readable date and time.
  */
 const formatDateTime = (date = new Date()) => {
   const d = date instanceof Date ? date : new Date(date);
-  return d.toUTCString();
+  try {
+    return d.toLocaleString('en-US', {
+      dateStyle: 'full',
+      timeStyle: 'long',
+    });
+  } catch (e) {
+    return d.toUTCString();
+  }
 };
 
 /**
@@ -388,9 +479,20 @@ export const verifyEmailService = async () => {
 export const sendMailSafe = async (mailOptions, dedupKey = null) => {
   const recipient = (mailOptions.to || '').toLowerCase().trim();
 
-  if (!recipient || !recipient.includes('@')) {
-    logEmailDiagnostic('Skipped invalid recipient', { to: recipient, subject: mailOptions.subject });
-    return { success: false, delivered: false, reason: 'invalid_recipient' };
+  // Validate recipient syntax and check DNS MX records to prevent bounce-backs ("Address not found" / "DNS error")
+  const val = await validateRecipientEmail(recipient);
+  if (!val.valid) {
+    logEmailDiagnostic('Skipped invalid or unroutable recipient domain', {
+      to: recipient,
+      subject: mailOptions.subject,
+      reason: val.reason,
+    });
+    return {
+      success: false,
+      delivered: false,
+      reason: val.reason,
+      message: `Delivery suppressed: ${val.reason}`,
+    };
   }
 
   // Deduplication check
@@ -514,8 +616,8 @@ export const sendMailSafe = async (mailOptions, dedupKey = null) => {
  * Generate registration email content.
  */
 const generateWelcomeContent = (user, meta = {}) => {
-  const userEmail = user.email.toLowerCase().trim();
-  const userName = user.name || 'Member';
+  const userEmail = (user.email || '').toLowerCase().trim();
+  const userName = resolveUserProfileName(user);
   const userRole = user.role || 'Member';
   const userType = user.userType || 'Professional';
   const pmi = user.pmi || 'Assigned in dashboard';
@@ -612,17 +714,14 @@ The IntelliMeet Team
 
 /**
  * Generate login notification email content.
+ * Follows the professional template with dynamic values from the authenticated user's real account.
  */
 const generateLoginContent = (user, details = {}) => {
-  const userEmail = user.email.toLowerCase().trim();
-  const userName = user.name || 'Member';
-  const provider = details.provider || details.method || 'Email & Password';
-  const ip = details.ip || 'Unknown IP';
-  const userAgent = details.userAgent || 'Unknown Browser/Device';
-  const loginTime = formatDateTime(new Date());
-  const frontendUrl = process.env.FRONTEND_URL || 'https://intellmeet-frontend-5khf.onrender.com';
+  const userEmail = (user.email || '').toLowerCase().trim();
+  const userName = resolveUserProfileName(user);
+  const loginTime = formatDateTime(details.timestamp || new Date());
 
-  const subject = `Security Alert: New sign-in to your IntelliMeet account (${provider})`;
+  const subject = 'Successful Login to IntelliMeet';
 
   const html = `
 <!DOCTYPE html>
@@ -630,69 +729,49 @@ const generateLoginContent = (user, details = {}) => {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Security Alert: New Sign-in</title>
+  <title>Successful Login to IntelliMeet</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 40px 16px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="100%" max-width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
+        <table role="presentation" width="100%" max-width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
           <tr>
-            <td style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 32px; text-align: center;">
-              <div style="display: inline-block; width: 44px; height: 44px; line-height: 44px; border-radius: 50%; background-color: rgba(255, 255, 255, 0.1); font-size: 20px; margin-bottom: 12px;">🛡️</div>
-              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">Security Alert: New Sign-in</h1>
-              <p style="margin: 6px 0 0 0; color: #94a3b8; font-size: 14px;">IntelliMeet Account Protection</p>
+            <td style="background-color: #4f46e5; padding: 24px 32px; text-align: left;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700; letter-spacing: -0.3px;">IntelliMeet</h1>
             </td>
           </tr>
           <tr>
             <td style="padding: 32px;">
-              <p style="margin: 0 0 16px 0; font-size: 15px; color: #0f172a;">
-                Hi <strong>${userName}</strong>,
+              <p style="margin: 0 0 16px 0; font-size: 16px; color: #0f172a;">
+                Hello <strong>${userName}</strong>,
               </p>
-              <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #334155;">
-                We detected a successful sign-in to your <strong>IntelliMeet</strong> account. If this was you, you can safely disregard this message.
+              <p style="margin: 0 0 20px 0; font-size: 15px; line-height: 1.6; color: #334155;">
+                You have successfully logged in to IntelliMeet.
               </p>
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; border-radius: 12px; padding: 20px; margin-bottom: 24px; border: 1px solid #e2e8f0;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; border-radius: 8px; padding: 18px 20px; margin-bottom: 24px; border: 1px solid #e2e8f0;">
                 <tr>
-                  <td style="padding-bottom: 10px; font-size: 13px; color: #64748b; width: 40%;"><strong>Sign-in Method:</strong></td>
-                  <td style="padding-bottom: 10px; font-size: 13px; color: #0f172a; font-weight: 600;">${provider}</td>
+                  <td style="padding-bottom: 8px; font-size: 14px; color: #64748b; width: 35%;"><strong>Account:</strong></td>
+                  <td style="padding-bottom: 8px; font-size: 14px; color: #0f172a; font-weight: 600;">${userEmail}</td>
                 </tr>
                 <tr>
-                  <td style="padding-bottom: 10px; font-size: 13px; color: #64748b;"><strong>Date & Time:</strong></td>
-                  <td style="padding-bottom: 10px; font-size: 13px; color: #0f172a;">${loginTime}</td>
-                </tr>
-                <tr>
-                  <td style="padding-bottom: 10px; font-size: 13px; color: #64748b;"><strong>IP Address:</strong></td>
-                  <td style="padding-bottom: 10px; font-size: 13px; color: #0f172a; font-family: monospace;">${ip}</td>
-                </tr>
-                <tr>
-                  <td style="font-size: 13px; color: #64748b;"><strong>Device / Client:</strong></td>
-                  <td style="font-size: 13px; color: #0f172a; word-break: break-all;">${userAgent}</td>
+                  <td style="font-size: 14px; color: #64748b;"><strong>Date and time:</strong></td>
+                  <td style="font-size: 14px; color: #0f172a;">${loginTime}</td>
                 </tr>
               </table>
-              <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; border-radius: 6px; padding: 16px; margin-bottom: 28px;">
-                <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #991b1b;">
-                  Didn't recognize this activity?
-                </p>
-                <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #7f1d1d;">
-                  If you did not sign in at this time, someone else may have gained access to your credentials. Please reset your password immediately and review your account security.
-                </p>
-              </div>
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                <tr>
-                  <td align="center">
-                    <a href="${frontendUrl}/profile" target="_blank" style="display: inline-block; background-color: #0f172a; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 600; padding: 12px 28px; border-radius: 8px;">
-                      Review Account & Security →
-                    </a>
-                  </td>
-                </tr>
-              </table>
+              <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #475569;">
+                If this login was not initiated by you, please secure your account.
+              </p>
+              <p style="margin: 0; font-size: 15px; color: #0f172a;">
+                Thank you,<br>
+                <strong>IntelliMeet Team</strong>
+              </p>
             </td>
           </tr>
           <tr>
-            <td style="background-color: #f8fafc; padding: 20px 32px; border-top: 1px solid #e2e8f0; text-align: center;">
+            <td style="background-color: #f8fafc; padding: 16px 32px; border-top: 1px solid #e2e8f0; text-align: center;">
               <p style="margin: 0; font-size: 12px; color: #94a3b8;">
-                This security notice was sent to <strong style="color: #64748b;">${userEmail}</strong>. &copy; ${new Date().getFullYear()} IntelliMeet Inc.
+                This automated security notification was sent to <strong style="color: #64748b;">${userEmail}</strong>. &copy; ${new Date().getFullYear()} IntelliMeet.
               </p>
             </td>
           </tr>
@@ -702,30 +781,23 @@ const generateLoginContent = (user, details = {}) => {
   </table>
 </body>
 </html>
-  `;
-
-  const text = `
-Security Alert: New sign-in to your IntelliMeet account
-
-Hi ${userName},
-
-We detected a successful sign-in to your account:
-- Method: ${provider}
-- Date & Time: ${loginTime}
-- IP Address: ${ip}
-- Device: ${userAgent}
-
-If this was you, no action is needed.
-
-DIDN'T RECOGNIZE THIS ACTIVITY?
-If you did not sign in, please secure your account immediately:
-${frontendUrl}/profile
-
-Best regards,
-IntelliMeet Security Team
   `.trim();
 
-  return { to: userEmail, subject, html, text, dedupKey: `login:${userEmail}:${provider}` };
+  const text = `
+Hello ${userName},
+
+You have successfully logged in to IntelliMeet.
+
+Account: ${userEmail}
+Date and time: ${loginTime}
+
+If this login was not initiated by you, please secure your account.
+
+Thank you,
+IntelliMeet Team
+  `.trim();
+
+  return { to: userEmail, subject, html, text, dedupKey: `login:${userEmail}` };
 };
 
 /**

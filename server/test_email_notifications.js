@@ -50,12 +50,12 @@ async function runTestSuite() {
   console.log('\n--- TEST 2: Registration Welcome Email ---');
   const mockUser1 = {
     _id: 'user_reg_test_123',
-    name: 'Alice Johnson',
-    email: 'alice.johnson@example.com',
+    name: 'Vasanthan K',
+    email: 'kvvasanth0309@gmail.com',
     role: 'Member',
     userType: 'professional',
     pmi: '456-789-1011',
-    vanityUrl: 'https://intellmeet.io/m/alice-johnson',
+    vanityUrl: 'https://intellmeet.io/m/vasanthan-k',
   };
 
   const regResult = await sendWelcomeEmail(mockUser1, {
