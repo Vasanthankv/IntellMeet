@@ -1,3 +1,13 @@
+// Global crash guards to prevent Node.js exit status 1 on Render
+process.on('uncaughtException', (err) => {
+  console.error('[CRITICAL] Uncaught Exception caught by global guard:', err?.message || err);
+  if (err?.stack) console.error(err.stack);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[CRITICAL] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
