@@ -43,6 +43,7 @@ import {
   queueWelcomeNotification,
   verifyEmailService,
   isEmailConfigured,
+  sendMailSafe,
 } from '../services/emailService.js';
 
 // Helper to extract sanitized client connection details (IP & User-Agent)
@@ -512,6 +513,76 @@ router.get('/email-status', async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   POST /api/auth/test-email
+// @desc    Dispatch a live test email directly to verify provider configuration
+// @access  Public
+router.post('/test-email', async (req, res) => {
+  try {
+    const { to } = req.body;
+    const recipient = (to || 'kvasanth0309@gmail.com').toLowerCase().trim();
+
+    if (!isEmailConfigured()) {
+      return res.status(400).json({
+        success: false,
+        delivered: false,
+        reason: 'unconfigured_smtp',
+        message: 'Cannot send email: SMTP credentials (SMTP_USER and SMTP_PASS) are not yet configured in the Render backend environment variables.',
+        instructions: {
+          step1: 'Go to your Render Dashboard -> intellmeet-backend -> Environment',
+          step2: 'Add SMTP_USER (your Gmail) and SMTP_PASS (your 16-character Google App Password)',
+          step3: 'Click Save Changes',
+        },
+      });
+    }
+
+    const testSubject = `IntelliMeet Live Test Verification Email (${new Date().toLocaleTimeString()})`;
+    const testHtml = `
+      <div style="font-family: Arial, sans-serif; padding: 24px; background-color: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; max-width: 500px;">
+        <h2 style="color: #4f46e5; margin-top: 0;">IntelliMeet Email System: Operational ✅</h2>
+        <p style="color: #334155; line-height: 1.6;">This is a live test email verifying that your IntelliMeet application on Render can successfully deliver real-world notifications to your inbox.</p>
+        <div style="background-color: #ffffff; padding: 16px; border-radius: 8px; border: 1px solid #cbd5e1; margin: 16px 0;">
+          <p style="margin: 4px 0; font-size: 14px;"><strong>Recipient:</strong> ${recipient}</p>
+          <p style="margin: 4px 0; font-size: 14px;"><strong>Timestamp:</strong> ${new Date().toUTCString()}</p>
+          <p style="margin: 4px 0; font-size: 14px;"><strong>Status:</strong> Delivered successfully</p>
+        </div>
+        <p style="color: #16a34a; font-weight: bold; margin-bottom: 0;">If you are reading this email in your inbox, your notification pipeline is 100% active and working!</p>
+      </div>
+    `;
+
+    const result = await sendMailSafe({
+      to: recipient,
+      subject: testSubject,
+      html: testHtml,
+      text: `IntelliMeet Test Email: Successfully connected to SMTP and delivered to ${recipient} at ${new Date().toUTCString()}`,
+    });
+
+    if (result.delivered) {
+      return res.json({
+        success: true,
+        delivered: true,
+        recipient,
+        message: `Test email successfully dispatched to ${recipient}!`,
+        messageId: result.messageId,
+      });
+    } else {
+      return res.status(502).json({
+        success: false,
+        delivered: false,
+        recipient,
+        reason: result.reason || result.error || 'Delivery rejected by SMTP server',
+        error: result.error,
+        message: `The SMTP server rejected the email: ${result.error || result.reason}. Please verify that your Google App Password is correct and that 2-Step Verification is active.`,
+      });
+    }
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      delivered: false,
+      error: err.message,
+    });
   }
 });
 
