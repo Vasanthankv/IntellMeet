@@ -17,7 +17,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { Server } from 'socket.io';
 import mongoose from 'mongoose';
-import { connectDB } from './config/db.js';
+import { connectDB, lastDbError, lastAttemptedUri, lastConnectedHost } from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
 import meetingRoutes from './routes/meetingRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
@@ -167,8 +167,11 @@ app.get(['/health', '/api/health'], (req, res) => {
     db: {
       readyState: mongoose.connection.readyState,
       status: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState] || 'unknown',
-      host: mongoose.connection.host || null,
-      name: mongoose.connection.name || null
+      host: mongoose.connection.host || lastConnectedHost || null,
+      name: mongoose.connection.name || null,
+      lastError: lastDbError,
+      lastAttemptedUri: lastAttemptedUri,
+      hasMongoUriEnv: !!(process.env.MONGO_URI || process.env.MONGODB_URI)
     }
   });
 });
