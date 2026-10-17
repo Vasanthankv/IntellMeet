@@ -442,7 +442,7 @@ Return ONLY valid JSON with this exact schema (no markdown, no backticks):
         text: answerText,
         confidence,
         sources: citedSources,
-        model: genAI ? 'gemini-1.5-flash' : 'intellmeet-heuristic-rag',
+        model: isGeminiConfigured() ? 'gemini-3.5-flash' : 'intellmeet-heuristic-rag',
         generatedAt: new Date()
       },
       createdAt: new Date()

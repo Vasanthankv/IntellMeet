@@ -395,7 +395,7 @@ Instructions:
       actionItems,
       questions,
       citations: citations.slice(0, 6),
-      model: genAI ? 'gemini-1.5-flash' : 'intellmeet-heuristic-notes-engine',
+      model: isGeminiConfigured() ? 'gemini-3.5-flash' : 'intellmeet-heuristic-notes-engine',
       status: 'COMPLETED',
       generatedAt: new Date(),
       chatRefinements: note.aiEnhancement?.chatRefinements || []
