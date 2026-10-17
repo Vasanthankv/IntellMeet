@@ -45,15 +45,32 @@ router.get('/', protect, async (req, res) => {
     const isDbConnected = mongoose.connection.readyState === 1;
     const userId = req.user?._id || req.user?.id;
     const userName = req.user?.name;
+    const userEmail = req.user?.email;
+    const userObjId = mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : null;
 
     if (isDbConnected) {
       try {
-        const meetings = await Meeting.find({
-          $or: [
-            ...(userId ? [{ host: userId }] : []),
-            ...(userName ? [{ hostName: userName }] : [])
-          ]
-        }).sort({ createdAt: -1 });
+        const hostConditions = [];
+        if (userId) {
+          hostConditions.push({ host: userId });
+          hostConditions.push({ host: String(userId) });
+          if (userObjId) {
+            hostConditions.push({ host: userObjId });
+            hostConditions.push({ 'participants.user': userObjId });
+          }
+          hostConditions.push({ 'participants.user': userId });
+          hostConditions.push({ 'participants.user': String(userId) });
+        }
+        if (userName) {
+          hostConditions.push({ hostName: userName });
+        }
+        if (userEmail) {
+          hostConditions.push({ hostEmail: userEmail.toLowerCase() });
+          hostConditions.push({ 'participants.email': userEmail.toLowerCase() });
+        }
+
+        const query = hostConditions.length > 0 ? { $or: hostConditions } : {};
+        const meetings = await Meeting.find(query).sort({ createdAt: -1 }).lean();
         if (meetings && meetings.length > 0) {
           return res.json({ success: true, meetings });
         }
@@ -64,8 +81,9 @@ router.get('/', protect, async (req, res) => {
 
     // Fallback to memory meetings
     const userMemMeetings = Array.from(memoryMeetings.values()).filter(m => 
-      (userId && (m.host === userId || m.host === String(userId))) ||
-      (userName && m.hostName === userName)
+      (userId && (m.host === userId || m.host === String(userId) || (userObjId && String(m.host) === String(userObjId)))) ||
+      (userName && m.hostName === userName) ||
+      (userEmail && m.hostEmail === userEmail.toLowerCase())
     );
     return res.json({ success: true, meetings: userMemMeetings });
   } catch (error) {

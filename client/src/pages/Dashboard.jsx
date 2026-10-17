@@ -151,7 +151,7 @@ export default function Dashboard() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {statCardsData.map((stat, i) => (
-          <StatCard key={i} {...stat} />
+          <StatCard key={i} {...stat} isLoading={loading} />
         ))}
       </div>
 
@@ -177,6 +177,7 @@ export default function Dashboard() {
         <div className="space-y-6">
           <MeetingsListWidget
             upcoming={upcomingMeetings}
+            isLoading={loading}
             onOpenScheduleModal={() => setIsScheduleOpen(true)}
           />
         </div>

@@ -15,9 +15,9 @@ export const protect = async (req, res, next) => {
         
         // If DB is connected
         if (User.db && User.db.readyState === 1) {
-          req.user = await User.findById(decoded.id || decoded._id).select('-password');
+          req.user = await User.findById(decoded.id || decoded._id).select('-password').lean();
           if (!req.user && decoded.email) {
-            req.user = await User.findOne({ email: decoded.email.toLowerCase() }).select('-password');
+            req.user = await User.findOne({ email: decoded.email.toLowerCase() }).select('-password').lean();
           }
         }
         if (!req.user) {

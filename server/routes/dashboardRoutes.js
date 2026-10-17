@@ -1,47 +1,125 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import User from '../models/User.js';
 import Meeting from '../models/Meeting.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Helper for memory store when DB is disconnected
-const memoryStats = new Map();
+// Helper to check whether a meeting is genuinely upcoming or active
+const isMeetingUpcoming = (m) => {
+  const status = (m.status || 'scheduled').toLowerCase();
+  if (['completed', 'cancelled', 'ended', 'archived'].includes(status)) {
+    return false;
+  }
+  if (['live', 'in-progress'].includes(status) || m.recurring) {
+    return true;
+  }
+  if (!m.date) return true;
+
+  try {
+    if (String(m.date).toLowerCase() === 'today') return true;
+
+    const dateStr = String(m.date).split('T')[0];
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+
+    // Strictly in the future
+    if (dateStr > todayStr) return true;
+    // Strictly in the past
+    if (dateStr < todayStr) return false;
+
+    // Same day: allow 2-hour window after start time for ongoing/delayed meetings
+    if (dateStr === todayStr && m.time) {
+      const timeMatch = String(m.time).match(/(\d+):(\d+)\s*(AM|PM)?/i);
+      if (timeMatch) {
+        let hours = parseInt(timeMatch[1], 10);
+        const minutes = parseInt(timeMatch[2], 10);
+        const ampm = timeMatch[3] ? timeMatch[3].toUpperCase() : null;
+        if (ampm === 'PM' && hours < 12) hours += 12;
+        if (ampm === 'AM' && hours === 12) hours = 0;
+
+        const meetingDate = new Date();
+        meetingDate.setHours(hours, minutes, 0, 0);
+        const twoHoursLater = new Date(meetingDate.getTime() + 2 * 60 * 60 * 1000);
+        return now <= twoHoursLater;
+      }
+    }
+    return true;
+  } catch (e) {
+    return true;
+  }
+};
 
 // @route   GET /api/dashboard/stats
 // @desc    Get live user dashboard statistics, tasks, and meetings from MongoDB
 // @access  Private
 router.get('/stats', protect, async (req, res) => {
   try {
-    const isDbConnected = User.db && User.db.readyState === 1;
-    const userId = req.user.id || req.user._id;
+    const isDbConnected = mongoose.connection.readyState === 1;
+    const userId = req.user?._id || req.user?.id;
+    const userName = req.user?.name;
+    const userEmail = req.user?.email;
+    const userObjId = mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : null;
 
-    let user = null;
+    // Use user already loaded in memory by auth middleware for high performance
+    let user = req.user;
     let meetings = [];
 
     if (isDbConnected) {
-      [user, meetings] = await Promise.all([
-        User.findById(userId).select('-password').lean(),
-        Meeting.find({ host: userId }).select('title date time participants status meetingId createdAt').sort({ createdAt: -1 }).lean(),
-      ]);
+      const hostConditions = [];
+      if (userId) {
+        hostConditions.push({ host: userId });
+        hostConditions.push({ host: String(userId) });
+        if (userObjId) {
+          hostConditions.push({ host: userObjId });
+          hostConditions.push({ 'participants.user': userObjId });
+        }
+        hostConditions.push({ 'participants.user': userId });
+        hostConditions.push({ 'participants.user': String(userId) });
+      }
+      if (userName) {
+        hostConditions.push({ hostName: userName });
+      }
+      if (userEmail) {
+        hostConditions.push({ hostEmail: userEmail.toLowerCase() });
+        hostConditions.push({ 'participants.email': userEmail.toLowerCase() });
+      }
+
+      const query = hostConditions.length > 0 ? { $or: hostConditions } : {};
+      meetings = await Meeting.find(query)
+        .select('title description date time duration timezone participants status meetingId passcode recurring createdAt')
+        .sort({ createdAt: -1 })
+        .limit(30)
+        .lean();
     }
 
-    // Default stats if empty
+    // Filter upcoming meetings accurately
+    const formattedMeetings = [];
+    for (const m of meetings) {
+      if (isMeetingUpcoming(m)) {
+        formattedMeetings.push({
+          id: m._id || m.id,
+          title: m.title,
+          description: m.description,
+          date: m.date || 'Today',
+          time: m.time || '10:00 AM',
+          duration: m.duration || '1h',
+          timezone: m.timezone || '',
+          attendees: m.participants?.length || 1,
+          status: m.status || 'scheduled',
+          meetingId: m.meetingId,
+          passcode: m.passcode || '',
+          recurring: !!m.recurring
+        });
+      }
+    }
+
     const totalMeetings = meetings.length || (user?.stats?.totalMeetings ?? 0);
     const hoursCollaborated = user?.stats?.hoursCollaborated ?? 0;
     const aiSummariesGenerated = user?.stats?.aiSummariesGenerated ?? 0;
     const tasks = user?.tasks || [];
     const pendingTasks = tasks.filter(t => !t.completed).length;
-
-    const formattedMeetings = meetings.map(m => ({
-      id: m._id || m.id,
-      title: m.title,
-      date: m.date || 'Today',
-      time: m.time || '10:00 AM',
-      attendees: m.participants?.length || 1,
-      status: m.status || 'scheduled',
-      meetingId: m.meetingId,
-    }));
 
     const weeklyActivity = user?.weeklyActivity || [0, 0, 0, 0, 0, 0, 0];
     const recentActivity = user?.recentActivity || [];
@@ -83,8 +161,9 @@ router.get('/summary', protect, (req, res, next) => {
 router.post('/meetings', protect, async (req, res) => {
   try {
     const { title, date, time, duration } = req.body;
-    const userId = req.user.id || req.user._id;
-    const isDbConnected = User.db && User.db.readyState === 1;
+    const userId = req.user._id || req.user.id;
+    const userObjId = mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : null;
+    const isDbConnected = mongoose.connection.readyState === 1;
 
     const p1 = Math.floor(100 + Math.random() * 900);
     const p2 = Math.floor(100 + Math.random() * 900);
@@ -96,30 +175,35 @@ router.post('/meetings', protect, async (req, res) => {
       newMeeting = await Meeting.create({
         title: title || 'New Scheduled Meeting',
         meetingId,
-        host: userId,
+        host: userObjId || userId,
         hostName: req.user.name || 'User',
+        hostEmail: req.user.email || '',
         date: date || 'Today',
         time: time || '10:00 AM',
+        duration: duration || '1h',
         status: 'scheduled',
         participants: [{ name: req.user.name || 'User', email: req.user.email }],
       });
 
-      // Update user stats & weekly chart in MongoDB
-      const user = await User.findById(userId);
-      if (user) {
-        user.stats.totalMeetings = (user.stats.totalMeetings || 0) + 1;
-        // Increment current day of week in weekly activity
-        const dayIndex = new Date().getDay(); // 0 is Sun, 1 is Mon...
-        const chartIndex = dayIndex === 0 ? 6 : dayIndex - 1; // Map to Mon-Sun (0-6)
-        user.weeklyActivity[chartIndex] = (user.weeklyActivity[chartIndex] || 0) + 1;
+      // Update user stats & weekly chart in MongoDB asynchronously without blocking response
+      User.findById(userId).then(user => {
+        if (user) {
+          user.stats = user.stats || {};
+          user.stats.totalMeetings = (user.stats.totalMeetings || 0) + 1;
+          const dayIndex = new Date().getDay();
+          const chartIndex = dayIndex === 0 ? 6 : dayIndex - 1;
+          user.weeklyActivity = user.weeklyActivity || [0, 0, 0, 0, 0, 0, 0];
+          user.weeklyActivity[chartIndex] = (user.weeklyActivity[chartIndex] || 0) + 1;
 
-        user.recentActivity.unshift({
-          type: 'meeting_created',
-          title: `Scheduled "${title || 'New Scheduled Meeting'}"`,
-          time: 'Just now',
-        });
-        await user.save();
-      }
+          user.recentActivity = user.recentActivity || [];
+          user.recentActivity.unshift({
+            type: 'meeting_created',
+            title: `Scheduled "${title || 'New Scheduled Meeting'}"`,
+            time: 'Just now',
+          });
+          user.save().catch(e => console.warn('User stats save notice:', e.message));
+        }
+      }).catch(() => {});
     } else {
       newMeeting = {
         id: 'mtg_' + Date.now(),
@@ -127,6 +211,7 @@ router.post('/meetings', protect, async (req, res) => {
         meetingId,
         date: date || 'Today',
         time: time || '10:00 AM',
+        duration: duration || '1h',
         status: 'scheduled',
         attendees: 1,
       };
@@ -156,71 +241,56 @@ router.post('/tasks', protect, async (req, res) => {
   try {
     const { title, priority, dueDate } = req.body;
     const userId = req.user.id || req.user._id;
-    const isDbConnected = User.db && User.db.readyState === 1;
+    const isDbConnected = mongoose.connection.readyState === 1;
 
-    if (!title) {
-      return res.status(400).json({ message: 'Task title is required' });
-    }
+    const newTask = {
+      _id: new mongoose.Types.ObjectId(),
+      title: title || 'New Task',
+      completed: false,
+      priority: priority || 'medium',
+      dueDate: dueDate || 'Today',
+      createdAt: new Date(),
+    };
 
-    let newTask;
     if (isDbConnected) {
       const user = await User.findById(userId);
-      if (user) {
-        user.tasks.push({
-          title,
-          priority: priority || 'Medium',
-          dueDate: dueDate || 'Today',
-          completed: false,
-        });
-        user.stats.pendingTasks = user.tasks.filter(t => !t.completed).length;
-        user.recentActivity.unshift({
-          type: 'task_created',
-          title: `Added task "${title}"`,
-          time: 'Just now',
-        });
-        await user.save();
-        newTask = user.tasks[user.tasks.length - 1];
-      }
-    } else {
-      newTask = {
-        _id: 'task_' + Date.now(),
-        title,
-        priority: priority || 'Medium',
-        dueDate: dueDate || 'Today',
-        completed: false,
-      };
+      if (!user) return res.status(404).json({ message: 'User not found' });
+      user.tasks = user.tasks || [];
+      user.tasks.push(newTask);
+      await user.save();
     }
 
     return res.status(201).json({ success: true, task: newTask });
   } catch (error) {
+    console.error('Create task error:', error);
     return res.status(500).json({ message: error.message });
   }
 });
 
-// @route   PUT /api/dashboard/tasks/:taskId/toggle
-// @desc    Toggle task completion status
+// @route   PUT /api/dashboard/tasks/:id/toggle
+// @desc    Toggle completion status of a task
 // @access  Private
-router.put('/tasks/:taskId/toggle', protect, async (req, res) => {
+router.put('/tasks/:id/toggle', protect, async (req, res) => {
   try {
-    const { taskId } = req.params;
+    const { id } = req.params;
     const userId = req.user.id || req.user._id;
-    const isDbConnected = User.db && User.db.readyState === 1;
+    const isDbConnected = mongoose.connection.readyState === 1;
 
     if (isDbConnected) {
       const user = await User.findById(userId);
-      if (user) {
-        const task = user.tasks.id(taskId);
-        if (task) {
-          task.completed = !task.completed;
-          user.stats.pendingTasks = user.tasks.filter(t => !t.completed).length;
-          await user.save();
-          return res.json({ success: true, task, pendingTasks: user.stats.pendingTasks });
-        }
-      }
+      if (!user) return res.status(404).json({ message: 'User not found' });
+
+      const task = user.tasks.id(id);
+      if (!task) return res.status(404).json({ message: 'Task not found' });
+
+      task.completed = !task.completed;
+      await user.save();
+      return res.json({ success: true, task });
     }
 
-    return res.json({ success: true });
+    return res.json({ success: true, message: 'Toggled task status in memory' });
   } catch (error) {
+    console.error('Toggle task error:', error);
     return res.status(500).json({ message: error.message });
   }
 });
