@@ -51,6 +51,18 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchDashboardData();
+
+    // Auto-refresh when user returns to window or schedules a meeting anywhere
+    const onWindowFocus = () => fetchDashboardData();
+    const onMeetingCreated = () => fetchDashboardData();
+
+    window.addEventListener('focus', onWindowFocus);
+    window.addEventListener('meeting-created', onMeetingCreated);
+
+    return () => {
+      window.removeEventListener('focus', onWindowFocus);
+      window.removeEventListener('meeting-created', onMeetingCreated);
+    };
   }, [token]);
 
   const handleScheduleMeeting = async (meetingData) => {

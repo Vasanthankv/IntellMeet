@@ -353,6 +353,9 @@ export default function ScheduleMeeting() {
       }
 
       toast.success('Meeting scheduled & synchronized with integrations!');
+      try {
+        window.dispatchEvent(new CustomEvent('meeting-created', { detail: createdMeeting }));
+      } catch (e) {}
       const targetMeetingId = (createdMeeting?.meetingId || generatedMeetingId).replace(/\s/g, '');
       navigate(`/meetings/${targetMeetingId}`);
     } catch (error) {

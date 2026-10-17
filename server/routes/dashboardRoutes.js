@@ -6,49 +6,15 @@ import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Helper to check whether a meeting is genuinely upcoming or active
+// Helper to check whether a meeting is eligible to appear in Upcoming Meetings
 const isMeetingUpcoming = (m) => {
   const status = (m.status || 'scheduled').toLowerCase();
+  // Strictly filter out meetings that have been completed, cancelled, or ended
   if (['completed', 'cancelled', 'ended', 'archived'].includes(status)) {
     return false;
   }
-  if (['live', 'in-progress'].includes(status) || m.recurring) {
-    return true;
-  }
-  if (!m.date) return true;
-
-  try {
-    if (String(m.date).toLowerCase() === 'today') return true;
-
-    const dateStr = String(m.date).split('T')[0];
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-
-    // Strictly in the future
-    if (dateStr > todayStr) return true;
-    // Strictly in the past
-    if (dateStr < todayStr) return false;
-
-    // Same day: allow 2-hour window after start time for ongoing/delayed meetings
-    if (dateStr === todayStr && m.time) {
-      const timeMatch = String(m.time).match(/(\d+):(\d+)\s*(AM|PM)?/i);
-      if (timeMatch) {
-        let hours = parseInt(timeMatch[1], 10);
-        const minutes = parseInt(timeMatch[2], 10);
-        const ampm = timeMatch[3] ? timeMatch[3].toUpperCase() : null;
-        if (ampm === 'PM' && hours < 12) hours += 12;
-        if (ampm === 'AM' && hours === 12) hours = 0;
-
-        const meetingDate = new Date();
-        meetingDate.setHours(hours, minutes, 0, 0);
-        const twoHoursLater = new Date(meetingDate.getTime() + 2 * 60 * 60 * 1000);
-        return now <= twoHoursLater;
-      }
-    }
-    return true;
-  } catch (e) {
-    return true;
-  }
+  // Any meeting that is scheduled, live, waiting to start, recurring, or active is eligible
+  return true;
 };
 
 // @route   GET /api/dashboard/stats
