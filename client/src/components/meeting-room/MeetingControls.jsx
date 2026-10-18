@@ -93,7 +93,8 @@ export default function MeetingControls({
       <IconButton 
         icon={Settings} 
         label="Settings" 
-        onClick={() => {}} 
+        active={activePanel === 'settings'}
+        onClick={() => setActivePanel(activePanel === 'settings' ? null : 'settings')} 
       />
     </div>
   );

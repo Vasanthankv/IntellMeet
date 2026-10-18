@@ -387,11 +387,10 @@ export default function SupportPage() {
             <div>
               <h4 className="text-white font-semibold text-sm mb-4 uppercase tracking-wider">Sales</h4>
               <ul className="space-y-2.5">
-                {['Plans & Pricing', 'Contact Sales', 'Request a Demo', 'Webinars and Events', 'IntellMeet Experience Center', 'Partner Solutions'].map(item => (
-                  <li key={item}>
-                    <Link to={`/info/${item.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`} className="text-sm text-gray-400 hover:text-white transition-colors">{item}</Link>
-                  </li>
-                ))}
+                <li><Link to="/info/pricing" className="text-sm text-gray-400 hover:text-white transition-colors">Plans &amp; Pricing</Link></li>
+                <li><Link to="/info/contact-sales" className="text-sm text-gray-400 hover:text-white transition-colors">Contact Sales</Link></li>
+                <li><Link to="/info/contact-sales" className="text-sm text-gray-400 hover:text-white transition-colors">Request a Demo</Link></li>
+                <li><Link to="/info/solutions" className="text-sm text-gray-400 hover:text-white transition-colors">Solutions by Use Case</Link></li>
               </ul>
             </div>
 
@@ -399,14 +398,10 @@ export default function SupportPage() {
             <div>
               <h4 className="text-white font-semibold text-sm mb-4 uppercase tracking-wider">Support</h4>
               <ul className="space-y-2.5">
-                {['Test IntellMeet', 'Account', 'Support Center', 'Live Training', 'Feedback', 'Contact Us', 'Accessibility', 'Submit a Ticket'].map(item => {
-                  if (item === 'Support Center') return <li key={item}><Link to="/support" className="text-sm text-gray-400 hover:text-white transition-colors">{item}</Link></li>;
-                  return (
-                  <li key={item}>
-                    <Link to={`/info/${item.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`} className="text-sm text-gray-400 hover:text-white transition-colors">{item}</Link>
-                  </li>
-                  )
-                })}
+                <li><Link to="/join" className="text-sm text-gray-400 hover:text-white transition-colors">Test / Join Meeting</Link></li>
+                <li><Link to="/support" className="text-sm text-gray-400 hover:text-white transition-colors">Support Center</Link></li>
+                <li><Link to="/support/chat" className="text-sm text-gray-400 hover:text-white transition-colors">Live Support Chat</Link></li>
+                <li><Link to="/info/contact-sales" className="text-sm text-gray-400 hover:text-white transition-colors">Contact Us</Link></li>
               </ul>
             </div>
 
@@ -425,11 +420,15 @@ export default function SupportPage() {
 
           {/* Contact row */}
           <div className="py-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 border-b border-gray-700">
-            {/* Phone numbers */}
+            {/* Real Communication Channels */}
             <div>
-              <p className="text-gray-400 text-xs mb-1 font-medium uppercase tracking-wider">Get in touch</p>
-              <a href="tel:+18887999666" className="block text-white font-bold text-lg hover:text-primary-400 transition-colors">+1.888.799.9666</a>
-              <a href="tel:+18883031012" className="block text-white font-bold text-lg hover:text-primary-400 transition-colors">+1.888.303.1012</a>
+              <p className="text-gray-400 text-xs mb-1 font-medium uppercase tracking-wider">Official Inquiries &amp; Support</p>
+              <a href="mailto:support@intellmeet.com" className="block text-white font-bold text-base hover:text-blue-400 transition-colors">
+                support@intellmeet.com
+              </a>
+              <a href="mailto:sales@intellmeet.com" className="block text-white font-bold text-base hover:text-blue-400 transition-colors">
+                sales@intellmeet.com
+              </a>
             </div>
 
             {/* Social icons */}

@@ -251,15 +251,15 @@ router.post('/ask', protect, async (req, res) => {
       });
     }
 
-    // 3. Fallback Dialogue if context is empty
+    // 3. Honest Empty State: Do not inject fake dialogue if context is empty
     if (contextSegments.length === 0) {
-      contextSegments.push({
-        sourceType: 'TRANSCRIPT',
-        speakerName: 'System',
-        startTime: 0,
-        endTime: 5,
-        timecode: '00:00',
-        text: 'The meeting commenced with architecture review and sprint planning.'
+      return res.json({
+        success: true,
+        answer: 'No speech transcripts or chat messages have been recorded for this meeting yet. Speak during the call or post in the meeting chat so I can answer questions about the discussion.',
+        confidence: 1.0,
+        sources: [],
+        question,
+        presetType,
       });
     }
 

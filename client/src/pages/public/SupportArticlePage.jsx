@@ -38,8 +38,7 @@ export default function SupportArticlePage() {
             <h1 className="text-3xl font-bold text-gray-900 mb-4 capitalize">{articleTitle}</h1>
             <div className="flex items-center gap-4 text-sm text-gray-500">
               <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> 3 min read</span>
-              <span className="flex items-center gap-1"><Eye className="w-4 h-4" /> 12k views</span>
-              <span className="bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full font-medium text-xs">Help Article</span>
+              <span className="bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full font-medium text-xs">Verified Guide</span>
             </div>
           </div>
 

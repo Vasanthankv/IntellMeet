@@ -688,24 +688,16 @@ export default function JoinMeeting() {
 
                   {/* Mode 2: Phone Call / Telephony Dial-In (Section 6.12) */}
                   {audioType === 'phone' && (
-                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl space-y-2 text-xs text-blue-900">
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-2 text-xs text-amber-900">
                       <div className="flex items-center gap-2 font-bold">
-                        <Phone className="w-4 h-4 text-blue-600" /> Telephony Dial-In Audio
+                        <Phone className="w-4 h-4 text-amber-600" /> Telephony Dial-In Notice
                       </div>
-                      <p className="text-[11px] text-blue-700">
-                        Dial from your phone to join audio without using computer bandwidth:
+                      <p className="text-[12px] text-amber-800 leading-relaxed">
+                        PSTN phone dial-in is an enterprise add-on that requires an active telephony SIP gateway.
                       </p>
-                      <div className="p-2.5 bg-white border border-blue-200 rounded-xl space-y-1 font-mono text-[11px]">
-                        <div><strong className="text-gray-500">Dial:</strong> +1 (669) 900-6833 (US Toll)</div>
-                        <div><strong className="text-gray-500">Meeting ID:</strong> {meetingId.replace(/[\s-]/g, '')} #</div>
-                        <div><strong className="text-gray-500">Participant ID:</strong> 482 190 #</div>
-                      </div>
-                      <a 
-                        href={`tel:+16699006833,,${meetingId.replace(/[\s-]/g, '')}#`} 
-                        className="inline-block text-[11px] font-bold text-blue-600 hover:underline"
-                      >
-                        📱 One-Tap Mobile Dial-in &rarr;
-                      </a>
+                      <p className="text-[11px] text-amber-700">
+                        Please select <strong>Computer Audio</strong> to join with high-definition audio and microphone directly from your web or mobile browser.
+                      </p>
                     </div>
                   )}
 
