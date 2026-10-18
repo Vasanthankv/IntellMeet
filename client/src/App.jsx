@@ -27,6 +27,7 @@ const GenericInfoPage = lazy(() => import('./pages/public/GenericInfoPage'));
 const PricingPage = lazy(() => import('./pages/public/PricingPage'));
 const AiPage = lazy(() => import('./pages/public/AiPage'));
 const SolutionsPage = lazy(() => import('./pages/public/SolutionsPage'));
+const ContactSalesPage = lazy(() => import('./pages/public/ContactSalesPage'));
 const ProfilePage = lazy(() => import('./pages/public/ProfilePage'));
 const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'));
 const AdminCenterPage = lazy(() => import('./pages/admin/AdminCenterPage'));
@@ -76,6 +77,8 @@ function App() {
           <Route path="/info/pricing" element={<PricingPage />} />
           <Route path="/info/ai" element={<AiPage />} />
           <Route path="/info/solutions" element={<SolutionsPage />} />
+          <Route path="/info/contact-sales" element={<ContactSalesPage />} />
+          <Route path="/contact" element={<ContactSalesPage />} />
           <Route path="/info/:pageId" element={<GenericInfoPage />} />
           <Route path="/recordings/share/:shareToken" element={<PublicRecordingView />} />
           <Route element={<AuthLayout />}>

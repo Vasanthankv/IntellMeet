@@ -43,25 +43,29 @@ export default function SupportArticlePage() {
             </div>
           </div>
 
-          {/* Article Body (Placeholder) */}
+          {/* Article Body */}
           <div className="prose prose-blue max-w-none text-gray-700">
-            <p className="text-lg mb-6">
-              This is a placeholder page for the article: <strong>{articleTitle}</strong>.
+            <p className="text-base sm:text-lg mb-6 leading-relaxed">
+              This guide provides step-by-step instructions and troubleshooting recommendations for <strong>{articleTitle}</strong> in IntellMeet.
             </p>
-            <p className="mb-4">
-              In a fully implemented system, this page would fetch the actual content from a CMS or database. 
-              The content would include detailed instructions, screenshots, and troubleshooting steps related to the topic.
+
+            <h3 className="text-xl font-bold text-gray-900 mt-6 mb-3">Overview &amp; Prerequisites</h3>
+            <p className="mb-4 text-sm sm:text-base leading-relaxed">
+              IntellMeet leverages modern WebRTC peer-to-peer protocols and Google Gemini AI processing directly inside your browser. Ensure your browser (Chrome, Edge, Firefox, or Safari) has permitted camera, microphone, and screen share permissions before entering the meeting room.
             </p>
-            <h3 className="text-xl font-bold text-gray-900 mt-8 mb-4">Step-by-Step Guide</h3>
-            <ol className="list-decimal pl-5 space-y-3 mb-8">
-              <li>Log in to your IntellMeet account.</li>
-              <li>Navigate to the relevant section in your dashboard.</li>
-              <li>Follow the specific instructions for <em>{articleTitle}</em>.</li>
-              <li>Save your changes or confirm the action.</li>
+
+            <h3 className="text-xl font-bold text-gray-900 mt-8 mb-4">Step-by-Step Instructions</h3>
+            <ol className="list-decimal pl-5 space-y-3 mb-8 text-sm sm:text-base">
+              <li>Log in to your IntellMeet account, or navigate directly to the meeting link if joining as an invited guest.</li>
+              <li>Confirm your audio input and video camera selection in the pre-join preview dialog.</li>
+              <li>If required by the meeting host, enter the assigned 6-digit meeting passcode or wait in the waiting room for host admittance.</li>
+              <li>Once connected, use the bottom meeting control bar to toggle your microphone, camera, screen share, or interactive whiteboard canvas.</li>
+              <li>To access automated transcripts or AI meeting summaries, open the AI Companion drawer located on the right side of the meeting interface.</li>
             </ol>
-            <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg mb-8">
-              <p className="text-blue-800 text-sm font-medium">
-                <strong>Note:</strong> If you are still experiencing issues, please make sure your app is updated to the latest version.
+
+            <div className="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-r-xl mb-8">
+              <p className="text-blue-900 text-sm font-medium">
+                <strong>Troubleshooting Tip:</strong> If your media devices fail to initialize, check your browser address bar permissions icon (lock/tune icon) to verify that Microphone and Camera access are set to "Allow".
               </p>
             </div>
           </div>

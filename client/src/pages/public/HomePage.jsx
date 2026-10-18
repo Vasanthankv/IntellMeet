@@ -40,23 +40,23 @@ export default function HomePage() {
                     <h3 className="font-bold text-gray-900 mb-4 text-sm uppercase tracking-wider">AI Productivity</h3>
                     <ul className="space-y-3">
                       <li><Link to="/info/ai" className="text-gray-600 hover:text-blue-600 font-medium">IntellMeet AI Companion</Link></li>
-                      <li><Link to="/info/notes" className="text-gray-600 hover:text-blue-600 font-medium">My Notes</Link></li>
+                      <li><Link to="/notes" className="text-gray-600 hover:text-blue-600 font-medium">My Notes</Link></li>
                     </ul>
                   </div>
                   <div>
                     <h3 className="font-bold text-gray-900 mb-4 text-sm uppercase tracking-wider">Communications</h3>
                     <ul className="space-y-3">
-                      <li><Link to="/meetings" className="text-gray-600 hover:text-blue-600 font-medium">Meetings</Link></li>
-                      <li><Link to="/info/phone" className="text-gray-600 hover:text-blue-600 font-medium">Phone</Link></li>
-                      <li><Link to="/info/chat" className="text-gray-600 hover:text-blue-600 font-medium">Team Chat</Link></li>
+                      <li><Link to="/join" className="text-gray-600 hover:text-blue-600 font-medium">Join Meeting</Link></li>
+                      <li><Link to="/info/solutions" className="text-gray-600 hover:text-blue-600 font-medium">Solutions by Use Case</Link></li>
+                      <li><Link to="/info/contact-sales" className="text-gray-600 hover:text-blue-600 font-medium">Contact Sales</Link></li>
                     </ul>
                   </div>
                   <div>
                     <h3 className="font-bold text-gray-900 mb-4 text-sm uppercase tracking-wider">Collaboration</h3>
                     <ul className="space-y-3">
-                      <li><Link to="/modules/whiteboards" className="text-gray-600 hover:text-blue-600 font-medium">Whiteboards</Link></li>
-                      <li><Link to="/modules/tasks" className="text-gray-600 hover:text-blue-600 font-medium">Tasks</Link></li>
-                      <li><Link to="/modules/recordings" className="text-gray-600 hover:text-blue-600 font-medium">Recordings</Link></li>
+                      <li><Link to="/whiteboards" className="text-gray-600 hover:text-blue-600 font-medium">Whiteboard Studio</Link></li>
+                      <li><Link to="/tasks" className="text-gray-600 hover:text-blue-600 font-medium">Tasks</Link></li>
+                      <li><Link to="/recordings" className="text-gray-600 hover:text-blue-600 font-medium">Recordings</Link></li>
                     </ul>
                   </div>
                   <div className="bg-blue-50 p-6 rounded-xl">
@@ -154,8 +154,8 @@ export default function HomePage() {
         </p>
 
         <div className="flex flex-col sm:flex-row items-center gap-4 mb-24">
-          <Link to="/info/products" className="bg-[#0b1b3d] hover:bg-[#07132e] border border-blue-900 text-white text-[15px] font-bold px-8 py-3.5 rounded-full shadow-lg transition-colors w-full sm:w-auto text-center">
-            Explore products
+          <Link to="/info/solutions" className="bg-[#0b1b3d] hover:bg-[#07132e] border border-blue-900 text-white text-[15px] font-bold px-8 py-3.5 rounded-full shadow-lg transition-colors w-full sm:w-auto text-center">
+            Explore solutions
           </Link>
           <Link to="/info/pricing" className="bg-white hover:bg-gray-100 text-[#0b1b3d] text-[15px] font-bold px-8 py-3.5 rounded-full shadow-lg transition-colors w-full sm:w-auto text-center">
             Find your plan
@@ -173,7 +173,7 @@ export default function HomePage() {
           </Link>
           
           {/* My Notes Card */}
-          <Link to="/info/ai-notes" className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-3xl p-6 h-[200px] flex flex-col shadow-xl cursor-pointer hover:-translate-y-1 transition-transform group">
+          <Link to="/notes" className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-3xl p-6 h-[200px] flex flex-col shadow-xl cursor-pointer hover:-translate-y-1 transition-transform group">
             <div className="flex items-center gap-2 text-white font-bold text-lg mb-auto">
               <CheckSquare className="w-5 h-5" /> My Notes
             </div>
@@ -183,10 +183,10 @@ export default function HomePage() {
             </div>
           </Link>
 
-          {/* IntellMate Card */}
-          <Link to="/info/intellmate" className="bg-gradient-to-br from-[#1e3a8a] to-[#172554] rounded-3xl p-6 h-[200px] flex flex-col shadow-xl cursor-pointer hover:-translate-y-1 transition-transform group">
+          {/* Whiteboard Studio Card */}
+          <Link to="/whiteboards" className="bg-gradient-to-br from-[#1e3a8a] to-[#172554] rounded-3xl p-6 h-[200px] flex flex-col shadow-xl cursor-pointer hover:-translate-y-1 transition-transform group">
             <div className="flex items-center gap-2 text-white font-bold text-lg mb-auto">
-              <Star className="w-5 h-5 text-blue-300" /> IntellMate
+              <Star className="w-5 h-5 text-blue-300" /> Whiteboard
             </div>
             <div className="w-full h-[80px] bg-gradient-to-tr from-blue-900 to-indigo-900 rounded-t-xl border border-blue-500/30 group-hover:h-[90px] transition-all flex justify-center items-center">
                <div className="w-12 h-1 bg-blue-400 rounded-full"></div>
@@ -196,7 +196,7 @@ export default function HomePage() {
           {/* AI Productivity Suite Card */}
           <Link to="/info/ai" className="bg-gradient-to-br from-blue-300 to-cyan-200 rounded-3xl p-6 h-[200px] flex flex-col shadow-xl cursor-pointer hover:-translate-y-1 transition-transform group">
             <div className="flex items-center gap-2 text-[#0b1b3d] font-bold text-lg mb-auto">
-              <LayoutGrid className="w-5 h-5" /> AI Productivity Suite
+              <LayoutGrid className="w-5 h-5" /> AI Companion
             </div>
             <div className="w-full h-[80px] bg-white rounded-t-xl shadow-inner group-hover:h-[90px] transition-all flex items-center justify-center gap-2">
                <div className="w-6 h-6 rounded bg-pink-500"></div>
@@ -205,10 +205,10 @@ export default function HomePage() {
             </div>
           </Link>
 
-          {/* Phone Card */}
-          <Link to="/info/phone" className="bg-gradient-to-br from-gray-700 to-gray-900 rounded-3xl p-6 h-[200px] flex flex-col shadow-xl cursor-pointer hover:-translate-y-1 transition-transform group">
+          {/* Contact Sales Card */}
+          <Link to="/info/contact-sales" className="bg-gradient-to-br from-gray-700 to-gray-900 rounded-3xl p-6 h-[200px] flex flex-col shadow-xl cursor-pointer hover:-translate-y-1 transition-transform group">
             <div className="flex items-center gap-2 text-white font-bold text-lg mb-auto">
-              <Phone className="w-5 h-5" /> Phone
+              <Phone className="w-5 h-5" /> Contact Sales
             </div>
             <div className="w-12 h-12 bg-blue-500 rounded-full self-end mt-auto flex items-center justify-center">
                <MessageSquare className="w-6 h-6 text-white" />
