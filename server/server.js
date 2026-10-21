@@ -113,6 +113,65 @@ app.use('/api/users', userRoutes);
 app.use('/api/organization', userRoutes);
 app.use('/api/organization/users', userRoutes);
 app.use('/api/billing', billingRoutes);
+
+// Production STUN/TURN ICE Servers Configuration Helper
+export const getProductionIceServers = () => {
+  const iceServers = [];
+
+  // 1. STUN Servers (configured via STUN_SERVER_URLS or public fallbacks)
+  if (process.env.STUN_SERVER_URLS) {
+    const urls = process.env.STUN_SERVER_URLS.split(',').map(u => u.trim()).filter(Boolean);
+    if (urls.length > 0) iceServers.push({ urls });
+  } else {
+    iceServers.push(
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' },
+      { urls: 'stun:stun4.l.google.com:19302' },
+      { urls: 'stun:global.stun.twilio.com:3478' }
+    );
+  }
+
+  // 2. TURN Servers (configured via TURN_SERVER_URLS, TURN_USERNAME, TURN_CREDENTIAL or fallback)
+  if (process.env.TURN_SERVER_URLS) {
+    const urls = process.env.TURN_SERVER_URLS.split(',').map(u => u.trim()).filter(Boolean);
+    const entry = { urls };
+    if (process.env.TURN_USERNAME) entry.username = process.env.TURN_USERNAME;
+    if (process.env.TURN_CREDENTIAL) entry.credential = process.env.TURN_CREDENTIAL;
+    iceServers.push(entry);
+  } else {
+    // OpenRelay reliable TURN fallback (UDP and TCP/443 for restrictive firewalls)
+    iceServers.push(
+      {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      }
+    );
+  }
+
+  return iceServers;
+};
+
+// Route: Provide secure ICE server configuration to clients (registered prior to /api/meetings/:id)
+app.get(['/api/meetings/ice-servers', '/api/ice-servers'], (req, res) => {
+  res.json({
+    success: true,
+    iceServers: getProductionIceServers()
+  });
+});
+
 app.use('/api/meetings', meetingRoutes);
 app.use('/api/meetings', chatRoutes);
 app.use('/api/meetings', participantRoutes);
@@ -170,63 +229,7 @@ app.use('/api/meetings', agendaRoutes);
 
 
 
-// Production STUN/TURN ICE Servers Configuration Helper
-export const getProductionIceServers = () => {
-  const iceServers = [];
-
-  // 1. STUN Servers (configured via STUN_SERVER_URLS or public fallbacks)
-  if (process.env.STUN_SERVER_URLS) {
-    const urls = process.env.STUN_SERVER_URLS.split(',').map(u => u.trim()).filter(Boolean);
-    if (urls.length > 0) iceServers.push({ urls });
-  } else {
-    iceServers.push(
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun2.l.google.com:19302' },
-      { urls: 'stun:stun3.l.google.com:19302' },
-      { urls: 'stun:stun4.l.google.com:19302' },
-      { urls: 'stun:global.stun.twilio.com:3478' }
-    );
-  }
-
-  // 2. TURN Servers (configured via TURN_SERVER_URLS, TURN_USERNAME, TURN_CREDENTIAL or fallback)
-  if (process.env.TURN_SERVER_URLS) {
-    const urls = process.env.TURN_SERVER_URLS.split(',').map(u => u.trim()).filter(Boolean);
-    const entry = { urls };
-    if (process.env.TURN_USERNAME) entry.username = process.env.TURN_USERNAME;
-    if (process.env.TURN_CREDENTIAL) entry.credential = process.env.TURN_CREDENTIAL;
-    iceServers.push(entry);
-  } else {
-    // OpenRelay reliable TURN fallback (UDP and TCP/443 for restrictive firewalls)
-    iceServers.push(
-      {
-        urls: 'turn:openrelay.metered.ca:80',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      }
-    );
-  }
-
-  return iceServers;
-};
-
-// Route: Provide secure ICE server configuration to clients
-app.get(['/api/meetings/ice-servers', '/api/ice-servers'], (req, res) => {
-  res.json({
-    success: true,
-    iceServers: getProductionIceServers()
-  });
-});
+// Health Check
 
 // Health Check
 app.get(['/health', '/api/health'], (req, res) => {

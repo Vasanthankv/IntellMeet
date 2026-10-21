@@ -929,7 +929,10 @@ export default function MeetingRoom() {
       // Fetch production STUN/TURN ICE servers configuration
       let activeIceServers = DEFAULT_ICE_SERVERS;
       try {
-        const iceRes = await fetch(`${SOCKET_SERVER_URL}/api/meetings/ice-servers`);
+        let iceRes = await fetch(`${SOCKET_SERVER_URL}/api/meetings/ice-servers`);
+        if (!iceRes.ok) {
+          iceRes = await fetch(`${SOCKET_SERVER_URL}/api/ice-servers`);
+        }
         const iceData = await iceRes.json();
         if (iceData.success && Array.isArray(iceData.iceServers) && iceData.iceServers.length > 0) {
           activeIceServers = iceData.iceServers;
