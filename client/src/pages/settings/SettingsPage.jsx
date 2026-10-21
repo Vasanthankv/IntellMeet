@@ -206,19 +206,19 @@ export default function SettingsPage() {
   ];
 
   return (
-    <div className="flex h-screen bg-[#1E1E1E] text-gray-100 font-sans overflow-hidden">
+    <div className="flex flex-col md:flex-row min-h-screen md:h-screen bg-[#1E1E1E] text-gray-100 font-sans md:overflow-hidden">
       
       {/* Left Sidebar Navigation */}
-      <div className="w-72 bg-[#181818] border-r border-[#2C2C2C] flex flex-col shrink-0">
-        <div className="p-6 border-b border-[#2C2C2C]">
-          <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+      <div className="w-full md:w-72 bg-[#181818] border-b md:border-b-0 md:border-r border-[#2C2C2C] flex flex-col shrink-0">
+        <div className="p-4 sm:p-6 border-b border-[#2C2C2C]">
+          <h2 className="text-lg sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
             <Settings className="w-5 h-5 text-blue-500" />
             User Settings
           </h2>
-          <p className="text-xs text-gray-400 mt-1">Configure your meeting workspace</p>
+          <p className="text-xs text-gray-400 mt-0.5 sm:mt-1">Configure your meeting workspace</p>
         </div>
 
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        <nav className="p-2 sm:p-3 flex md:flex-col overflow-x-auto no-scrollbar gap-1.5 md:gap-1 md:overflow-y-auto">
           {tabs.map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -226,16 +226,16 @@ export default function SettingsPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                className={`flex items-center gap-2 sm:gap-3.5 px-3 sm:px-4 py-2 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold transition-all shrink-0 md:shrink md:w-full ${
                   isActive 
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' 
                     : 'text-gray-400 hover:text-white hover:bg-[#252525]'
                 }`}
               >
-                <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-gray-400'}`} />
+                <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${isActive ? 'text-white' : 'text-gray-400'}`} />
                 <div className="text-left">
-                  <div>{tab.label}</div>
-                  <div className={`text-[11px] font-normal ${isActive ? 'text-blue-100' : 'text-gray-500'}`}>{tab.desc}</div>
+                  <div className="whitespace-nowrap">{tab.label}</div>
+                  <div className={`hidden md:block text-[11px] font-normal ${isActive ? 'text-blue-100' : 'text-gray-500'}`}>{tab.desc}</div>
                 </div>
               </button>
             );
@@ -244,8 +244,8 @@ export default function SettingsPage() {
       </div>
 
       {/* Right Content Panel */}
-      <div className="flex-1 overflow-y-auto p-8 bg-[#1E1E1E]">
-        <div className="max-w-3xl mx-auto space-y-8">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 bg-[#1E1E1E]">
+        <div className="max-w-3xl mx-auto space-y-6 sm:space-y-8">
           
           {/* TAB 1: MEETING SETTINGS */}
           {activeTab === 'meeting' && (

@@ -398,18 +398,18 @@ export default function ScheduleMeeting() {
     <div className="max-w-5xl mx-auto py-8 px-4 sm:px-6 bg-white min-h-screen">
       
       {/* Top Header */}
-      <div className="mb-6 flex items-center justify-between border-b border-gray-200 pb-4">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
         <div>
           <Link to="/meetings" className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1 mb-1">
             <ChevronLeft className="w-3.5 h-3.5" /> Back to Upcoming Meetings
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Schedule a Meeting</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Schedule a Meeting</h1>
         </div>
-        <div className="flex gap-3">
-          <Button variant="ghost" onClick={() => navigate('/meetings')} className="text-xs font-semibold text-gray-600">
+        <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
+          <Button variant="ghost" onClick={() => navigate('/meetings')} className="flex-1 sm:flex-initial text-xs font-semibold text-gray-600">
             Cancel
           </Button>
-          <Button onClick={handleSave} isLoading={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-6 rounded-xl shadow-md shadow-blue-600/20">
+          <Button onClick={handleSave} isLoading={isSubmitting} className="flex-1 sm:flex-initial bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 sm:px-6 rounded-xl shadow-md shadow-blue-600/20">
             Save & Schedule
           </Button>
         </div>
@@ -1503,7 +1503,7 @@ export default function ScheduleMeeting() {
         </FormRow>
 
         {/* BOTTOM SAVE ACTIONS */}
-        <div className="pt-8 border-t border-gray-200 flex items-center justify-end gap-4">
+        <div className="pt-8 border-t border-gray-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 sm:gap-4">
           <Button variant="ghost" onClick={() => navigate('/meetings')} className="text-xs font-bold text-gray-600 px-6 py-2.5 rounded-xl">
             Cancel
           </Button>
@@ -1516,13 +1516,13 @@ export default function ScheduleMeeting() {
 
       {/* POLL CREATION MODAL */}
       {showPollModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-gray-200 overflow-hidden">
-            <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-gray-200 overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="p-4 sm:p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50 shrink-0">
               <h3 className="font-bold text-gray-900 text-sm">Add Pre-Meeting Poll Question</h3>
               <button onClick={() => setShowPollModal(false)} className="text-gray-400 hover:text-gray-600 text-lg font-bold">×</button>
             </div>
-            <div className="p-6 space-y-4 text-xs">
+            <div className="p-5 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
               <div>
                 <label className="block text-gray-700 font-bold mb-1">Poll Question</label>
                 <input 

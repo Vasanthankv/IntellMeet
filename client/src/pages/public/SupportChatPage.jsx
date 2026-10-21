@@ -99,26 +99,26 @@ export default function SupportChatPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans h-screen">
       {/* Header */}
-      <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0 z-20">
-        <div className="flex items-center gap-4">
+      <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 shrink-0 z-20">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+            className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-500 hover:text-gray-900 transition-colors shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
           </button>
-          <div className="w-px h-5 bg-gray-200" />
-          <Link to="/" className="flex items-center gap-2 text-primary-600 font-bold text-xl tracking-tight">
+          <div className="w-px h-5 bg-gray-200 shrink-0" />
+          <Link to="/" className="flex items-center gap-1 sm:gap-2 text-primary-600 font-bold text-lg sm:text-xl tracking-tight shrink-0">
             IntellMeet
           </Link>
-          <span className="text-gray-400 font-light text-xl">/</span>
-          <span className="text-gray-700 font-medium text-sm">Live Support Chat</span>
+          <span className="text-gray-400 font-light text-base sm:text-xl shrink-0">/</span>
+          <span className="text-gray-700 font-medium text-xs sm:text-sm truncate">Live Support Chat</span>
         </div>
       </header>
 
       {/* Chat Area */}
-      <main className="flex-1 max-w-3xl mx-auto w-full p-4 sm:p-6 flex flex-col overflow-hidden">
+      <main className="flex-1 max-w-3xl mx-auto w-full p-2 sm:p-4 md:p-6 flex flex-col overflow-hidden">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col flex-1 overflow-hidden">
           
           {/* Chat Header */}

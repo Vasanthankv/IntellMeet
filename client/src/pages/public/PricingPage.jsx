@@ -8,14 +8,14 @@ export default function PricingPage() {
   return (
     <div className="min-h-screen bg-white font-sans flex flex-col selection:bg-blue-100 selection:text-blue-900">
       {/* Header */}
-      <header className="h-[70px] flex items-center justify-between px-6 md:px-10 shrink-0 bg-[#0b1b3d] border-b border-blue-950/60 shadow-md">
+      <header className="h-[70px] flex items-center justify-between px-4 sm:px-6 md:px-10 shrink-0 bg-[#0b1b3d] border-b border-blue-950/60 shadow-md">
         <Link to="/" className="flex items-center gap-2 group">
           <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
             <span className="text-[#0b1b3d] font-black text-base leading-none">IM</span>
           </div>
-          <span className="text-white font-extrabold text-[24px] tracking-tight">IntellMeet</span>
+          <span className="text-white font-extrabold text-[20px] sm:text-[24px] tracking-tight">IntellMeet</span>
         </Link>
-        <div className="flex items-center gap-4 text-sm font-medium">
+        <div className="flex items-center gap-3 sm:gap-4 text-sm font-medium">
           <Link to="/info/solutions" className="text-gray-300 hover:text-white transition-colors hidden sm:inline">
             Solutions
           </Link>
@@ -26,19 +26,19 @@ export default function PricingPage() {
       </header>
 
       {/* Hero Section */}
-      <div className="bg-gradient-to-b from-[#0b1b3d] via-[#10234e] to-blue-950 py-20 px-4 text-center text-white relative overflow-hidden">
-        <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-6 tracking-tight">
+      <div className="bg-gradient-to-b from-[#0b1b3d] via-[#10234e] to-blue-950 py-12 sm:py-16 md:py-20 px-4 text-center text-white relative overflow-hidden">
+        <h1 className="text-2xl sm:text-4xl md:text-5xl font-extrabold text-white mb-4 sm:mb-6 tracking-tight max-w-4xl mx-auto">
           Choose the Right Plan for Your Team
         </h1>
-        <p className="text-base sm:text-lg text-blue-100/90 mb-10 max-w-2xl mx-auto leading-relaxed">
+        <p className="text-sm sm:text-base md:text-lg text-blue-100/90 mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed">
           From quick 1-on-1 video calls to enterprise-wide collaboration with automated Google Gemini AI summaries, IntellMeet delivers clear, predictable pricing.
         </p>
 
         {/* Real Interactive Billing Toggle */}
-        <div className="inline-flex bg-blue-900/60 p-1.5 rounded-full border border-blue-700/60 mb-12 shadow-inner">
+        <div className="inline-flex max-w-full bg-blue-900/60 p-1 sm:p-1.5 rounded-full border border-blue-700/60 mb-8 sm:mb-12 shadow-inner">
           <button
             onClick={() => setIsAnnual(false)}
-            className={`px-6 py-2 rounded-full font-bold text-sm transition-all cursor-pointer ${
+            className={`px-3.5 sm:px-6 py-1.5 sm:py-2 rounded-full font-bold text-xs sm:text-sm transition-all cursor-pointer ${
               !isAnnual ? 'bg-white text-[#0b1b3d] shadow-sm' : 'text-blue-200 hover:text-white'
             }`}
           >
@@ -46,12 +46,12 @@ export default function PricingPage() {
           </button>
           <button
             onClick={() => setIsAnnual(true)}
-            className={`px-6 py-2 rounded-full font-semibold text-sm transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`px-3.5 sm:px-6 py-1.5 sm:py-2 rounded-full font-semibold text-xs sm:text-sm transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 ${
               isAnnual ? 'bg-white text-[#0b1b3d] shadow-sm' : 'text-blue-200 hover:text-white'
             }`}
           >
             <span>Pay Annually</span>
-            <span className="text-[11px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+            <span className="text-[10px] sm:text-[11px] bg-emerald-500/20 text-emerald-300 px-1.5 sm:px-2 py-0.5 rounded-full font-bold">
               Save 20%
             </span>
           </button>
@@ -59,9 +59,9 @@ export default function PricingPage() {
       </div>
 
       {/* Pricing Cards */}
-      <div className="max-w-7xl mx-auto px-4 -mt-10 pb-24 grid grid-cols-1 md:grid-cols-3 gap-8 w-full">
+      <div className="max-w-7xl mx-auto px-4 -mt-8 sm:-mt-10 pb-16 sm:pb-24 grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 w-full">
         {/* Basic Plan */}
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8 flex flex-col hover:shadow-2xl transition-shadow relative">
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-6 sm:p-8 flex flex-col hover:shadow-2xl transition-shadow relative">
           <h3 className="text-2xl font-bold text-gray-900 mb-2">Basic</h3>
           <p className="text-gray-500 text-sm mb-6 h-10">Free video meetings for personal use.</p>
           <div className="mb-6">
@@ -102,7 +102,7 @@ export default function PricingPage() {
         </div>
 
         {/* Pro Plan */}
-        <div className="bg-[#0b1b3d] rounded-2xl shadow-2xl border border-blue-800 p-8 flex flex-col relative transform md:-translate-y-4">
+        <div className="bg-[#0b1b3d] rounded-2xl shadow-2xl border border-blue-800 p-6 sm:p-8 flex flex-col relative transform md:-translate-y-4">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-blue-600 text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest shadow-md">
             Most Popular
           </div>
@@ -148,7 +148,7 @@ export default function PricingPage() {
         </div>
 
         {/* Business / Enterprise Plan */}
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8 flex flex-col hover:shadow-2xl transition-shadow relative">
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-6 sm:p-8 flex flex-col hover:shadow-2xl transition-shadow relative">
           <h3 className="text-2xl font-bold text-gray-900 mb-2">Business</h3>
           <p className="text-gray-500 text-sm mb-6 h-10">Advanced governance and custom enterprise deployments.</p>
           <div className="mb-6">

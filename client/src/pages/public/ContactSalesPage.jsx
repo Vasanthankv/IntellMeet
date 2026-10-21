@@ -125,13 +125,13 @@ export default function ContactSalesPage() {
   return (
     <div className="min-h-screen bg-gray-50 font-sans flex flex-col text-gray-900 selection:bg-blue-100 selection:text-blue-900">
       {/* Header */}
-      <header className="h-[70px] sticky top-0 z-50 flex items-center justify-between px-6 md:px-12 bg-[#0b1b3d] border-b border-blue-950/60 shadow-md">
-        <div className="flex items-center gap-8">
-          <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
-              <span className="text-[#0b1b3d] font-black text-base leading-none">IM</span>
+      <header className="h-[70px] sticky top-0 z-50 flex items-center justify-between px-4 sm:px-6 md:px-12 bg-[#0b1b3d] border-b border-blue-950/60 shadow-md">
+        <div className="flex items-center gap-4 sm:gap-8">
+          <Link to="/" className="flex items-center gap-2 sm:gap-2.5 group">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-white rounded-lg flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
+              <span className="text-[#0b1b3d] font-black text-sm sm:text-base leading-none">IM</span>
             </div>
-            <span className="text-white font-extrabold text-[22px] tracking-tight">IntellMeet</span>
+            <span className="text-white font-extrabold text-[18px] sm:text-[22px] tracking-tight">IntellMeet</span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-6 text-[15px] font-medium text-gray-200">
@@ -150,21 +150,21 @@ export default function ContactSalesPage() {
           </nav>
         </div>
 
-        <div className="flex items-center gap-3 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <Link
             to="/join"
-            className="text-gray-200 hover:text-white font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors"
+            className="text-gray-200 hover:text-white font-medium text-xs sm:text-sm px-2.5 sm:px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors"
           >
-            Join Meeting
+            Join
           </Link>
 
           {isAuthenticated ? (
             <Link
               to="/dashboard"
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm px-4 py-2 rounded-full shadow-sm transition-colors flex items-center gap-1.5"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm px-3.5 sm:px-4 py-2 rounded-full shadow-sm transition-colors flex items-center gap-1.5"
             >
               Dashboard
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </Link>
           ) : (
             <>
@@ -176,7 +176,7 @@ export default function ContactSalesPage() {
               </Link>
               <Link
                 to="/register"
-                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm px-4 py-2 rounded-full shadow-sm transition-colors"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm px-3.5 sm:px-4 py-2 rounded-full shadow-sm transition-colors"
               >
                 Get Started
               </Link>
@@ -186,28 +186,28 @@ export default function ContactSalesPage() {
       </header>
 
       {/* Hero Intro */}
-      <section className="bg-gradient-to-b from-[#0b1b3d] via-[#10234e] to-[#0b1b3d] text-white pt-16 pb-20 px-4 text-center relative overflow-hidden">
+      <section className="bg-gradient-to-b from-[#0b1b3d] via-[#10234e] to-[#0b1b3d] text-white pt-12 pb-16 sm:pt-16 sm:pb-20 px-4 text-center relative overflow-hidden">
         <div className="max-w-4xl mx-auto relative z-10">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-200 text-xs sm:text-sm font-semibold mb-6 shadow-sm">
-            <Headphones className="w-4 h-4 text-blue-300" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-200 text-xs sm:text-sm font-semibold mb-4 sm:mb-6 shadow-sm">
+            <Headphones className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-300" />
             Enterprise Sales &amp; Custom Deployments
           </div>
 
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white mb-6 leading-tight">
+          <h1 className="text-2xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white mb-4 sm:mb-6 leading-tight">
             Let's Talk About Your Meeting Needs
           </h1>
 
-          <p className="text-base sm:text-lg text-blue-100/90 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-sm sm:text-lg text-blue-100/90 max-w-2xl mx-auto leading-relaxed">
             Whether you are evaluating enterprise video conferencing, custom security controls, volume licensing, or automated Google Gemini AI workflows, our team is ready to assist.
           </p>
         </div>
       </section>
 
       {/* Main Content Area: Form & Value Props */}
-      <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 -mt-10 pb-20">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <main className="flex-1 max-w-6xl mx-auto w-full px-3 sm:px-6 -mt-8 sm:-mt-10 pb-16 sm:pb-20">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
           {/* Left Column: Form or Success Confirmation (7 cols) */}
-          <div className="lg:col-span-7 bg-white rounded-2xl shadow-xl border border-gray-200 p-6 sm:p-10 relative">
+          <div className="lg:col-span-7 bg-white rounded-2xl shadow-xl border border-gray-200 p-5 sm:p-8 md:p-10 relative">
             {submitSuccess ? (
               <div className="py-8 text-center animate-fadeIn">
                 <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">

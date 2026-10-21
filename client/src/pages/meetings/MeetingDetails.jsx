@@ -324,7 +324,7 @@ export default function MeetingDetails() {
       </button>
 
       {/* Top Banner Actions */}
-      <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-200 shadow-sm p-4 sm:p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6 mb-6 sm:mb-8">
         <div>
           <div className="flex items-center gap-2 mb-2">
             <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
@@ -336,7 +336,7 @@ export default function MeetingDetails() {
               </span>
             )}
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{meeting.title}</h1>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">{meeting.title}</h1>
           <p className="text-xs text-gray-500 mt-1">{meeting.description || 'No agenda description provided'}</p>
         </div>
 
@@ -358,7 +358,7 @@ export default function MeetingDetails() {
       </div>
 
       {/* SPECIFICATION CARD: DIRECT MEETING INVITATION ACTIONS */}
-      <div className="bg-gradient-to-br from-blue-900 to-indigo-950 rounded-3xl text-white p-6 md:p-8 shadow-xl mb-8 relative overflow-hidden">
+      <div className="bg-gradient-to-br from-blue-900 to-indigo-950 rounded-2xl sm:rounded-3xl text-white p-4 sm:p-6 md:p-8 shadow-xl mb-6 sm:mb-8 relative overflow-hidden">
         
         {/* Subtle decorative background pattern */}
         <div className="absolute -top-12 -right-12 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -847,9 +847,9 @@ export default function MeetingDetails() {
 
       {/* INVITE CONTACTS MODAL */}
       {showContactsModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full border border-gray-200 overflow-hidden">
-            <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl max-w-md w-full border border-gray-200 overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="p-4 sm:p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50 shrink-0">
               <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2">
                 <Users className="w-4 h-4 text-blue-600" />
                 Invite Team Contacts
@@ -857,7 +857,7 @@ export default function MeetingDetails() {
               <button onClick={() => setShowContactsModal(false)} className="text-gray-400 hover:text-gray-600 text-lg font-bold">×</button>
             </div>
 
-            <div className="p-6 space-y-4 text-xs">
+            <div className="p-5 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
               <p className="text-gray-500">Select colleagues from your organization to send a meeting invite:</p>
 
               <div className="max-h-60 overflow-y-auto space-y-2 border border-gray-200 rounded-2xl p-2">

@@ -363,19 +363,19 @@ export default function Login() {
   };
 
   return (
-    <div className="w-full max-w-md space-y-6 bg-white p-8 rounded-xl shadow-lg">
+    <div className="w-full max-w-md space-y-5 sm:space-y-6 bg-white p-5 sm:p-8 rounded-xl shadow-lg">
 
       {/* Header */}
       <div className="text-center">
-        <h2 className="text-3xl font-bold tracking-tight text-gray-900">Sign in to IntellMeet</h2>
-        <p className="mt-2 text-sm text-gray-500">Enter your details below to access your account</p>
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">Sign in to IntellMeet</h2>
+        <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-gray-500">Enter your details below to access your account</p>
       </div>
 
       {/* Email/Password Form */}
-      <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
+      <form className="space-y-4 sm:space-y-5" onSubmit={handleSubmit(onSubmit)}>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email address</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Email address</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Mail className="h-5 w-5 text-gray-400" />
@@ -391,7 +391,7 @@ export default function Login() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Password</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Lock className="h-5 w-5 text-gray-400" />
@@ -417,7 +417,7 @@ export default function Login() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center">
             <input
               id="remember-me"
@@ -425,14 +425,14 @@ export default function Login() {
               type="checkbox"
               className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
             />
-            <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">Remember me</label>
+            <label htmlFor="remember-me" className="ml-2 block text-xs sm:text-sm text-gray-900">Remember me</label>
           </div>
-          <Link to="/forgot-password" className="text-sm font-semibold text-primary-600 hover:text-primary-500 transition-colors">
+          <Link to="/forgot-password" className="text-xs sm:text-sm font-semibold text-primary-600 hover:text-primary-500 transition-colors">
             Forgot your password?
           </Link>
         </div>
 
-        <Button type="submit" className="w-full h-11 text-base" isLoading={isLoading}>
+        <Button type="submit" className="w-full h-11 text-sm sm:text-base" isLoading={isLoading}>
           Sign in
         </Button>
       </form>

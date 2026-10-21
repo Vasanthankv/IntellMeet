@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, CheckCircle2, Circle, Calendar, AlertCircle, Trash2, Edit2, X } from 'lucide-react';
+import { Plus, CheckCircle2, Circle, Calendar, AlertCircle, Trash2, Edit2, X, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function TasksPage() {
@@ -143,14 +143,14 @@ export default function TasksPage() {
 
   return (
     <div className="flex flex-col h-full bg-white max-w-7xl mx-auto w-full pb-10 shadow-sm border-x border-gray-100">
-      <div className="flex items-center justify-between p-6 border-b border-gray-200 shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-6 border-b border-gray-200 shrink-0">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tasks</h1>
-          <p className="text-sm text-gray-500 mt-1">Select a task to view or edit its detailed information.</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Tasks</h1>
+          <p className="text-xs sm:text-sm text-gray-500 mt-0.5 sm:mt-1">Select a task to view or edit its detailed information.</p>
         </div>
         <button 
           onClick={openCreateForm}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-semibold flex items-center transition-colors shadow-sm"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-5 py-2 rounded-lg text-sm font-semibold flex items-center justify-center transition-colors shadow-sm self-start sm:self-auto"
         >
           <Plus className="w-4 h-4 mr-1.5" />
           Create Task
@@ -159,7 +159,7 @@ export default function TasksPage() {
 
       <div className="flex flex-1 overflow-hidden h-[calc(100vh-140px)]">
         {/* Left Pane: Task List */}
-        <div className="w-1/3 border-r border-gray-200 flex flex-col bg-gray-50/30 overflow-y-auto">
+        <div className={`${(isCreating || selectedTaskId) ? 'hidden md:flex' : 'flex'} w-full md:w-1/3 border-r border-gray-200 flex-col bg-gray-50/30 overflow-y-auto`}>
           {tasks.length === 0 ? (
             <div className="p-8 text-center text-gray-500 text-sm">
               No tasks found. Click "Create Task" to get started.
@@ -201,15 +201,22 @@ export default function TasksPage() {
         </div>
 
         {/* Right Pane: Task Detail / Edit View */}
-        <div className="w-2/3 bg-white flex flex-col overflow-y-auto">
+        <div className={`${(isCreating || selectedTaskId) ? 'flex' : 'hidden md:flex'} w-full md:w-2/3 bg-white flex-col overflow-y-auto`}>
           {(isCreating || selectedTask) ? (
-            <form onSubmit={handleSave} className="p-8 max-w-3xl">
-              <div className="flex items-center justify-between mb-8">
-                <h2 className="text-xl font-bold text-gray-900">{isCreating ? 'Create New Task' : 'Task Details'}</h2>
+            <form onSubmit={handleSave} className="p-4 sm:p-6 md:p-8 max-w-3xl">
+              <button
+                type="button"
+                onClick={() => { setSelectedTaskId(null); setIsCreating(false); }}
+                className="md:hidden flex items-center text-xs text-blue-600 font-semibold mb-4"
+              >
+                <ArrowLeft className="w-4 h-4 mr-1" /> Back to Tasks list
+              </button>
+              <div className="flex items-center justify-between mb-6 sm:mb-8">
+                <h2 className="text-lg sm:text-xl font-bold text-gray-900">{isCreating ? 'Create New Task' : 'Task Details'}</h2>
                 {selectedTask && (
                   <div className="flex items-center gap-2">
-                    <button type="button" onClick={() => toggleTaskStatus(selectedTask.id)} className={`px-4 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-1.5 border transition-colors ${selectedTask.status === 'completed' ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>
-                      {selectedTask.status === 'completed' ? <><CheckCircle2 className="w-4 h-4" /> Completed</> : <><Circle className="w-4 h-4" /> Mark Complete</>}
+                    <button type="button" onClick={() => toggleTaskStatus(selectedTask.id)} className={`px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 border transition-colors ${selectedTask.status === 'completed' ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>
+                      {selectedTask.status === 'completed' ? <><CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Completed</> : <><Circle className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Mark Complete</>}
                     </button>
                     <button type="button" onClick={() => handleDelete(selectedTask.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-transparent">
                       <Trash2 className="w-4 h-4" />
@@ -240,7 +247,7 @@ export default function TasksPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1.5">Priority Level</label>
                     <select 

@@ -131,29 +131,29 @@ export default function Register() {
   };
 
   return (
-    <div className="w-full max-w-lg space-y-6 bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
+    <div className="w-full max-w-lg space-y-5 sm:space-y-6 bg-white p-5 sm:p-8 rounded-2xl shadow-xl border border-gray-100">
       {/* Header */}
       <div className="text-center">
-        <h2 className="text-2xl font-bold tracking-tight text-gray-900">Create your IntellMeet account</h2>
-        <p className="mt-1 text-sm text-gray-500">Step {step} of {STEPS.length} — {STEPS[step - 1].title}</p>
+        <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900">Create your IntellMeet account</h2>
+        <p className="mt-1 text-xs sm:text-sm text-gray-500">Step {step} of {STEPS.length} — {STEPS[step - 1].title}</p>
       </div>
 
       {/* Step Progress Bar */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 sm:gap-2">
         {STEPS.map((s, i) => (
           <React.Fragment key={s.number}>
-            <div className="flex flex-col items-center gap-1 flex-1">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all duration-300 ${
+            <div className="flex flex-col items-center gap-1 flex-1 min-w-0">
+              <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-[11px] sm:text-xs font-bold border-2 transition-all duration-300 shrink-0 ${
                 step > s.number ? 'bg-green-500 border-green-500 text-white' :
                 step === s.number ? 'bg-primary-600 border-primary-600 text-white' :
                 'bg-white border-gray-300 text-gray-400'
               }`}>
-                {step > s.number ? <CheckCircle className="w-4 h-4" /> : s.number}
+                {step > s.number ? <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : s.number}
               </div>
-              <span className={`text-[10px] font-medium ${step === s.number ? 'text-primary-600' : 'text-gray-400'}`}>{s.title}</span>
+              <span className={`text-[9px] sm:text-[10px] font-medium truncate max-w-[60px] sm:max-w-none text-center ${step === s.number ? 'text-primary-600 font-semibold' : 'text-gray-400'}`}>{s.title}</span>
             </div>
             {i < STEPS.length - 1 && (
-              <div className={`flex-1 h-0.5 rounded mb-4 transition-all duration-500 ${step > s.number ? 'bg-green-400' : 'bg-gray-200'}`} />
+              <div className={`flex-1 h-0.5 rounded mb-3 sm:mb-4 transition-all duration-500 ${step > s.number ? 'bg-green-400' : 'bg-gray-200'}`} />
             )}
           </React.Fragment>
         ))}
@@ -254,7 +254,7 @@ export default function Register() {
         {step === 3 && (
           <div className="space-y-3">
             <p className="text-sm text-gray-600 font-medium">Which best describes you? This helps us personalise your IntellMeet experience.</p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
               {USER_TYPES.map((type) => {
                 const Icon = type.icon;
                 const isActive = selectedType === type.id;

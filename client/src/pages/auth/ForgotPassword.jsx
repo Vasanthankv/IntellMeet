@@ -22,16 +22,16 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="w-full max-w-md space-y-8 bg-white p-8 rounded-xl shadow-lg">
+    <div className="w-full max-w-md space-y-6 sm:space-y-8 bg-white p-5 sm:p-8 rounded-xl shadow-lg">
       <div className="text-center">
-        <h2 className="text-3xl font-bold tracking-tight text-gray-900">Reset Password</h2>
-        <p className="mt-2 text-sm text-gray-600">
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">Reset Password</h2>
+        <p className="mt-2 text-xs sm:text-sm text-gray-600">
           {isSubmitted ? "Check your email for the reset link" : "Enter your email to receive a password reset link"}
         </p>
       </div>
 
       {!isSubmitted ? (
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
+        <form className="mt-6 sm:mt-8 space-y-5 sm:space-y-6" onSubmit={handleSubmit(onSubmit)}>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email address</label>
             <div className="relative">

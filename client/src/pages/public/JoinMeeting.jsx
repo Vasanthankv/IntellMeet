@@ -418,7 +418,7 @@ export default function JoinMeeting() {
     <div className="min-h-screen bg-[#F7F9FC] flex flex-col font-sans select-none">
       
       {/* Top Navbar */}
-      <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 md:px-12 shrink-0">
+      <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 md:px-12 shrink-0">
         <Link to="/" className="flex items-center gap-2.5">
           <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-blue-600/25">
             IM
@@ -426,13 +426,13 @@ export default function JoinMeeting() {
           <span className="text-blue-600 font-extrabold text-xl tracking-tight">IntellMeet</span>
         </Link>
 
-        <div className="flex items-center gap-4 text-xs font-semibold">
+        <div className="flex items-center gap-3 sm:gap-4 text-xs font-semibold">
           <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 rounded-full border border-blue-200 text-[11px]">
             <Globe className="w-3.5 h-3.5" /> Web Browser Client
           </span>
           <Link to="/support" className="text-gray-600 hover:text-blue-600">Support</Link>
           {!user ? (
-            <Link to="/login" className="text-gray-700 hover:text-blue-600 px-3 py-1.5 rounded-full hover:bg-gray-100">
+            <Link to="/login" className="text-gray-700 hover:text-blue-600 px-2.5 sm:px-3 py-1.5 rounded-full hover:bg-gray-100">
               Sign In
             </Link>
           ) : (
@@ -444,13 +444,13 @@ export default function JoinMeeting() {
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 md:p-8">
+      <main className="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 md:p-8">
         
         {/* =========================================================================
             STAGE 1: PRE-JOIN SCREEN (AUDIO & VIDEO PREVIEW & SETUP - SECTION 6.16)
             ========================================================================= */}
         {isPreJoinScreen ? (
-          <div className="w-full max-w-4xl bg-white border border-gray-200 rounded-3xl shadow-2xl p-6 sm:p-8 md:p-10 space-y-8 animate-fade-in">
+          <div className="w-full max-w-4xl bg-white border border-gray-200 rounded-2xl sm:rounded-3xl shadow-2xl p-4 sm:p-8 md:p-10 space-y-6 sm:space-y-8 animate-fade-in">
             
             {/* Header / Meeting Meta Info */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-5">
@@ -609,14 +609,14 @@ export default function JoinMeeting() {
                             key={t.id}
                             type="button"
                             onClick={() => setAudioType(t.id)}
-                            className={`py-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center gap-1 ${
+                            className={`py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all flex flex-col items-center gap-1 ${
                               isSelected
                                 ? 'bg-white text-blue-600 shadow-sm'
                                 : 'text-gray-500 hover:text-gray-900'
                             }`}
                           >
                             <Icon className="w-3.5 h-3.5" />
-                            <span>{t.label}</span>
+                            <span className="truncate">{t.label}</span>
                           </button>
                         );
                       })}
@@ -769,7 +769,7 @@ export default function JoinMeeting() {
           /* =========================================================================
               STAGE 2: INITIAL MEETING ID & SECURITY BARRIER FORMS (PART 5 FLOW)
               ========================================================================= */
-          <div className="w-full max-w-md bg-white border border-gray-200 rounded-3xl shadow-xl p-8 space-y-6 animate-fade-in">
+          <div className="w-full max-w-md bg-white border border-gray-200 rounded-2xl sm:rounded-3xl shadow-xl p-5 sm:p-8 space-y-5 sm:space-y-6 animate-fade-in">
             
             {/* STATE A: MEETING LOCKED */}
             {isMeetingLocked ? (

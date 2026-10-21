@@ -218,10 +218,10 @@ export default function AITranscriptPage() {
       </div>
 
       {/* Navigation Tabs (24.11) */}
-      <div className="flex items-center gap-2 border-b border-gray-200 mb-6">
+      <div className="flex items-center gap-2 border-b border-gray-200 mb-6 overflow-x-auto no-scrollbar whitespace-nowrap shrink-0">
         <button
           onClick={() => setActiveTab('transcript')}
-          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${
+          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors shrink-0 ${
             activeTab === 'transcript'
               ? 'border-purple-600 text-purple-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -236,7 +236,7 @@ export default function AITranscriptPage() {
 
         <button
           onClick={() => setActiveTab('summary')}
-          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${
+          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors shrink-0 ${
             activeTab === 'summary'
               ? 'border-purple-600 text-purple-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -248,7 +248,7 @@ export default function AITranscriptPage() {
 
         <button
           onClick={() => setActiveTab('decisions')}
-          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${
+          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors shrink-0 ${
             activeTab === 'decisions'
               ? 'border-purple-600 text-purple-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -263,7 +263,7 @@ export default function AITranscriptPage() {
 
         <button
           onClick={() => setActiveTab('actions')}
-          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${
+          className={`pb-3 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors shrink-0 ${
             activeTab === 'actions'
               ? 'border-purple-600 text-purple-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'

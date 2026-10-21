@@ -635,7 +635,7 @@ export default function AppLayout() {
                 {hasUnread && <span className="absolute top-1.5 right-1.5 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"></span>}
               </button>
               
-              <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-gray-200 py-2 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 origin-top-right transform scale-95 group-hover:scale-100">
+              <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-1.5rem)] bg-white rounded-2xl shadow-2xl border border-gray-200 py-2 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 origin-top-right transform scale-95 group-hover:scale-100">
                 <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                   <h3 className="font-bold text-gray-900">Notifications</h3>
                   {hasUnread && (
@@ -672,7 +672,7 @@ export default function AppLayout() {
                 {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
               </button>
               
-              <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-gray-200 py-3 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 origin-top-right transform scale-95 group-hover:scale-100">
+              <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-1.5rem)] bg-white rounded-2xl shadow-xl border border-gray-200 py-3 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 origin-top-right transform scale-95 group-hover:scale-100">
                 <div className="px-4 py-2 border-b border-gray-100 mb-2">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-xl bg-purple-700 text-white font-bold flex items-center justify-center text-lg">
@@ -729,7 +729,7 @@ export default function AppLayout() {
         </header>
 
         {/* Page Content */}
-        <div className="flex-1 overflow-y-auto bg-gray-50 p-4 sm:p-6 lg:p-8 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto bg-gray-50 p-3 sm:p-6 lg:p-8 custom-scrollbar">
           <Outlet />
         </div>
       </main>

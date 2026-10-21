@@ -364,7 +364,7 @@ export default function AINotesPage() {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={copyNoteLink}
             className="px-3 py-2 border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
@@ -391,10 +391,10 @@ export default function AINotesPage() {
       </div>
 
       {/* Sub Tab Navigation (27.8) */}
-      <div className="flex border-b border-gray-200 gap-6">
+      <div className="flex border-b border-gray-200 gap-4 sm:gap-6 overflow-x-auto no-scrollbar whitespace-nowrap shrink-0">
         <button
           onClick={() => setActiveSubTab('notes')}
-          className={`py-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+          className={`py-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors shrink-0 ${
             activeSubTab === 'notes' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-900'
           }`}
         >
@@ -403,7 +403,7 @@ export default function AINotesPage() {
 
         <button
           onClick={() => setActiveSubTab('ai-enhanced')}
-          className={`py-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+          className={`py-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors shrink-0 ${
             activeSubTab === 'ai-enhanced' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-900'
           }`}
         >
@@ -415,7 +415,7 @@ export default function AINotesPage() {
 
         <button
           onClick={() => setActiveSubTab('transcript')}
-          className={`py-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+          className={`py-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors shrink-0 ${
             activeSubTab === 'transcript' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-900'
           }`}
         >

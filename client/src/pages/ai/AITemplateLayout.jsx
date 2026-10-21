@@ -47,14 +47,14 @@ export default function AITemplateLayout() {
         </div>
       </div>
 
-      <div className="bg-white rounded-t-xl border border-gray-200 border-b-0 px-4 flex gap-6 mt-4">
+      <div className="bg-white rounded-t-xl border border-gray-200 border-b-0 px-4 flex gap-4 sm:gap-6 mt-4 overflow-x-auto no-scrollbar whitespace-nowrap">
         {tabs.map(tab => {
           const isActive = location.pathname === tab.path;
           return (
             <Link
               key={tab.name}
               to={tab.path}
-              className={`flex items-center gap-2 py-4 px-2 border-b-2 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2 py-4 px-2 border-b-2 text-xs sm:text-sm font-medium transition-colors shrink-0 ${
                 isActive 
                   ? 'border-indigo-600 text-indigo-600' 
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -67,7 +67,7 @@ export default function AITemplateLayout() {
         })}
       </div>
       
-      <div className="flex-1 bg-white border border-gray-200 rounded-b-xl rounded-tr-xl p-6 shadow-sm">
+      <div className="flex-1 bg-white border border-gray-200 rounded-b-xl rounded-tr-xl p-4 sm:p-6 shadow-sm">
         <Outlet />
       </div>
     </div>

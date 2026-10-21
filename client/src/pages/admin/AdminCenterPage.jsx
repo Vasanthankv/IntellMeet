@@ -341,15 +341,15 @@ Thank you for using IntellMeet Video Platform!
       
       {/* Top Header Banner */}
       <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
               <span>IntellMeet</span>
               <span>/</span>
               <span className="text-blue-600">Admin Center</span>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2.5">
-              <Shield className="w-6 h-6 text-blue-600" />
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2.5">
+              <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
               Enterprise Administration
             </h1>
             <p className="text-xs text-gray-500 mt-1">Manage users, license allocations, plans, billing, enterprise security, and integrations</p>
@@ -373,7 +373,7 @@ Thank you for using IntellMeet Video Platform!
         </div>
 
         {/* Tab Navigation */}
-        <div className="max-w-7xl mx-auto px-6 flex gap-6 overflow-x-auto border-t border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex gap-4 sm:gap-6 overflow-x-auto no-scrollbar border-t border-gray-100">
           {tabs.map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -381,7 +381,7 @@ Thank you for using IntellMeet Video Platform!
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
-                className={`py-4 border-b-2 text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                className={`py-3.5 sm:py-4 border-b-2 text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap shrink-0 ${
                   isActive 
                     ? 'border-blue-600 text-blue-600' 
                     : 'border-transparent text-gray-500 hover:text-gray-900'
@@ -403,7 +403,7 @@ Thank you for using IntellMeet Video Platform!
       </div>
 
       {/* Main Container */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-6 sm:py-8">
         
         {/* ========================================================================= */}
         {/* TAB 1: USERS */}
@@ -1420,14 +1420,14 @@ Thank you for using IntellMeet Video Platform!
       {/* MODAL: ADD USER */}
       {/* ========================================================================= */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-gray-200 overflow-hidden">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-              <h3 className="font-bold text-gray-900 text-lg">Add New User to Organization</h3>
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-gray-200 overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="p-4 sm:p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 shrink-0">
+              <h3 className="font-bold text-gray-900 text-base sm:text-lg">Add New User to Organization</h3>
               <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600 text-lg font-bold">×</button>
             </div>
-            <form onSubmit={handleCreateUser} className="p-6 space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleCreateUser} className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-gray-700 font-bold mb-1">Full Name</label>
                   <input 
@@ -1463,7 +1463,7 @@ Thank you for using IntellMeet Video Platform!
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-gray-700 font-bold mb-1">Department</label>
                   <input 
@@ -1485,7 +1485,7 @@ Thank you for using IntellMeet Video Platform!
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-2">
                 <div>
                   <label className="block text-gray-700 font-bold mb-1">Enterprise Role</label>
                   <select 
@@ -1535,13 +1535,13 @@ Thank you for using IntellMeet Video Platform!
       {/* MODAL: EDIT USER */}
       {/* ========================================================================= */}
       {editingUser && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-gray-200 overflow-hidden">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-              <h3 className="font-bold text-gray-900 text-base">Edit User: {editingUser.name}</h3>
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-gray-200 overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="p-4 sm:p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 shrink-0">
+              <h3 className="font-bold text-gray-900 text-sm sm:text-base">Edit User: {editingUser.name}</h3>
               <button onClick={() => setEditingUser(null)} className="text-gray-400 hover:text-gray-600 text-lg font-bold">×</button>
             </div>
-            <form onSubmit={handleUpdateUser} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleUpdateUser} className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
               <div>
                 <label className="block text-gray-700 font-bold mb-1">Full Name</label>
                 <input 
@@ -1611,10 +1611,10 @@ Thank you for using IntellMeet Video Platform!
       {/* MODAL: EDIT BILLING INFO */}
       {/* ========================================================================= */}
       {showBillingModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-gray-200 overflow-hidden">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-              <h3 className="font-bold text-gray-900 text-base">Update Payment & Billing Information</h3>
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-gray-200 overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="p-4 sm:p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 shrink-0">
+              <h3 className="font-bold text-gray-900 text-sm sm:text-base">Update Payment & Billing Information</h3>
               <button onClick={() => setShowBillingModal(false)} className="text-gray-400 hover:text-gray-600 text-lg font-bold">×</button>
             </div>
             <form 
@@ -1624,9 +1624,9 @@ Thank you for using IntellMeet Video Platform!
                 setShowBillingModal(false);
                 toast.success('Billing & payment details updated successfully!');
               }} 
-              className="p-6 space-y-4 text-xs"
+              className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1"
             >
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-gray-700 font-bold mb-1">Card Number</label>
                   <input 
@@ -1660,7 +1660,7 @@ Thank you for using IntellMeet Video Platform!
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-gray-700 font-bold mb-1">Organization Legal Name</label>
                   <input 
@@ -1683,7 +1683,7 @@ Thank you for using IntellMeet Video Platform!
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-gray-700 font-bold mb-1">Billing Address</label>
                   <input 

@@ -21,11 +21,11 @@ export default function NotificationsPage() {
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-    <div className="max-w-4xl mx-auto py-10 px-6 bg-gray-50 min-h-screen">
-      <div className="flex items-center justify-between mb-8">
+    <div className="max-w-4xl mx-auto py-6 sm:py-10 px-4 sm:px-6 bg-gray-50 min-h-screen">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-            <Bell className="w-6 h-6 text-blue-600" />
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-3">
+            <Bell className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
             Notifications
             {unreadCount > 0 && (
               <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
@@ -33,12 +33,12 @@ export default function NotificationsPage() {
               </span>
             )}
           </h1>
-          <p className="text-sm text-gray-500 mt-1">Manage all your account and meeting alerts here.</p>
+          <p className="text-xs sm:text-sm text-gray-500 mt-1">Manage all your account and meeting alerts here.</p>
         </div>
         {unreadCount > 0 && (
           <button 
             onClick={markAllAsRead}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 font-semibold text-sm rounded-lg transition-colors"
+            className="self-start sm:self-auto flex items-center gap-2 px-3.5 sm:px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 font-semibold text-xs sm:text-sm rounded-lg transition-colors"
           >
             <CheckCircle className="w-4 h-4" />
             Mark all as read
@@ -55,7 +55,7 @@ export default function NotificationsPage() {
               <div 
                 key={notif.id}
                 onClick={() => markAsRead(notif.id)}
-                className={`p-6 flex gap-4 transition-colors cursor-pointer hover:bg-gray-50 ${notif.read ? 'opacity-70' : 'bg-blue-50/30'}`}
+                className={`p-4 sm:p-6 flex gap-3 sm:gap-4 transition-colors cursor-pointer hover:bg-gray-50 ${notif.read ? 'opacity-70' : 'bg-blue-50/30'}`}
               >
                 <div className="mt-1">
                   <div className={`w-3 h-3 rounded-full ${notif.read ? 'bg-gray-300' : 'bg-blue-600'}`}></div>
