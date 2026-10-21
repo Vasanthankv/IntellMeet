@@ -1371,3 +1371,24 @@ const startServer = () => {
 };
 
 startServer();
+
+// Graceful shutdown handling for Render deployments and container swaps
+const handleGracefulShutdown = (signal) => {
+  console.log(`[Shutdown] Received ${signal}. Closing server gracefully...`);
+  server.close(() => {
+    console.log('[Shutdown] HTTP & Socket.IO server closed.');
+    mongoose.connection.close(false).then(() => {
+      console.log('[Shutdown] MongoDB connection closed.');
+      process.exit(0);
+    }).catch(() => process.exit(0));
+  });
+
+  // Force close after 10 seconds if graceful close hangs
+  setTimeout(() => {
+    console.warn('[Shutdown] Forceful shutdown initiated after timeout.');
+    process.exit(0);
+  }, 10000);
+};
+
+process.on('SIGTERM', () => handleGracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => handleGracefulShutdown('SIGINT'));
