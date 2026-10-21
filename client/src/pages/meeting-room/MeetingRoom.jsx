@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
-import Peer from 'simple-peer';
+import { WebRTCManager, DEFAULT_ICE_SERVERS } from '../../services/webRTCManager';
 import { useAuthStore } from '../../store/authStore';
 import { 
   Mic, MicOff, Video, VideoOff, MessageSquare, Users, 
@@ -764,6 +764,7 @@ export default function MeetingRoom() {
   const socketRef = useRef();
   const userVideo = useRef();
   const peersRef = useRef([]);
+  const webRTCManagerRef = useRef(null);
   const localStreamRef = useRef(null);
   const screenTrackRef = useRef(null);
   const localAudioContextRef = useRef(null);
@@ -909,16 +910,9 @@ export default function MeetingRoom() {
           userVideo.current.play().catch(e => console.warn('Local camera initial play note:', e));
         }
 
-        // If any peers were already created while getUserMedia was acquiring, attach tracks now
-        peersRef.current.forEach(({ peer }) => {
-          if (peer) {
-            try {
-              currentStream.getTracks().forEach(track => {
-                peer.addTrack(track, currentStream);
-              });
-            } catch (err) {}
-          }
-        });
+        if (webRTCManagerRef.current) {
+          webRTCManagerRef.current.setLocalStream(currentStream);
+        }
       }
 
       if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
@@ -932,12 +926,41 @@ export default function MeetingRoom() {
         }).catch(() => {});
       }
 
+      // Fetch production STUN/TURN ICE servers configuration
+      let activeIceServers = DEFAULT_ICE_SERVERS;
+      try {
+        const iceRes = await fetch(`${SOCKET_SERVER_URL}/api/meetings/ice-servers`);
+        const iceData = await iceRes.json();
+        if (iceData.success && Array.isArray(iceData.iceServers) && iceData.iceServers.length > 0) {
+          activeIceServers = iceData.iceServers;
+        }
+      } catch (e) {}
+
+      // Instantiate native WebRTCManager for multi-party mesh communication
+      const manager = new WebRTCManager({
+        socket: socketRef.current,
+        localStream: currentStream,
+        iceServers: activeIceServers,
+        onStreamUpdate: (socketId, remoteStream, peer) => {
+          peersRef.current = manager.getPeerEntries();
+          setPeers([...peersRef.current]);
+        },
+        onPeerLeft: (socketId) => {
+          peersRef.current = manager.getPeerEntries();
+          setPeers([...peersRef.current]);
+        },
+        onStateChange: (socketId, connState, iceState) => {
+          console.log(`[MeetingRoom] Peer ${socketId} connectionState: ${connState}, iceState: ${iceState}`);
+        }
+      });
+      webRTCManagerRef.current = manager;
+
       socketRef.current.emit('join-room', cleanMId || meetingId, userId, userName);
     };
 
     startRoomMediaAndSocket();
 
-      // Listen for all existing users already in the room (Newcomer initiates to each existing user)
+      // Listen for all existing users already in the room (Newcomer initiates connection to each existing user)
       socketRef.current.on('all-users', (existingUsers) => {
         if (Array.isArray(existingUsers) && existingUsers.length > 0) {
           setSampleParticipants(prev => {
@@ -950,36 +973,25 @@ export default function MeetingRoom() {
             });
             return next;
           });
-          const activeStream = stream || localStreamRef.current || currentStream;
-          existingUsers.forEach(u => {
-            try {
-              // Destroy any stale peer connection to u.socketId
-              const existingIdx = peersRef.current.findIndex(p => p.peerID === u.socketId);
-              if (existingIdx !== -1) {
-                try { peersRef.current[existingIdx].peer?.destroy(); } catch (e) {}
-                peersRef.current.splice(existingIdx, 1);
-              }
 
-              const peer = createPeer(u.socketId, socketRef.current.id, activeStream, userName);
-              const peerEntry = { peerID: u.socketId, peer, name: u.userName, stream: null };
-              peer.on('stream', (remoteStream) => {
-                console.log('Incoming remote stream for existing user:', u.socketId, remoteStream);
-                peerEntry.stream = remoteStream;
-                const pObj = peersRef.current.find(p => p.peerID === u.socketId);
-                if (pObj) pObj.stream = remoteStream;
-                setPeers(prevPeers => prevPeers.map(p => p.peerID === u.socketId ? { ...p, stream: remoteStream } : p));
-              });
-              peersRef.current.push(peerEntry);
-            } catch (err) {
-              console.warn('Peer create error for existing user:', err);
+          const activeStream = stream || localStreamRef.current || currentStream;
+          if (webRTCManagerRef.current && activeStream) {
+            webRTCManagerRef.current.setLocalStream(activeStream);
+          }
+
+          existingUsers.forEach(u => {
+            const targetSocketId = u.socketId || u.id;
+            if (targetSocketId && targetSocketId !== socketRef.current?.id) {
+              webRTCManagerRef.current?.connectToUser(targetSocketId, u.userId, u.userName);
             }
           });
+
+          peersRef.current = webRTCManagerRef.current ? webRTCManagerRef.current.getPeerEntries() : [];
           setPeers([...peersRef.current]);
         }
       });
 
-      // Existing user informed that a newcomer connected.
-      // (Do NOT call createPeer here to avoid WebRTC offer glare; wait for newcomer's offer via 'user-joined')
+      // Existing user informed that a newcomer connected
       socketRef.current.on('user-connected', (newUserId, newUserName, socketId) => {
         setSampleParticipants(prev => {
           const effectiveId = socketId || newUserId;
@@ -1001,17 +1013,9 @@ export default function MeetingRoom() {
       });
 
       socketRef.current.on('receiving-returned-signal', payload => {
-        const item = peersRef.current.find(p => p.peerID === payload.id);
-        if (item) {
-          try {
-            item.peer.signal(payload.signal);
-          } catch (err) {
-            console.warn('Signal return error:', err);
-          }
-        }
+        webRTCManagerRef.current?.handleLegacySignal(payload.id, payload.signal);
       });
 
-      // Existing user receives offer from newcomer and creates answer
       socketRef.current.on('user-joined', payload => {
         setSampleParticipants(prev => {
           const existingIdx = prev.findIndex(p => p.id === payload.callerID || p.userId === payload.callerID);
@@ -1022,30 +1026,7 @@ export default function MeetingRoom() {
           }
           return [...prev, { id: payload.callerID, name: payload.callerName || 'Participant', isLocal: false, isMuted: false, hasVideo: true }];
         });
-
-        try {
-          // Destroy any stale peer connection to payload.callerID
-          const existingIdx = peersRef.current.findIndex(p => p.peerID === payload.callerID);
-          if (existingIdx !== -1) {
-            try { peersRef.current[existingIdx].peer?.destroy(); } catch (e) {}
-            peersRef.current.splice(existingIdx, 1);
-          }
-
-          const activeStream = stream || localStreamRef.current || currentStream;
-          const peer = addPeer(payload.signal, payload.callerID, activeStream);
-          const peerEntry = { peerID: payload.callerID, peer, name: payload.callerName, stream: null };
-          peer.on('stream', (remoteStream) => {
-            console.log('Incoming remote stream for caller:', payload.callerID, remoteStream);
-            peerEntry.stream = remoteStream;
-            const pObj = peersRef.current.find(p => p.peerID === payload.callerID);
-            if (pObj) pObj.stream = remoteStream;
-            setPeers(prevPeers => prevPeers.map(p => p.peerID === payload.callerID ? { ...p, stream: remoteStream } : p));
-          });
-          peersRef.current.push(peerEntry);
-          setPeers([...peersRef.current]);
-        } catch (err) {
-          console.warn('addPeer error:', err);
-        }
+        webRTCManagerRef.current?.handleLegacySignal(payload.callerID, payload.signal, payload.callerName);
       });
 
       // Real-time camera and microphone status from remote peer
@@ -1110,13 +1091,14 @@ export default function MeetingRoom() {
           delete next[socketId];
           return next;
         });
-        const peerObj = peersRef.current.find(p => p.peerID === socketId);
-        if (peerObj) {
-          try { peerObj.peer.destroy(); } catch (err) {}
+        if (webRTCManagerRef.current) {
+          webRTCManagerRef.current.removePeer(socketId);
+          peersRef.current = webRTCManagerRef.current.getPeerEntries();
+          setPeers([...peersRef.current]);
+        } else {
+          peersRef.current = peersRef.current.filter(p => p.peerID !== socketId && p.id !== socketId);
+          setPeers([...peersRef.current]);
         }
-        const newPeers = peersRef.current.filter(p => p.peerID !== socketId);
-        peersRef.current = newPeers;
-        setPeers(newPeers);
         setSampleParticipants(prev => prev.filter(p => p.id !== socketId && p.socketId !== socketId && p.userId !== socketId));
         if (playJoinLeaveChime) playChimeSound('leave');
       });
@@ -2112,9 +2094,10 @@ export default function MeetingRoom() {
           socketRef.current.disconnect();
         } catch (e) {}
       }
-      peersRef.current.forEach(({ peer }) => {
-        try { peer.destroy(); } catch (err) {}
-      });
+      if (webRTCManagerRef.current) {
+        webRTCManagerRef.current.destroy();
+        webRTCManagerRef.current = null;
+      }
       peersRef.current = [];
       setPeers([]);
       setSampleParticipants([]);
@@ -2203,54 +2186,21 @@ export default function MeetingRoom() {
 
 
 
-  const ICE_SERVERS = [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
-    { urls: 'stun:stun.services.mozilla.com' },
-    { urls: 'stun:global.stun.twilio.com:3478' },
-    {
-      urls: 'turn:openrelay.metered.ca:80',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    }
-  ];
+  const ICE_SERVERS = DEFAULT_ICE_SERVERS;
 
   function createPeer(userToSignal, callerID, streamToSend, callerName) {
-    const activeStream = streamToSend || localStreamRef.current || stream;
-    const peer = new Peer({ 
-      initiator: true, 
-      trickle: false, 
-      ...(activeStream ? { stream: activeStream } : {}),
-      config: { iceServers: ICE_SERVERS }
-    });
-    peer.on('signal', signal => socketRef.current?.emit('sending-signal', { userToSignal, callerID, signal, callerName }));
-    return peer;
+    if (webRTCManagerRef.current) {
+      return webRTCManagerRef.current.connectToUser(userToSignal, userToSignal, callerName);
+    }
+    return null;
   }
 
   function addPeer(incomingSignal, callerID, streamToSend) {
-    const activeStream = streamToSend || localStreamRef.current || stream;
-    const peer = new Peer({ 
-      initiator: false, 
-      trickle: false, 
-      ...(activeStream ? { stream: activeStream } : {}),
-      config: { iceServers: ICE_SERVERS }
-    });
-    peer.on('signal', signal => socketRef.current?.emit('returning-signal', { signal, callerID }));
-    peer.signal(incomingSignal);
-    return peer;
+    if (webRTCManagerRef.current) {
+      webRTCManagerRef.current.handleLegacySignal(callerID, incomingSignal);
+      return webRTCManagerRef.current.peers.get(callerID) || null;
+    }
+    return null;
   }
 
   const sendChatMessage = async (e) => {
@@ -2506,20 +2456,10 @@ export default function MeetingRoom() {
             activeStream = refreshedStream;
           }
 
-          // Hot-swap or add track on all connected peers
-          peersRef.current.forEach(({ peer }) => {
-            if (peer) {
-              try {
-                if (videoTrack) {
-                  peer.replaceTrack(videoTrack, newVideoTrack, activeStream);
-                } else {
-                  peer.addTrack(newVideoTrack, activeStream);
-                }
-              } catch (e) {
-                console.warn('Peer track update on camera start:', e);
-              }
-            }
-          });
+          // Hot-swap or add track on all connected peers via WebRTCManager
+          if (webRTCManagerRef.current && newVideoTrack) {
+            await webRTCManagerRef.current.replaceVideoTrack(newVideoTrack);
+          }
 
           videoTrack = newVideoTrack;
         }
@@ -2567,14 +2507,10 @@ export default function MeetingRoom() {
           userVideo.current.srcObject = stream;
         }
 
-        // Replace track on RTCPeerConnections
-        peersRef.current.forEach(({ peer }) => {
-          if (peer && oldVideoTrack && newVideoTrack) {
-            try {
-              peer.replaceTrack(oldVideoTrack, newVideoTrack, stream);
-            } catch (e) {}
-          }
-        });
+        // Replace track on RTCPeerConnections via WebRTCManager
+        if (webRTCManagerRef.current && newVideoTrack) {
+          await webRTCManagerRef.current.replaceVideoTrack(newVideoTrack);
+        }
       }
       toast.success('Camera switched');
     } catch (err) {
@@ -2619,13 +2555,9 @@ export default function MeetingRoom() {
             userVideo.current.play().catch(() => {});
           }
 
-          peersRef.current.forEach(({ peer }) => {
-            if (peer && oldVideoTrack && newVideoTrack) {
-              try {
-                peer.replaceTrack(oldVideoTrack, newVideoTrack, stream);
-              } catch (e) {}
-            }
-          });
+          if (webRTCManagerRef.current && newVideoTrack) {
+            await webRTCManagerRef.current.replaceVideoTrack(newVideoTrack);
+          }
           setCurrentFacingMode(nextMode);
           toast.success(nextMode === 'environment' ? 'Switched to Rear Camera' : 'Switched to Front Camera');
         }
@@ -2749,7 +2681,7 @@ export default function MeetingRoom() {
           audio: selectedMic === 'default' ? true : { deviceId: { exact: selectedMic } }
         };
         navigator.mediaDevices.getUserMedia(constraints)
-          .then(freshAudioStream => {
+          .then(async freshAudioStream => {
             const newAudioTrack = freshAudioStream.getAudioTracks()[0];
             if (audioTrack) {
               try { activeStream.removeTrack(audioTrack); } catch (e) {}
@@ -2759,21 +2691,12 @@ export default function MeetingRoom() {
             setStream(refreshedStream);
             localStreamRef.current = refreshedStream;
 
-            peersRef.current.forEach(({ peer }) => {
-              if (peer) {
-                try {
-                  if (audioTrack) {
-                    peer.replaceTrack(audioTrack, newAudioTrack, refreshedStream);
-                  } else {
-                    peer.addTrack(newAudioTrack, refreshedStream);
-                  }
-                } catch (e) {
-                  console.warn('Peer track update on mic start:', e);
-                }
-              }
-            });
+            if (webRTCManagerRef.current && newAudioTrack) {
+              await webRTCManagerRef.current.replaceAudioTrack(newAudioTrack);
+            }
 
             setIsAudioOn(true);
+            webRTCManagerRef.current?.setAudioEnabled(true);
             const cleanMId = meetingId ? meetingId.replace(/[\s-]/g, '') : '';
             socketRef.current?.emit('toggle-media-state', cleanMId || meetingId, { isAudioOn: true });
             toast('Microphone unmuted', { icon: '🎤' });
@@ -2786,6 +2709,7 @@ export default function MeetingRoom() {
 
       audioTrack.enabled = !audioTrack.enabled;
       setIsAudioOn(audioTrack.enabled);
+      webRTCManagerRef.current?.setAudioEnabled(audioTrack.enabled);
       const cleanMId = meetingId ? meetingId.replace(/[\s-]/g, '') : '';
       if (!audioTrack.enabled) {
         setLocalIsSpeaking(false);
@@ -4748,20 +4672,9 @@ export default function MeetingRoom() {
         }
 
         // Hot-swap video track on all connected WebRTC peers so remote participants see the screen
-        const currentCamTrack = (localStreamRef.current || stream)?.getVideoTracks()[0];
-        peersRef.current.forEach(({ peer }) => {
-          if (peer && screenTrack) {
-            try {
-              if (currentCamTrack) {
-                peer.replaceTrack(currentCamTrack, screenTrack, stream || screenStream);
-              } else {
-                peer.addTrack(screenTrack, screenStream);
-              }
-            } catch (err) {
-              console.warn('Error hot-swapping screen share track to peer:', err);
-            }
-          }
-        });
+        if (webRTCManagerRef.current && screenTrack) {
+          webRTCManagerRef.current.replaceVideoTrack(screenTrack).catch(e => console.warn('Screen share track swap note:', e));
+        }
 
         // Listen for native browser "Stop Sharing" button
         screenTrack.onended = () => {
@@ -4878,19 +4791,9 @@ export default function MeetingRoom() {
     }
 
     // Restore camera video track on all connected peers
-    peersRef.current.forEach(({ peer }) => {
-      if (peer && cameraTrack) {
-        try {
-          if (stoppedTrack) {
-            peer.replaceTrack(stoppedTrack, cameraTrack, stream);
-          } else {
-            peer.addTrack(cameraTrack, stream);
-          }
-        } catch (err) {
-          console.warn('Error restoring camera track to peer:', err);
-        }
-      }
-    });
+    if (webRTCManagerRef.current && cameraTrack) {
+      webRTCManagerRef.current.replaceVideoTrack(cameraTrack).catch(e => console.warn('Camera restore track swap note:', e));
+    }
 
     const myId = user?.id || user?._id || 'local';
     const myName = user?.name || 'You';

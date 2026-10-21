@@ -170,6 +170,64 @@ app.use('/api/meetings', agendaRoutes);
 
 
 
+// Production STUN/TURN ICE Servers Configuration Helper
+export const getProductionIceServers = () => {
+  const iceServers = [];
+
+  // 1. STUN Servers (configured via STUN_SERVER_URLS or public fallbacks)
+  if (process.env.STUN_SERVER_URLS) {
+    const urls = process.env.STUN_SERVER_URLS.split(',').map(u => u.trim()).filter(Boolean);
+    if (urls.length > 0) iceServers.push({ urls });
+  } else {
+    iceServers.push(
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' },
+      { urls: 'stun:stun4.l.google.com:19302' },
+      { urls: 'stun:global.stun.twilio.com:3478' }
+    );
+  }
+
+  // 2. TURN Servers (configured via TURN_SERVER_URLS, TURN_USERNAME, TURN_CREDENTIAL or fallback)
+  if (process.env.TURN_SERVER_URLS) {
+    const urls = process.env.TURN_SERVER_URLS.split(',').map(u => u.trim()).filter(Boolean);
+    const entry = { urls };
+    if (process.env.TURN_USERNAME) entry.username = process.env.TURN_USERNAME;
+    if (process.env.TURN_CREDENTIAL) entry.credential = process.env.TURN_CREDENTIAL;
+    iceServers.push(entry);
+  } else {
+    // OpenRelay reliable TURN fallback (UDP and TCP/443 for restrictive firewalls)
+    iceServers.push(
+      {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      }
+    );
+  }
+
+  return iceServers;
+};
+
+// Route: Provide secure ICE server configuration to clients
+app.get(['/api/meetings/ice-servers', '/api/ice-servers'], (req, res) => {
+  res.json({
+    success: true,
+    iceServers: getProductionIceServers()
+  });
+});
+
 // Health Check
 app.get(['/health', '/api/health'], (req, res) => {
   res.json({
@@ -276,13 +334,88 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('user-connected', socket.userId, socket.userName, socket.id);
   });
 
-  // WebRTC Signaling
+  // Production STUN/TURN ICE Servers socket RPC
+  socket.on('get-ice-servers', (callback) => {
+    if (typeof callback === 'function') {
+      callback(getProductionIceServers());
+    }
+  });
+
+  // Native WebRTC Signaling with room boundary security and identity verification
+  socket.on('webrtc-offer', ({ to, offer }) => {
+    if (!to || !offer) return;
+    if (!socket.roomId) {
+      console.warn(`[WebRTC Security] Socket ${socket.id} attempted to send offer without joined room`);
+      return;
+    }
+    const targetSocket = io.sockets.sockets.get(to);
+    if (!targetSocket) {
+      console.warn(`[WebRTC Signaling] Target socket ${to} not found for offer from ${socket.id}`);
+      return;
+    }
+    if (targetSocket.roomId !== socket.roomId) {
+      console.warn(`[WebRTC Security] Cross-room offer blocked from ${socket.id} to ${to}`);
+      return;
+    }
+    targetSocket.emit('webrtc-offer', {
+      from: socket.id,
+      userId: socket.userId || socket.id,
+      userName: socket.userName || 'Participant',
+      offer
+    });
+  });
+
+  socket.on('webrtc-answer', ({ to, answer }) => {
+    if (!to || !answer) return;
+    if (!socket.roomId) return;
+    const targetSocket = io.sockets.sockets.get(to);
+    if (!targetSocket || targetSocket.roomId !== socket.roomId) {
+      console.warn(`[WebRTC Security] Cross-room answer blocked from ${socket.id} to ${to}`);
+      return;
+    }
+    targetSocket.emit('webrtc-answer', {
+      from: socket.id,
+      userId: socket.userId || socket.id,
+      userName: socket.userName || 'Participant',
+      answer
+    });
+  });
+
+  socket.on('webrtc-ice-candidate', ({ to, candidate }) => {
+    if (!to || !candidate) return;
+    if (!socket.roomId) return;
+    const targetSocket = io.sockets.sockets.get(to);
+    if (!targetSocket || targetSocket.roomId !== socket.roomId) {
+      return;
+    }
+    targetSocket.emit('webrtc-ice-candidate', {
+      from: socket.id,
+      candidate
+    });
+  });
+
+  // Backward-compatible WebRTC Signaling for legacy clients
   socket.on('sending-signal', payload => {
-    io.to(payload.userToSignal).emit('user-joined', { signal: payload.signal, callerID: payload.callerID, callerName: payload.callerName });
+    if (!payload?.userToSignal) return;
+    const targetSocket = io.sockets.sockets.get(payload.userToSignal);
+    if (targetSocket && targetSocket.roomId === socket.roomId) {
+      io.to(payload.userToSignal).emit('user-joined', { 
+        signal: payload.signal, 
+        callerID: payload.callerID || socket.id, 
+        callerName: payload.callerName || socket.userName 
+      });
+    }
   });
 
   socket.on('returning-signal', payload => {
-    io.to(payload.callerID).emit('receiving-returned-signal', { signal: payload.signal, id: socket.id });
+    if (!payload?.callerID) return;
+    const targetSocket = io.sockets.sockets.get(payload.callerID);
+    if (targetSocket && targetSocket.roomId === socket.roomId) {
+      io.to(payload.callerID).emit('receiving-returned-signal', { 
+        signal: payload.signal, 
+        id: socket.id 
+      });
+    }
   });
 
   // Real-time camera and microphone track status synchronization

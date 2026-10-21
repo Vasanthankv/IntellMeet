@@ -14,6 +14,7 @@ import toast from 'react-hot-toast';
 function RemoteParticipantTile({ participant, hasCamOn }) {
   const [remoteStream, setRemoteStream] = useState(participant.stream || null);
   const [remoteAudioSpeaking, setRemoteAudioSpeaking] = useState(false);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const audioRef = useRef(null);
   const videoRef = useRef(null);
   const audioCtxRef = useRef(null);
@@ -21,9 +22,22 @@ function RemoteParticipantTile({ participant, hasCamOn }) {
   const rafRef = useRef(null);
   const releaseTimerRef = useRef(null);
 
+  // Sync remote stream and listen for track events
   useEffect(() => {
     if (participant.stream) {
       setRemoteStream(participant.stream);
+
+      const handleTrackEvent = () => {
+        setRemoteStream(new MediaStream(participant.stream.getTracks()));
+      };
+
+      participant.stream.addEventListener('addtrack', handleTrackEvent);
+      participant.stream.addEventListener('removetrack', handleTrackEvent);
+
+      return () => {
+        participant.stream.removeEventListener('addtrack', handleTrackEvent);
+        participant.stream.removeEventListener('removetrack', handleTrackEvent);
+      };
     }
     const peer = participant.peer;
     if (!peer) return;
@@ -33,11 +47,12 @@ function RemoteParticipantTile({ participant, hasCamOn }) {
     }
 
     const onStream = (stream) => {
-      console.log('RemoteParticipantTile received remote stream:', stream.id, stream.getTracks());
       setRemoteStream(stream);
     };
 
-    peer.on('stream', onStream);
+    if (typeof peer.on === 'function') {
+      peer.on('stream', onStream);
+    }
 
     return () => {
       if (typeof peer.removeListener === 'function') {
@@ -46,15 +61,37 @@ function RemoteParticipantTile({ participant, hasCamOn }) {
     };
   }, [participant.peer, participant.stream]);
 
-  // Bind and play audio stream
+  // Bind and play audio stream with autoplay policy recovery
   useEffect(() => {
-    if (audioRef.current && remoteStream) {
-      if (audioRef.current.srcObject !== remoteStream) {
-        audioRef.current.srcObject = remoteStream;
+    const audioEl = audioRef.current;
+    if (audioEl && remoteStream) {
+      if (audioEl.srcObject !== remoteStream) {
+        audioEl.srcObject = remoteStream;
       }
-      audioRef.current.play().catch(e => {
-        console.warn('Remote audio autoplay error, will retry on click:', e);
-      });
+      const playPromise = audioEl.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setAutoplayBlocked(false);
+          })
+          .catch(err => {
+            console.warn('[Remote Audio Autoplay] Blocked by browser policy, will unlock on user interaction:', err);
+            setAutoplayBlocked(true);
+            const tryUnlock = () => {
+              if (audioEl) {
+                audioEl.play()
+                  .then(() => setAutoplayBlocked(false))
+                  .catch(() => {});
+              }
+              window.removeEventListener('click', tryUnlock);
+              window.removeEventListener('keydown', tryUnlock);
+              window.removeEventListener('touchstart', tryUnlock);
+            };
+            window.addEventListener('click', tryUnlock, { once: true });
+            window.addEventListener('keydown', tryUnlock, { once: true });
+            window.addEventListener('touchstart', tryUnlock, { once: true });
+          });
+      }
     }
   }, [remoteStream]);
 
@@ -135,18 +172,23 @@ function RemoteParticipantTile({ participant, hasCamOn }) {
     };
   }, [remoteStream, participant.isMuted]);
 
-  // Bind and play video stream
+  // Bind and play video stream when available
   useEffect(() => {
     if (videoRef.current && remoteStream) {
       if (videoRef.current.srcObject !== remoteStream) {
         videoRef.current.srcObject = remoteStream;
       }
-      videoRef.current.play().catch(e => console.warn('Remote video play:', e));
+      videoRef.current.play().catch(e => console.warn('Remote video play note:', e));
     }
   }, [remoteStream, hasCamOn]);
 
   const initials = (participant.name || 'Participant').slice(0, 2).toUpperCase();
-  const hasLiveVideoTrack = remoteStream && remoteStream.getVideoTracks && remoteStream.getVideoTracks().length > 0 && remoteStream.getVideoTracks().some(t => t.readyState !== 'ended');
+  const hasLiveVideoTrack = Boolean(
+    remoteStream &&
+    remoteStream.getVideoTracks &&
+    remoteStream.getVideoTracks().length > 0 &&
+    remoteStream.getVideoTracks().some(t => t.readyState !== 'ended')
+  );
   const isSpeaking = Boolean((participant.isSpeaking || remoteAudioSpeaking) && !participant.isMuted);
 
   return (
@@ -158,6 +200,20 @@ function RemoteParticipantTile({ participant, hasCamOn }) {
         playsInline
       />
 
+      {/* Autoplay block recovery prompt banner if audio was prevented by browser */}
+      {autoplayBlocked && (
+        <button
+          onClick={() => {
+            if (audioRef.current) {
+              audioRef.current.play().then(() => setAutoplayBlocked(false)).catch(() => {});
+            }
+          }}
+          className="absolute top-2 left-1/2 -translate-x-1/2 z-30 bg-amber-500/90 hover:bg-amber-500 text-black text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1.5 animate-bounce"
+        >
+          <Volume2 className="w-3.5 h-3.5" /> Click to enable audio
+        </button>
+      )}
+
       {/* Video display when camera is active and stream has live video track */}
       {hasCamOn && hasLiveVideoTrack && remoteStream ? (
         <video
@@ -168,6 +224,10 @@ function RemoteParticipantTile({ participant, hasCamOn }) {
               el.playsInline = true;
               el.setAttribute('playsinline', '');
               el.setAttribute('webkit-playsinline', '');
+              if (remoteStream && el.srcObject !== remoteStream) {
+                el.srcObject = remoteStream;
+              }
+              el.play().catch(e => console.warn('Remote video ref play note:', e));
             }
             videoRef.current = el;
           }}
