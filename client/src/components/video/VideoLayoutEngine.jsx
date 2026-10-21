@@ -12,9 +12,10 @@ import WatermarkOverlay from '../security/WatermarkOverlay';
 import toast from 'react-hot-toast';
 
 function RemoteParticipantTile({ participant, hasCamOn }) {
-  const [remoteStream, setRemoteStream] = useState(participant.stream || null);
+  const remoteStream = participant.stream || null;
   const [remoteAudioSpeaking, setRemoteAudioSpeaking] = useState(false);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+  const [streamRevision, setStreamRevision] = useState(0);
   const audioRef = useRef(null);
   const videoRef = useRef(null);
   const audioCtxRef = useRef(null);
@@ -22,44 +23,32 @@ function RemoteParticipantTile({ participant, hasCamOn }) {
   const rafRef = useRef(null);
   const releaseTimerRef = useRef(null);
 
-  // Sync remote stream and listen for track events
+  // Sync remote stream and listen for track events reactively
   useEffect(() => {
-    if (participant.stream) {
-      setRemoteStream(participant.stream);
+    if (!remoteStream) return;
 
-      const handleTrackEvent = () => {
-        setRemoteStream(new MediaStream(participant.stream.getTracks()));
-      };
-
-      participant.stream.addEventListener('addtrack', handleTrackEvent);
-      participant.stream.addEventListener('removetrack', handleTrackEvent);
-
-      return () => {
-        participant.stream.removeEventListener('addtrack', handleTrackEvent);
-        participant.stream.removeEventListener('removetrack', handleTrackEvent);
-      };
-    }
-    const peer = participant.peer;
-    if (!peer) return;
-
-    if (peer._remoteStreams && peer._remoteStreams[0]) {
-      setRemoteStream(peer._remoteStreams[0]);
-    }
-
-    const onStream = (stream) => {
-      setRemoteStream(stream);
+    const onTracksChanged = () => {
+      setStreamRevision(r => r + 1);
     };
 
-    if (typeof peer.on === 'function') {
-      peer.on('stream', onStream);
-    }
+    remoteStream.addEventListener('addtrack', onTracksChanged);
+    remoteStream.addEventListener('removetrack', onTracksChanged);
+
+    remoteStream.getAudioTracks().forEach(t => {
+      t.addEventListener('unmute', onTracksChanged);
+      t.addEventListener('mute', onTracksChanged);
+    });
+
+    remoteStream.getVideoTracks().forEach(t => {
+      t.addEventListener('unmute', onTracksChanged);
+      t.addEventListener('mute', onTracksChanged);
+    });
 
     return () => {
-      if (typeof peer.removeListener === 'function') {
-        peer.removeListener('stream', onStream);
-      }
+      remoteStream.removeEventListener('addtrack', onTracksChanged);
+      remoteStream.removeEventListener('removetrack', onTracksChanged);
     };
-  }, [participant.peer, participant.stream]);
+  }, [remoteStream]);
 
   // Bind and play audio stream with autoplay policy recovery
   useEffect(() => {
@@ -75,25 +64,32 @@ function RemoteParticipantTile({ participant, hasCamOn }) {
             setAutoplayBlocked(false);
           })
           .catch(err => {
-            console.warn('[Remote Audio Autoplay] Blocked by browser policy, will unlock on user interaction:', err);
+            console.warn('[Remote Audio Autoplay] Blocked by browser policy, will unlock on interaction:', err);
             setAutoplayBlocked(true);
-            const tryUnlock = () => {
-              if (audioEl) {
-                audioEl.play()
-                  .then(() => setAutoplayBlocked(false))
-                  .catch(() => {});
-              }
-              window.removeEventListener('click', tryUnlock);
-              window.removeEventListener('keydown', tryUnlock);
-              window.removeEventListener('touchstart', tryUnlock);
-            };
-            window.addEventListener('click', tryUnlock, { once: true });
-            window.addEventListener('keydown', tryUnlock, { once: true });
-            window.addEventListener('touchstart', tryUnlock, { once: true });
           });
       }
     }
-  }, [remoteStream]);
+  }, [remoteStream, streamRevision]);
+
+  // One-time interaction listener to unlock audio if blocked by browser policy
+  useEffect(() => {
+    if (!autoplayBlocked) return;
+    const unlockAudio = () => {
+      if (audioRef.current) {
+        audioRef.current.play()
+          .then(() => setAutoplayBlocked(false))
+          .catch(() => {});
+      }
+    };
+    window.addEventListener('click', unlockAudio, { once: true });
+    window.addEventListener('keydown', unlockAudio, { once: true });
+    window.addEventListener('touchstart', unlockAudio, { once: true });
+    return () => {
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+    };
+  }, [autoplayBlocked]);
 
   // Web Audio voice activity detection on remote audio stream
   useEffect(() => {
@@ -170,24 +166,25 @@ function RemoteParticipantTile({ participant, hasCamOn }) {
         try { audioCtxRef.current.close(); } catch (e) {}
       }
     };
-  }, [remoteStream, participant.isMuted]);
+  }, [remoteStream, participant.isMuted, streamRevision]);
 
   // Bind and play video stream when available
   useEffect(() => {
-    if (videoRef.current && remoteStream) {
-      if (videoRef.current.srcObject !== remoteStream) {
-        videoRef.current.srcObject = remoteStream;
+    const videoEl = videoRef.current;
+    if (videoEl && remoteStream) {
+      if (videoEl.srcObject !== remoteStream) {
+        videoEl.srcObject = remoteStream;
       }
-      videoRef.current.play().catch(e => console.warn('Remote video play note:', e));
+      videoEl.play().catch(e => console.warn('Remote video play note:', e));
     }
-  }, [remoteStream, hasCamOn]);
+  }, [remoteStream, hasCamOn, streamRevision]);
 
   const initials = (participant.name || 'Participant').slice(0, 2).toUpperCase();
   const hasLiveVideoTrack = Boolean(
     remoteStream &&
     remoteStream.getVideoTracks &&
     remoteStream.getVideoTracks().length > 0 &&
-    remoteStream.getVideoTracks().some(t => t.readyState !== 'ended')
+    remoteStream.getVideoTracks().some(t => t.readyState === 'live' || t.enabled)
   );
   const isSpeaking = Boolean((participant.isSpeaking || remoteAudioSpeaking) && !participant.isMuted);
 
@@ -214,29 +211,32 @@ function RemoteParticipantTile({ participant, hasCamOn }) {
         </button>
       )}
 
-      {/* Video display when camera is active and stream has live video track */}
-      {hasCamOn && hasLiveVideoTrack && remoteStream ? (
-        <video
-          ref={el => {
-            if (el) {
-              el.muted = true;
-              el.defaultMuted = true;
-              el.playsInline = true;
-              el.setAttribute('playsinline', '');
-              el.setAttribute('webkit-playsinline', '');
-              if (remoteStream && el.srcObject !== remoteStream) {
-                el.srcObject = remoteStream;
-              }
+      {/* Video display permanently mounted to retain stream attachment without mount race */}
+      <video
+        ref={el => {
+          if (el) {
+            el.muted = true;
+            el.defaultMuted = true;
+            el.playsInline = true;
+            el.setAttribute('playsinline', '');
+            el.setAttribute('webkit-playsinline', '');
+            if (remoteStream && el.srcObject !== remoteStream) {
+              el.srcObject = remoteStream;
+            }
+            if (hasCamOn && hasLiveVideoTrack) {
               el.play().catch(e => console.warn('Remote video ref play note:', e));
             }
-            videoRef.current = el;
-          }}
-          autoPlay
-          playsInline
-          muted
-          className="w-full h-full object-cover relative z-10"
-        />
-      ) : (
+          }
+          videoRef.current = el;
+        }}
+        autoPlay
+        playsInline
+        muted
+        className={`w-full h-full object-cover relative z-10 ${hasCamOn && hasLiveVideoTrack ? 'block' : 'hidden'}`}
+      />
+
+      {/* Avatar tile displayed when camera is off or video track is pending */}
+      {(!hasCamOn || !hasLiveVideoTrack) && (
         <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-b from-[#2B2B2B] to-[#1C1C1C]">
           <div className={`w-20 h-20 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg transition-all duration-200 ${
             isSpeaking ? 'bg-purple-700 ring-4 ring-emerald-500 shadow-[0_0_25px_rgba(16,185,129,0.6)] scale-105' : 'bg-purple-700'

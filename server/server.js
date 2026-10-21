@@ -326,15 +326,22 @@ io.on('connection', (socket) => {
         .map(s => ({
           socketId: s.id,
           userId: s.userId || s.id,
-          userName: s.userName || 'Participant'
+          userName: s.userName || 'Participant',
+          role: s.role || 'PARTICIPANT',
+          isHost: Boolean(s.isHost),
+          isCoHost: Boolean(s.isCoHost)
         }));
       socket.emit('all-users', existingUsers);
     } catch (e) {
       console.warn('Error fetching existing room sockets:', e);
     }
 
-    // Tell everyone else in the room that a new user joined
-    socket.to(roomId).emit('user-connected', socket.userId, socket.userName, socket.id);
+    // Tell everyone else in the room that a new user joined with authoritative role
+    socket.to(roomId).emit('user-connected', socket.userId, socket.userName, socket.id, {
+      role: authResult.role || 'PARTICIPANT',
+      isHost: Boolean(authResult.isHost),
+      isCoHost: Boolean(authResult.isCoHost)
+    });
   });
 
   // Production STUN/TURN ICE Servers socket RPC
@@ -364,6 +371,8 @@ io.on('connection', (socket) => {
       from: socket.id,
       userId: socket.userId || socket.id,
       userName: socket.userName || 'Participant',
+      role: socket.role || 'PARTICIPANT',
+      isHost: Boolean(socket.isHost),
       offer
     });
   });
@@ -380,6 +389,8 @@ io.on('connection', (socket) => {
       from: socket.id,
       userId: socket.userId || socket.id,
       userName: socket.userName || 'Participant',
+      role: socket.role || 'PARTICIPANT',
+      isHost: Boolean(socket.isHost),
       answer
     });
   });

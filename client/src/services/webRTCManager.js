@@ -187,9 +187,13 @@ export class WebRTCManager {
   /**
    * Create or retrieve a peer connection for a target socket
    */
-  getOrCreatePeer(targetSocketId, userId = '', userName = 'Participant') {
+  getOrCreatePeer(targetSocketId, userId = '', userName = 'Participant', isHost = false, role = 'PARTICIPANT') {
     if (this.peers.has(targetSocketId)) {
-      return this.peers.get(targetSocketId);
+      const existing = this.peers.get(targetSocketId);
+      if (userName && userName !== 'Participant') existing.userName = userName;
+      if (isHost !== undefined) existing.isHost = Boolean(isHost);
+      if (role) existing.role = role;
+      return existing;
     }
 
     // Deterministic politeness: socket with lexicographically smaller ID is polite
@@ -207,6 +211,8 @@ export class WebRTCManager {
       socketId: targetSocketId,
       userId: userId || targetSocketId,
       userName: userName || 'Participant',
+      isHost: Boolean(isHost),
+      role: role || 'PARTICIPANT',
       pc,
       stream: remoteStream,
       makingOffer: false,
@@ -238,13 +244,6 @@ export class WebRTCManager {
           to: targetSocketId,
           offer: pc.localDescription
         });
-        // Also emit legacy sending-signal for compatibility
-        this.socket.emit('sending-signal', {
-          userToSignal: targetSocketId,
-          callerID: myId,
-          callerName: this.socket?.userName || 'Participant',
-          signal: pc.localDescription
-        });
       } catch (err) {
         console.error(`[WebRTC] Negotiation offer failure to ${targetSocketId}:`, err);
       } finally {
@@ -265,24 +264,32 @@ export class WebRTCManager {
     // 3. Track Reception Handler
     pc.ontrack = (event) => {
       console.log(`[WebRTC] Received ${event.track.kind} track from ${targetSocketId} (${userName})`);
-      if (!remoteStream.getTracks().some(t => t.id === event.track.id)) {
-        remoteStream.addTrack(event.track);
+      const incomingStream = (event.streams && event.streams[0]) ? event.streams[0] : null;
+      if (incomingStream) {
+        peerEntry.stream = incomingStream;
+      } else {
+        if (!peerEntry.stream) peerEntry.stream = new MediaStream();
+        if (!peerEntry.stream.getTracks().some(t => t.id === event.track.id)) {
+          peerEntry.stream.addTrack(event.track);
+        }
       }
 
+      const activeStream = peerEntry.stream;
+
       event.track.onended = () => {
-        try { remoteStream.removeTrack(event.track); } catch (e) {}
-        this._notifyStreamChange(targetSocketId, remoteStream, peerEntry);
+        try { activeStream.removeTrack(event.track); } catch (e) {}
+        this._notifyStreamChange(targetSocketId, activeStream, peerEntry);
       };
 
       event.track.onmute = () => {
-        this._notifyStreamChange(targetSocketId, remoteStream, peerEntry);
+        this._notifyStreamChange(targetSocketId, activeStream, peerEntry);
       };
 
       event.track.onunmute = () => {
-        this._notifyStreamChange(targetSocketId, remoteStream, peerEntry);
+        this._notifyStreamChange(targetSocketId, activeStream, peerEntry);
       };
 
-      this._notifyStreamChange(targetSocketId, remoteStream, peerEntry);
+      this._notifyStreamChange(targetSocketId, activeStream, peerEntry);
     };
 
     // 4. Connection State Monitoring
@@ -310,26 +317,47 @@ export class WebRTCManager {
       }
     };
 
+    // Immediately notify stream change so UI displays the peer tile without delay
+    this._notifyStreamChange(targetSocketId, peerEntry.stream, peerEntry);
+
     return peerEntry;
   }
 
   /**
    * Connect to an existing user when entering a room
    */
-  connectToUser(targetSocketId, userId = '', userName = 'Participant') {
+  connectToUser(targetSocketId, userId = '', userName = 'Participant', isHost = false, role = 'PARTICIPANT') {
     if (!targetSocketId || targetSocketId === this.socket?.id) return null;
-    return this.getOrCreatePeer(targetSocketId, userId, userName);
+    return this.getOrCreatePeer(targetSocketId, userId, userName, isHost, role);
+  }
+
+  /**
+   * Connect to all existing users in the room
+   */
+  connectToExistingUsers(users) {
+    if (!Array.isArray(users)) return;
+    users.forEach(u => {
+      const targetSocketId = u.socketId || u.id;
+      if (targetSocketId && targetSocketId !== this.socket?.id) {
+        this.connectToUser(targetSocketId, u.userId, u.userName, u.isHost, u.role);
+      }
+    });
   }
 
   /**
    * Handle incoming WebRTC offer (W3C Perfect Negotiation)
    */
-  async handleOffer({ from, userId = '', userName = '', offer }) {
+  async handleOffer({ from, userId = '', userName = '', isHost = false, role = 'PARTICIPANT', offer }) {
     if (!from || !offer) return;
     if (this.isDestroyed) return;
 
-    const peer = this.getOrCreatePeer(from, userId, userName);
+    const peer = this.getOrCreatePeer(from, userId, userName, isHost, role);
     const pc = peer.pc;
+
+    // Guard: ignore exact duplicate offer if already applied
+    if (pc.remoteDescription && pc.remoteDescription.sdp === offer.sdp) {
+      return;
+    }
 
     const readyForOffer = !peer.makingOffer && (pc.signalingState === 'stable' || peer.isSettingRemoteAnswerPending);
     const offerCollision = !readyForOffer;
@@ -356,15 +384,21 @@ export class WebRTCManager {
       }
 
       if (offer.type === 'offer') {
+        // Ensure local tracks are attached BEFORE generating answer
+        if (this.localStream) {
+          const senders = pc.getSenders();
+          this.localStream.getTracks().forEach(track => {
+            const exists = senders.some(s => s.track && s.track.id === track.id);
+            if (!exists) {
+              try { pc.addTrack(track, this.localStream); } catch (e) {}
+            }
+          });
+        }
+
         await pc.setLocalDescription();
         this.socket.emit('webrtc-answer', {
           to: from,
           answer: pc.localDescription
-        });
-        // Also emit legacy returning-signal for backward compatibility
-        this.socket.emit('returning-signal', {
-          callerID: from,
-          signal: pc.localDescription
         });
       }
     } catch (err) {
@@ -386,8 +420,21 @@ export class WebRTCManager {
     }
 
     const pc = peer.pc;
+
+    // Guard: If connection is already stable, ignore duplicate answer
+    if (pc.signalingState === 'stable') {
+      return;
+    }
+
+    // Guard: ignore identical answer SDP if already applied
+    if (pc.remoteDescription && pc.remoteDescription.sdp === answer.sdp) {
+      return;
+    }
+
     try {
+      peer.isSettingRemoteAnswerPending = true;
       await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      peer.isSettingRemoteAnswerPending = false;
 
       // Drain queued ICE candidates
       while (peer.candidateQueue.length > 0) {
@@ -400,6 +447,8 @@ export class WebRTCManager {
       }
     } catch (err) {
       console.error(`[WebRTC] Error applying remote answer from ${from}:`, err);
+    } finally {
+      peer.isSettingRemoteAnswerPending = false;
     }
   }
 
@@ -476,6 +525,8 @@ export class WebRTCManager {
       id: p.socketId,
       userId: p.userId,
       name: p.userName,
+      isHost: Boolean(p.isHost),
+      role: p.role || 'PARTICIPANT',
       stream: p.stream,
       pc: p.pc
     }));

@@ -971,7 +971,17 @@ export default function MeetingRoom() {
             existingUsers.forEach(u => {
               const uId = u.socketId || u.userId;
               if (!next.some(p => p.id === uId || p.userId === u.userId)) {
-                next.push({ id: uId, userId: u.userId, name: u.userName || 'Participant', isLocal: false, isMuted: false, hasVideo: true });
+                next.push({ 
+                  id: uId, 
+                  userId: u.userId, 
+                  name: u.userName || 'Participant', 
+                  isLocal: false, 
+                  isHost: Boolean(u.isHost),
+                  role: u.role || 'PARTICIPANT',
+                  isCoHost: Boolean(u.isCoHost),
+                  isMuted: false, 
+                  hasVideo: true 
+                });
               }
             });
             return next;
@@ -985,7 +995,7 @@ export default function MeetingRoom() {
           existingUsers.forEach(u => {
             const targetSocketId = u.socketId || u.id;
             if (targetSocketId && targetSocketId !== socketRef.current?.id) {
-              webRTCManagerRef.current?.connectToUser(targetSocketId, u.userId, u.userName);
+              webRTCManagerRef.current?.connectToUser(targetSocketId, u.userId, u.userName, u.isHost, u.role);
             }
           });
 
@@ -995,9 +1005,13 @@ export default function MeetingRoom() {
       });
 
       // Existing user informed that a newcomer connected
-      socketRef.current.on('user-connected', (newUserId, newUserName, socketId) => {
+      socketRef.current.on('user-connected', (newUserId, newUserName, socketId, roleMeta = {}) => {
         setSampleParticipants(prev => {
           const effectiveId = socketId || newUserId;
+          const isUserHost = Boolean(roleMeta?.isHost);
+          const userRole = roleMeta?.role || 'PARTICIPANT';
+          const isUserCoHost = Boolean(roleMeta?.isCoHost);
+
           const existingIdx = prev.findIndex(p => p.id === socketId || p.id === newUserId || p.userId === newUserId);
           if (existingIdx !== -1) {
             const updated = [...prev];
@@ -1005,18 +1019,31 @@ export default function MeetingRoom() {
               ...updated[existingIdx],
               id: effectiveId,
               userId: newUserId,
-              name: newUserName || updated[existingIdx].name
+              name: newUserName || updated[existingIdx].name,
+              isHost: isUserHost,
+              role: userRole,
+              isCoHost: isUserCoHost
             };
             return updated;
           }
-          return [...prev, { id: effectiveId, userId: newUserId, name: newUserName || 'Participant', isLocal: false, isMuted: false, hasVideo: true }];
+          return [...prev, { 
+            id: effectiveId, 
+            userId: newUserId, 
+            name: newUserName || 'Participant', 
+            isLocal: false, 
+            isHost: isUserHost,
+            role: userRole,
+            isCoHost: isUserCoHost,
+            isMuted: false, 
+            hasVideo: true 
+          }];
         });
         if (playJoinLeaveChime) playChimeSound('join');
         toast.success(`${newUserName || 'A participant'} joined the meeting`);
       });
 
       socketRef.current.on('receiving-returned-signal', payload => {
-        webRTCManagerRef.current?.handleLegacySignal(payload.id, payload.signal);
+        // Native webrtc-answer handles return signals cleanly; no-op legacy handler to prevent glare
       });
 
       socketRef.current.on('user-joined', payload => {
@@ -1029,7 +1056,6 @@ export default function MeetingRoom() {
           }
           return [...prev, { id: payload.callerID, name: payload.callerName || 'Participant', isLocal: false, isMuted: false, hasVideo: true }];
         });
-        webRTCManagerRef.current?.handleLegacySignal(payload.callerID, payload.signal, payload.callerName);
       });
 
       // Real-time camera and microphone status from remote peer
@@ -5935,11 +5961,16 @@ export default function MeetingRoom() {
 
 
   const allParticipants = useMemo(() => {
+    const actualHostId = String(meetingInfo?.host?._id || meetingInfo?.host || meetingInfo?.hostId || '');
+
     const list = [
       { 
         id: 'local', 
-        name: user?.name || 'You', 
+        name: user?.name || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('intellmeet_guest_name') : null) || 'You', 
         isLocal: true, 
+        isHost: Boolean(isHost),
+        role: userRole || (isHost ? 'HOST' : 'PARTICIPANT'),
+        isCoHost: Boolean(isCoHost),
         isMuted: !isAudioOn, 
         isVideoOff: !isVideoOn, 
         hasVideo: isVideoOn, 
@@ -5960,10 +5991,17 @@ export default function MeetingRoom() {
         (sp.socketId && speakingParticipants[sp.socketId]?.isSpeaking)
       );
       const audioLevel = speakingParticipants[spId]?.audioLevel || 0;
+      const isThisParticipantHost = Boolean(
+        sp.isHost || 
+        sp.role === 'HOST' || 
+        (actualHostId && (String(sp.id) === actualHostId || String(sp.userId) === actualHostId))
+      );
 
       remoteMap.set(sp.id, {
         ...sp,
         isLocal: false,
+        isHost: isThisParticipantHost,
+        role: isThisParticipantHost ? 'HOST' : (sp.role || 'PARTICIPANT'),
         hasVideo: sp.hasVideo !== undefined ? sp.hasVideo : !sp.isVideoOff,
         isSpeaking: isSpeaking && !sp.isMuted,
         audioLevel: sp.isMuted ? 0 : audioLevel
@@ -5985,12 +6023,19 @@ export default function MeetingRoom() {
         (existing?.userId ? speakingParticipants[existing.userId]?.audioLevel : 0) || 0;
 
       const isMuted = existing?.isMuted || false;
+      const isThisPeerHost = Boolean(
+        existing?.isHost || 
+        p.isHost || 
+        (actualHostId && (String(finalId) === actualHostId || String(p.userId) === actualHostId || String(existing?.userId) === actualHostId))
+      );
 
       remoteMap.set(finalId, {
         ...(existing || {}),
         id: finalId,
         name: p.name || existing?.name || 'Participant',
         isLocal: false,
+        isHost: isThisPeerHost,
+        role: isThisPeerHost ? 'HOST' : (p.role || existing?.role || 'PARTICIPANT'),
         peer: p.peer,
         stream: p.stream || existing?.stream,
         isMuted,
@@ -6006,7 +6051,7 @@ export default function MeetingRoom() {
     });
 
     return [...list, ...Array.from(remoteMap.values())];
-  }, [sampleParticipants, peers, isAudioOn, isVideoOn, stream, user?.name, localIsSpeaking, localAudioLevel, speakingParticipants]);
+  }, [sampleParticipants, peers, isAudioOn, isVideoOn, stream, user?.name, localIsSpeaking, localAudioLevel, speakingParticipants, isHost, isCoHost, userRole, meetingInfo]);
   const participants = allParticipants;
 
   const filteredParticipants = allParticipants.filter(p => 
@@ -7222,8 +7267,8 @@ export default function MeetingRoom() {
                     </div>
                   ) : (
                     filteredParticipants.map(p => {
-                      const isLocalHost = p.isLocal;
-                      const isCoHost = coHosts.includes(p.id);
+                      const isParticipantTheHost = p.isLocal ? Boolean(isHost) : Boolean(p.isHost || p.role === 'HOST');
+                      const isCoHost = coHosts.includes(p.id) || p.isCoHost;
                       const isHandUp = raisedHands.includes(p.id);
 
                       return (
@@ -7236,7 +7281,7 @@ export default function MeetingRoom() {
                             <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${
                               hideProfilePics
                                 ? 'bg-[#333] text-gray-400'
-                                : isLocalHost ? 'bg-purple-700 shadow-sm' : isCoHost ? 'bg-blue-600 shadow-sm' : 'bg-gray-600'
+                                : isParticipantTheHost ? 'bg-amber-700 shadow-sm' : isCoHost ? 'bg-blue-600 shadow-sm' : 'bg-gray-600'
                             }`}>
                               {hideProfilePics ? (
                                 <User className="w-3.5 h-3.5 text-gray-400" />
@@ -7249,7 +7294,7 @@ export default function MeetingRoom() {
                               <div className="text-[12px] font-medium text-gray-200 flex items-center gap-1.5 flex-wrap">
                                 <span className="truncate max-w-[90px]">{p.name}</span>
                                 {p.isLocal && <span className="text-[10px] text-gray-400 shrink-0">(me)</span>}
-                                {isLocalHost ? (
+                                {isParticipantTheHost ? (
                                   <span className="flex items-center gap-0.5 text-[9px] text-amber-400 font-bold px-1 py-0.2 rounded bg-amber-950/50 border border-amber-600/30 shrink-0">
                                     <Crown className="w-2.5 h-2.5 fill-amber-400" />
                                     <span>Host</span>
