@@ -1,16 +1,52 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Video, Calendar, CheckSquare, FileText } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { useAuthStore } from '../../store/authStore';
+import { meetingService } from '../../services/meetingService';
 
 export default function QuickActions({ onOpenScheduleModal, onOpenTaskModal }) {
   const navigate = useNavigate();
+  const [isCreatingInstant, setIsCreatingInstant] = useState(false);
 
-  const handleInstantMeeting = () => {
-    const meetingId = 'instant-' + Date.now();
-    toast.success('Starting instant meeting room...');
-    navigate(`/meetings/${meetingId}/room`);
+  const handleInstantMeeting = async () => {
+    if (isCreatingInstant) return;
+    setIsCreatingInstant(true);
+    try {
+      const token = useAuthStore.getState().token;
+      const user = useAuthStore.getState().user;
+      const randomMeetingId = `${Math.floor(100 + Math.random() * 900)}-${Math.floor(100 + Math.random() * 900)}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      const payload = {
+        title: user?.name ? `${user.name}'s Meeting` : 'Instant Meeting',
+        topic: user?.name ? `${user.name}'s Meeting` : 'Instant Meeting',
+        meetingId: randomMeetingId,
+        date: 'Today',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        duration: '45 mins',
+        status: 'live'
+      };
+
+      let createdMtg = null;
+      if (token) {
+        try {
+          createdMtg = await meetingService.createMeeting(payload, token);
+        } catch (createErr) {
+          console.warn('Instant meeting persistence note:', createErr);
+        }
+      }
+
+      const targetId = (createdMtg?.meetingId || randomMeetingId).replace(/[\s-]/g, '');
+      toast.success('Starting instant meeting room...');
+      navigate(`/meetings/${targetId}/room`);
+    } catch (err) {
+      console.warn('Instant meeting error:', err);
+      const fallbackId = `${Math.floor(100 + Math.random() * 900)}${Math.floor(100 + Math.random() * 900)}${Math.floor(1000 + Math.random() * 9000)}`;
+      navigate(`/meetings/${fallbackId}/room`);
+    } finally {
+      setIsCreatingInstant(false);
+    }
   };
 
   const fileInputRef = React.useRef(null);

@@ -18,18 +18,13 @@ export const DEFAULT_ICE_SERVERS = [
   { urls: 'stun:stun3.l.google.com:19302' },
   { urls: 'stun:stun4.l.google.com:19302' },
   { urls: 'stun:global.stun.twilio.com:3478' },
+  { urls: 'stun:stun.services.mozilla.com' },
+  { urls: 'stun:stun.sipgate.net:3478' },
   {
-    urls: 'turn:openrelay.metered.ca:80',
-    username: 'openrelayproject',
-    credential: 'openrelayproject'
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443',
-    username: 'openrelayproject',
-    credential: 'openrelayproject'
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+    urls: [
+      'turn:openrelay.metered.ca:443?transport=tcp',
+      'turn:openrelay.metered.ca:80'
+    ],
     username: 'openrelayproject',
     credential: 'openrelayproject'
   }
@@ -187,7 +182,7 @@ export class WebRTCManager {
   /**
    * Create or retrieve a peer connection for a target socket
    */
-  getOrCreatePeer(targetSocketId, userId = '', userName = 'Participant', isHost = false, role = 'PARTICIPANT') {
+  getOrCreatePeer(targetSocketId, userId = '', userName = 'Participant', isHost = false, role = 'PARTICIPANT', isInitiator = false) {
     if (this.peers.has(targetSocketId)) {
       const existing = this.peers.get(targetSocketId);
       if (userName && userName !== 'Participant') existing.userName = userName;
@@ -219,6 +214,7 @@ export class WebRTCManager {
       ignoreOffer: false,
       isSettingRemoteAnswerPending: false,
       isPolite,
+      isInitiator,
       candidateQueue: []
     };
 
@@ -235,11 +231,16 @@ export class WebRTCManager {
       });
     }
 
-    // 1. Negotiation Needed Handler (W3C Perfect Negotiation)
+    // 1. Negotiation Needed Handler (W3C Perfect Negotiation with collision prevention)
     pc.onnegotiationneeded = async () => {
+      if (pc.signalingState !== 'stable' || peerEntry.isSettingRemoteAnswerPending) {
+        return;
+      }
       try {
         peerEntry.makingOffer = true;
-        await pc.setLocalDescription();
+        const offer = await pc.createOffer();
+        if (pc.signalingState !== 'stable') return;
+        await pc.setLocalDescription(offer);
         this.socket.emit('webrtc-offer', {
           to: targetSocketId,
           offer: pc.localDescription
@@ -264,11 +265,17 @@ export class WebRTCManager {
     // 3. Track Reception Handler
     pc.ontrack = (event) => {
       console.log(`[WebRTC] Received ${event.track.kind} track from ${targetSocketId} (${userName})`);
-      const incomingStream = (event.streams && event.streams[0]) ? event.streams[0] : null;
-      if (incomingStream) {
-        peerEntry.stream = incomingStream;
-      } else {
-        if (!peerEntry.stream) peerEntry.stream = new MediaStream();
+      if (!peerEntry.stream) {
+        peerEntry.stream = new MediaStream();
+      }
+
+      if (event.streams && event.streams[0]) {
+        event.streams[0].getTracks().forEach(t => {
+          if (!peerEntry.stream.getTracks().some(existing => existing.id === t.id)) {
+            peerEntry.stream.addTrack(t);
+          }
+        });
+      } else if (event.track) {
         if (!peerEntry.stream.getTracks().some(t => t.id === event.track.id)) {
           peerEntry.stream.addTrack(event.track);
         }
@@ -328,7 +335,29 @@ export class WebRTCManager {
    */
   connectToUser(targetSocketId, userId = '', userName = 'Participant', isHost = false, role = 'PARTICIPANT') {
     if (!targetSocketId || targetSocketId === this.socket?.id) return null;
-    return this.getOrCreatePeer(targetSocketId, userId, userName, isHost, role);
+    const peer = this.getOrCreatePeer(targetSocketId, userId, userName, isHost, role, true);
+    if (peer && peer.pc && peer.pc.signalingState === 'stable') {
+      setTimeout(async () => {
+        try {
+          if (peer.pc && peer.pc.signalingState === 'stable' && !peer.pc.remoteDescription) {
+            peer.makingOffer = true;
+            const offer = await peer.pc.createOffer();
+            if (peer.pc.signalingState === 'stable') {
+              await peer.pc.setLocalDescription(offer);
+              this.socket.emit('webrtc-offer', {
+                to: targetSocketId,
+                offer: peer.pc.localDescription
+              });
+            }
+          }
+        } catch (err) {
+          console.warn(`[WebRTC] Direct connect offer error to ${targetSocketId}:`, err);
+        } finally {
+          peer.makingOffer = false;
+        }
+      }, 50);
+    }
+    return peer;
   }
 
   /**
@@ -351,7 +380,7 @@ export class WebRTCManager {
     if (!from || !offer) return;
     if (this.isDestroyed) return;
 
-    const peer = this.getOrCreatePeer(from, userId, userName, isHost, role);
+    const peer = this.getOrCreatePeer(from, userId, userName, isHost, role, false);
     const pc = peer.pc;
 
     // Guard: ignore exact duplicate offer if already applied
@@ -370,6 +399,16 @@ export class WebRTCManager {
 
     try {
       peer.isSettingRemoteAnswerPending = (offer.type === 'answer');
+
+      // W3C Perfect Negotiation: Rollback local offer if collision occurs on polite peer
+      if (offerCollision && peer.isPolite && pc.signalingState !== 'stable') {
+        try {
+          await pc.setLocalDescription({ type: 'rollback' });
+        } catch (rbErr) {
+          console.warn('[WebRTC] Rollback error:', rbErr);
+        }
+      }
+
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
       peer.isSettingRemoteAnswerPending = false;
 
@@ -395,7 +434,8 @@ export class WebRTCManager {
           });
         }
 
-        await pc.setLocalDescription();
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
         this.socket.emit('webrtc-answer', {
           to: from,
           answer: pc.localDescription

@@ -71,6 +71,21 @@ function RemoteParticipantTile({ participant, hasCamOn }) {
     }
   }, [remoteStream, streamRevision]);
 
+  // Proactive mobile/browser audio unlock on first user gesture
+  useEffect(() => {
+    const unlockAudio = () => {
+      if (audioRef.current && audioRef.current.srcObject) {
+        audioRef.current.play().then(() => setAutoplayBlocked(false)).catch(() => {});
+      }
+    };
+    window.addEventListener('click', unlockAudio, { passive: true });
+    window.addEventListener('touchstart', unlockAudio, { passive: true });
+    return () => {
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+    };
+  }, []);
+
   // One-time interaction listener to unlock audio if blocked by browser policy
   useEffect(() => {
     if (!autoplayBlocked) return;
@@ -651,7 +666,14 @@ export default function VideoLayoutEngine({
         <div className={`absolute bottom-2.5 left-2.5 bg-black/70 px-2.5 py-1 rounded-md text-white text-xs font-medium backdrop-blur-sm flex items-center gap-2 z-20 border transition-all duration-200 ${
           isSpeaking ? 'border-emerald-500/60 shadow-[0_0_10px_rgba(16,185,129,0.4)]' : 'border-transparent'
         }`}>
-          <span>{p.name} {isLocal && '(Me)'}</span>
+          <span className="flex items-center gap-1.5">
+            <span className="truncate max-w-[120px]">{p.name} {isLocal && '(Me)'}</span>
+            {p.isHost && (
+              <span className="text-[9px] text-amber-400 font-bold px-1.5 py-0.2 rounded bg-amber-950/70 border border-amber-500/40 shrink-0">
+                Host
+              </span>
+            )}
+          </span>
           {p.isMuted ? (
             <MicOff className="w-3.5 h-3.5 text-red-500" />
           ) : (

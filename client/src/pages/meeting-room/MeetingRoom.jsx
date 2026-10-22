@@ -157,9 +157,8 @@ export default function MeetingRoom() {
             currentUserId && hostId && String(currentUserId) === String(hostId)
           );
           setIsHost(isUserHost);
-          if (isUserHost) {
-            setUserRole('HOST');
-          }
+          setUserRole(isUserHost ? 'HOST' : 'PARTICIPANT');
+          if (meeting.title) setMeetingTitle(meeting.title);
         }
 
         if (roleResult.status === 'fulfilled' && roleResult.value?.success) {
@@ -774,7 +773,7 @@ export default function MeetingRoom() {
   const speakingTimeoutRef = useRef(null);
   const lastBroadcastTimeRef = useRef(0);
 
-  const [meetingTitle, setMeetingTitle] = useState(user?.name ? `${user.name}'s IntellMeet` : 'IntellMeet Meeting');
+  const [meetingTitle, setMeetingTitle] = useState('IntellMeet Meeting');
 
   // Part 38: Device & Network Adaptation States (38.1 - 38.20)
   const [showNetworkHealthModal, setShowNetworkHealthModal] = useState(false);
@@ -5968,7 +5967,7 @@ export default function MeetingRoom() {
         id: 'local', 
         name: user?.name || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('intellmeet_guest_name') : null) || 'You', 
         isLocal: true, 
-        isHost: Boolean(isHost),
+        isHost: Boolean(isHost && (actualHostId ? (String(user?.id || user?._id) === actualHostId) : true)),
         role: userRole || (isHost ? 'HOST' : 'PARTICIPANT'),
         isCoHost: Boolean(isCoHost),
         isMuted: !isAudioOn, 
@@ -5992,9 +5991,8 @@ export default function MeetingRoom() {
       );
       const audioLevel = speakingParticipants[spId]?.audioLevel || 0;
       const isThisParticipantHost = Boolean(
-        sp.isHost || 
-        sp.role === 'HOST' || 
-        (actualHostId && (String(sp.id) === actualHostId || String(sp.userId) === actualHostId))
+        (actualHostId && (String(sp.id) === actualHostId || String(sp.userId) === actualHostId)) ||
+        (!actualHostId && (sp.isHost || sp.role === 'HOST'))
       );
 
       remoteMap.set(sp.id, {
@@ -6024,9 +6022,8 @@ export default function MeetingRoom() {
 
       const isMuted = existing?.isMuted || false;
       const isThisPeerHost = Boolean(
-        existing?.isHost || 
-        p.isHost || 
-        (actualHostId && (String(finalId) === actualHostId || String(p.userId) === actualHostId || String(existing?.userId) === actualHostId))
+        (actualHostId && (String(finalId) === actualHostId || String(p.userId) === actualHostId || String(existing?.userId) === actualHostId)) ||
+        (!actualHostId && (existing?.isHost || p.isHost || p.role === 'HOST'))
       );
 
       remoteMap.set(finalId, {
@@ -9992,7 +9989,7 @@ export default function MeetingRoom() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Host:</span>
-                  <span className="text-white">{user?.name || 'Meeting Host'}</span>
+                  <span className="text-white">{meetingInfo?.hostName || meetingInfo?.host?.name || 'Meeting Host'}</span>
                 </div>
               </div>
             </div>
@@ -10106,11 +10103,11 @@ export default function MeetingRoom() {
             socketRef.current.emit('whiteboard-open', meetingId, {
               whiteboard: board,
               whiteboardId: board.whiteboardId,
-              user: { id: user?.id || user?._id || 'local', name: user?.name || 'Host' }
+              user: { id: user?.id || user?._id || 'local', name: user?.name || 'Participant' }
             });
           }
         }}
-        currentUser={{ id: user?.id || user?._id || 'local', name: user?.name || 'Host' }}
+        currentUser={{ id: user?.id || user?._id || 'local', name: user?.name || 'Participant' }}
         meetingId={meetingId}
         isHost={user?.id === 'host' || isHost}
       />
@@ -10121,7 +10118,7 @@ export default function MeetingRoom() {
           <WhiteboardStudio
             whiteboardId={activeWhiteboard.whiteboardId}
             initialWhiteboard={activeWhiteboard}
-            currentUser={{ id: user?.id || user?._id || 'local', name: user?.name || 'Host' }}
+            currentUser={{ id: user?.id || user?._id || 'local', name: user?.name || 'Participant' }}
             socket={socketRef.current}
             roomId={meetingId}
             onClose={() => {
@@ -10159,7 +10156,7 @@ export default function MeetingRoom() {
         onClose={() => setShowBreakoutHostModal(false)}
         meetingId={meetingId}
         currentParticipants={allParticipants}
-        currentUser={{ id: user?.id || user?._id || 'local', name: user?.name || 'Host' }}
+        currentUser={{ id: user?.id || user?._id || 'local', name: user?.name || 'Participant' }}
         socket={socketRef.current}
         onJoinBreakoutRoom={(room) => {
           setCurrentBreakoutRoom(room);

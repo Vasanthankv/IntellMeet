@@ -67,7 +67,9 @@ export async function getMeetingUserRole(meetingId, userId, socketId = null) {
   const isHost = Boolean(
     normalizedUserId && 
     meetingHostId && 
-    (meetingHostId === normalizedUserId || normalizedUserId === 'host')
+    normalizedUserId !== 'guest' &&
+    !normalizedUserId.startsWith('guest_') &&
+    meetingHostId === normalizedUserId
   );
 
   if (isHost) {

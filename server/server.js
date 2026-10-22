@@ -129,7 +129,9 @@ export const getProductionIceServers = () => {
       { urls: 'stun:stun2.l.google.com:19302' },
       { urls: 'stun:stun3.l.google.com:19302' },
       { urls: 'stun:stun4.l.google.com:19302' },
-      { urls: 'stun:global.stun.twilio.com:3478' }
+      { urls: 'stun:global.stun.twilio.com:3478' },
+      { urls: 'stun:stun.services.mozilla.com' },
+      { urls: 'stun:stun.sipgate.net:3478' }
     );
   }
 
@@ -141,24 +143,14 @@ export const getProductionIceServers = () => {
     if (process.env.TURN_CREDENTIAL) entry.credential = process.env.TURN_CREDENTIAL;
     iceServers.push(entry);
   } else {
-    // OpenRelay reliable TURN fallback (UDP and TCP/443 for restrictive firewalls)
-    iceServers.push(
-      {
-        urls: 'turn:openrelay.metered.ca:80',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      }
-    );
+    iceServers.push({
+      urls: [
+        'turn:openrelay.metered.ca:443?transport=tcp',
+        'turn:openrelay.metered.ca:80'
+      ],
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    });
   }
 
   return iceServers;
@@ -314,7 +306,9 @@ io.on('connection', (socket) => {
       role: authResult.role,
       isHost: authResult.isHost,
       isCoHost: authResult.isCoHost,
-      permissions: authResult.permissions
+      permissions: authResult.permissions,
+      hostName: authResult.meeting?.hostName || authResult.meeting?.host?.name || 'Meeting Host',
+      hostId: authResult.meeting?.host?._id ? String(authResult.meeting.host._id) : (authResult.meeting?.host ? String(authResult.meeting.host) : null)
     });
 
     console.log(`User ${socket.userName} (${socket.userId}) joined room ${roomId} as [${authResult.role}]`);
